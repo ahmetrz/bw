@@ -119,9 +119,38 @@ account is not activated, or its free-plan bookmaker selection has not been made
 the value was truncated when it was stored. The key was **not** tried against any other
 vendor — sending a credential to a service it may not belong to would leak it.
 
-Worth noting regardless of the outcome: the-odds-api.com's published bookmaker list
-does **not** include Betwinner (it carries 1xBet under key `onexbet`), so if the key
-turns out to be theirs, it does not solve the Betwinner problem either.
+## The key is a the-odds-api.com key — valid, but no Betwinner
+
+Tested with the operator's go-ahead, since ownership was unclear. `/v4/sports` is a
+sound canary there: it answers `401 INVALID_KEY` for a fabricated key.
+
+- `GET /v4/sports?apiKey=…` → **200**. The key is valid on **the-odds-api.com**.
+  `x-requests-used: 30`.
+- `GET /v4/sports/soccer_argentina_primera_division/odds?apiKey=…&regions=eu&markets=h2h`
+  → 200, 24 events.
+
+Bookmakers this key actually returns (not a catalogue — the books present in the
+response):
+
+```
+winamax_de 24 · winamax_fr 24 · betclic_fr 23 · onexbet 22 · codere_it 22
+marathonbet 22 · unibet_fr 21 · betsson 20 · nordicbet 20 · betfair_ex_eu 19
+leovegas_se 15 · unibet_se 15 · betonlineag 12 · pinnacle 11 · everygame 6
+betanysports 6
+```
+
+**Betwinner: absent.** The only 1xBet-family member is `onexbet` (1xBet itself).
+So this key does not solve Betwinner either.
+
+### But it does carry Pinnacle — which changes what this project could be
+`pinnacle` appears in 11 of 24 events. CLAUDE.md's whole design rests on "there is
+**no reference book**", which forces the within-book-margin scoring and the explicit
+refusal to make a value claim. That constraint came from having only one book. With
+Pinnacle available as a sharp reference, genuine value detection — comparing a soft
+book's price against a de-vigged sharp line — becomes possible for the first time.
+
+This is a product decision, not a code change to make unilaterally. Flagged for the
+operator; nothing in the scanner has been altered on the strength of it.
 
 ## Open questions for OddsPapi
 
