@@ -89,6 +89,40 @@ Recorded for schema work only — this is **not** Betwinner data.
 - `marketActive`: True on 3234/3234; outcome `active`: False on only 47/7233
 - `changedAt`: present on every selection
 
+## Second provider: odds-api.io — key does not authenticate
+
+Tried as an alternative source, since odds-api.io lists BetWinner among its
+sportsbooks and has a free tier.
+
+- Secret resolved: **`ODDS_API_KEY`** (32 characters). Value never logged.
+- `/v3/events?apiKey=…&sport=football` → **401** `{"error":"You need to provide a
+  valid apiKey"}`.
+- Six request variants all returned that same 401, so the request shape is not the
+  problem: `api2.odds-api.io` host, `x-api-key` header, `Authorization: Bearer`,
+  `api_key=`, `key=`, and a request carrying `league`.
+
+### `/v3/sports` and `/v3/bookmakers` are OPEN endpoints — do not use them as proof
+Both return **200 for a completely fabricated API key** (tested directly). The first
+version of the probe treated a 200 from `/v3/sports` as "auth verified" and reported
+success; that was a **false positive**, now corrected — the auth canary is `/v3/events`,
+which actually validates.
+
+This matters beyond the probe: `"BetWinner", "active": true` in the `/v3/bookmakers`
+response is the provider's **public catalogue**, not a statement about what this key
+may fetch. It is the same trap as OddsPapi's "valid bookmakers" list — a name in a
+listing is not coverage. Nothing about odds-api.io's Betwinner data has been verified,
+because no authenticated call has succeeded.
+
+Candidate explanations, none confirmed: the key belongs to a different vendor (32-char
+hex is the house style of the-odds-api.com, a *different* company); the odds-api.io
+account is not activated, or its free-plan bookmaker selection has not been made; or
+the value was truncated when it was stored. The key was **not** tried against any other
+vendor — sending a credential to a service it may not belong to would leak it.
+
+Worth noting regardless of the outcome: the-odds-api.com's published bookmaker list
+does **not** include Betwinner (it carries 1xBet under key `onexbet`), so if the key
+turns out to be theirs, it does not solve the Betwinner problem either.
+
 ## Open questions for OddsPapi
 
 1. `betwinner` is listed among the valid bookmakers but returns 22bet's feed
