@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import bwfeed, ladder, score, settlement  # noqa: E402
+from engine import bwfeed, ladder, pick, score, settlement, telegram  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
@@ -278,6 +278,87 @@ class TestRegression(unittest.TestCase):
         rows = bwfeed.normalize(data + [outright, blank])
         self.assertEqual(len(rows), base, "an entry without an opponent reached the rows")
         self.assertFalse([r for r in rows if r["fixture_id"] in (-999, -998)])
+
+    def test_picks_clear_both_gates(self):
+        """Every offered selection must clear the odds gate AND the model's confidence floor.
+
+        Synthetic probabilities, so this never touches the network. The model is told the
+        home side is strong, which is the only thing allowed to set the direction — the
+        prices are not consulted for that and must not be.
+        """
+        probs = {
+            "p_home": 0.62, "p_draw": 0.23, "p_away": 0.15,
+            "p_over": {0.5: 0.95, 1.5: 0.78, 2.5: 0.52, 3.5: 0.28, 4.5: 0.13, 5.5: 0.05},
+            "gd": {-3: 0.02, -2: 0.05, -1: 0.08, 0: 0.23, 1: 0.30, 2: 0.20, 3: 0.12},
+            "score_mass": 1.0,
+        }
+        rows = [r for r in bwfeed.normalize(_sample()) if not r.get("sub_game")]
+        by_match = collections.defaultdict(list)
+        for r in rows:
+            by_match[r.get("match_id", r["fixture_id"])].append(r)
+
+        checked = 0
+        for match_rows in by_match.values():
+            got = pick.best(match_rows, 1, probs)
+            if not got:
+                continue
+            checked += 1
+            self.assertGreaterEqual(got["odds"], config.MIN_ODDS,
+                                    f"{got['ladder_rung']} priced below the gate")
+            self.assertGreaterEqual(got["model_survival"], config.MIN_MODEL_SURVIVAL,
+                                    f"{got['ladder_rung']} below the confidence floor")
+        self.assertGreater(checked, 3, "not enough matches produced a pick to test")
+
+    def test_pick_takes_the_safest_qualifying_rung(self):
+        """The ladder must not be short-circuited by a better price further up.
+
+        This is the operator's rule in its sharpest form: given two rungs that both clear
+        the gates, the SAFER one wins even though it pays less. A selector that maximised
+        odds — or that read a short price as a high probability — would invert this.
+        """
+        probs = {
+            "p_home": 0.55, "p_draw": 0.25, "p_away": 0.20,
+            "p_over": {0.5: 0.94, 1.5: 0.75, 2.5: 0.48, 3.5: 0.25, 4.5: 0.11, 5.5: 0.04},
+            "gd": {-3: 0.03, -2: 0.06, -1: 0.11, 0: 0.25, 1: 0.28, 2: 0.17, 3: 0.10},
+            "score_mass": 1.0,
+        }
+        rows = [r for r in bwfeed.normalize(_sample()) if not r.get("sub_game")]
+        by_match = collections.defaultdict(list)
+        for r in rows:
+            by_match[r.get("match_id", r["fixture_id"])].append(r)
+
+        compared = 0
+        for match_rows in by_match.values():
+            for direction in ("home", "away"):
+                rungs = ladder.build(match_rows, 1, direction)
+                qualifying = [
+                    x for x in rungs
+                    if x["row"]["odds"] >= config.MIN_ODDS
+                    and (pick._survival(x["row"], probs) or 0) >= config.MIN_MODEL_SURVIVAL
+                ]
+                if len(qualifying) < 2:
+                    continue
+                chosen = max(qualifying, key=lambda x: x["rank"])
+                cands = pick.candidates(match_rows, 1, probs)
+                mine = [c for c in cands if c.get("direction") == direction]
+                if not mine:
+                    continue
+                compared += 1
+                self.assertEqual(
+                    mine[0]["ladder_rung"], chosen["label"],
+                    "picked a rung that is not the safest qualifying one")
+        self.assertGreater(compared, 0, "no match offered two qualifying rungs to compare")
+
+    def test_telegram_chunks_stay_under_the_limit(self):
+        """Telegram rejects anything over 4096 characters, and a rejected send is a
+        silently missing report."""
+        text = "\n".join(f"satır {i} — bir seçim daha" for i in range(2000))
+        parts = telegram.chunks(text)
+        self.assertTrue(parts)
+        for p in parts:
+            self.assertLessEqual(len(p), telegram.MAX_LEN)
+        # Nothing may be dropped on the way through.
+        self.assertEqual(sum(len(p) for p in parts) + len(parts) - 1, len(text))
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must

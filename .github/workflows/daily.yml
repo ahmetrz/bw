@@ -1,0 +1,97 @@
+name: daily
+
+# Gunluk analiz: onumuzdeki 24 ve 48 saat icinde baslayan mac-oncesi bahisler,
+# model yonu + guvenlik merdiveni + 1.10 esigi, sonuc Telegram'a.
+#
+# Cadence operator tarafindan onaylandi (CLAUDE.md HITL 5): gunde 1 kez.
+# 06:10 UTC = Turkiye saatiyle 09:10. Aksam kartinin tamami acik olur ve
+# 24 saatlik pencere gunun maclarini kapsar.
+#
+# GEREKEN SECRET'LAR (yoksa tarama yine calisir, sadece bildirim atlanir):
+#   TELEGRAM_BOT_TOKEN   @BotFather'dan alinan token
+#   TELEGRAM_CHAT_ID     mesajin gidecegi sohbet id'si
+
+on:
+  schedule:
+    - cron: "10 6 * * *"
+  workflow_dispatch:
+    inputs:
+      windows:
+        description: "Pencereler (saat, virgullu)"
+        required: false
+        default: "24,48"
+      max_fixtures:
+        description: "Mac ust siniri (0 = sinirsiz)"
+        required: false
+        default: "0"
+      dry_run:
+        description: "true = Telegram'a gonderme, sadece yazdir"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      # 48 saatlik pencereyi bir kez cekiyoruz; 24 saatlik pencere onun alt kumesi,
+      # ikinci bir cekim gereksiz yuk olur.
+      - name: Fetch 48h window
+        env:
+          MF: ${{ inputs.max_fixtures || '0' }}
+        run: |
+          set -o pipefail
+          mkdir -p data
+          python3 tools/fetch_window.py \
+            --hours 48 \
+            --partner 159 \
+            --max-fixtures "${MF}" \
+            --workers 6 \
+            --budget-min 120 \
+            --out data/betwinner_daily.json.gz
+          ls -la data/
+
+      - name: Analyse and notify
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          W: ${{ inputs.windows || '24,48' }}
+          DRY: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -o pipefail
+          FLAG=""
+          if [ "${DRY}" = "true" ]; then FLAG="--no-telegram"; fi
+          python3 tools/daily_report.py \
+            --input data/betwinner_daily.json.gz \
+            --windows "${W}" \
+            --out daily_report.json \
+            ${FLAG}
+
+      - name: Build mobile coupon
+        run: |
+          python3 tools/make_coupon.py \
+            --input data/betwinner_daily.json.gz \
+            --hours 48 \
+            --legs 50 \
+            --out coupon.html || echo "kupon uretilemedi"
+
+      - name: Commit
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Ham cekim repoya girmiyor; sadece rapor ve kupon versiyonlaniyor.
+          git add daily_report.json coupon.html || true
+          git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
+          git pull --rebase origin main || true
+          git push || echo "push atlandi"

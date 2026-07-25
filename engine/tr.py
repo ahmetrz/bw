@@ -148,6 +148,42 @@ def settlement(spec):
     return SETTLEMENT.get(sport_general) or spec.get("detail", "")
 
 
+def pick(row):
+    """The chosen selection in plain Turkish, naming the team and saying what has to happen.
+
+    The raw label says "away +2.5"; the reader needs "Floriana en fazla 2 farkla
+    kaybedebilir". Built from the ladder's own rung and direction rather than re-parsing
+    the token, so it cannot drift away from what was actually selected.
+    """
+    rung = row.get("ladder_rung")
+    direction = row.get("direction")
+    if not rung:
+        return selection(row.get("selection"))
+
+    team = row.get("p1") if direction == "home" else row.get("p2")
+    body = rung.split(" ", 1)[1] if " " in rung else rung   # strip the "home "/"away " prefix
+
+    if body.startswith("does not lose"):
+        return f"{team} kaybetmez (beraberlik de kazandırır)"
+    if body.startswith("wins"):
+        return f"{team} kazanır"
+    if body.startswith("+") and "sets" in body:
+        return f"{team} {body.split()[0]} set handikap"
+    if body.startswith("+"):
+        try:
+            n = float(body.split()[0].lstrip("+"))
+        except ValueError:
+            return f"{team} {body}"
+        frac = n % 1
+        if abs(frac - 0.5) < 1e-9:
+            return f"{team} +{n:g} handikap (en fazla {int(n)} farkla kaybedebilir)"
+        if frac == 0:
+            return f"{team} +{n:g} handikap ({n:g} farkla kaybederse iade)"
+        return f"{team} +{n:g} handikap (yarısı bir alt baremde)"
+    # Totals carry no team; the raw form already reads correctly once localized.
+    return selection(row.get("selection"))
+
+
 def ladder_note(row):
     """One line explaining why this selection, not the more obvious one.
 

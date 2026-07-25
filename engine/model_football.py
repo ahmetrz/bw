@@ -74,13 +74,64 @@ def _probs(row):
                 continue
         totals[line] = over
 
+    # The full goal-difference distribution, keyed by margin from the home side's view.
+    # This is what lets a handicap rung be priced rather than guessed: "home +1.5" wins
+    # exactly when the margin is -1 or better, and the model already publishes that mass.
+    # The tails are folded onto +-6 because ClubElo bins everything past 5 into GD>5 and
+    # GD<-5; no handicap line we ladder to reaches that far, so the fold is harmless.
+    gd = {}
+    for k in gd_keys:
+        if k.startswith("GD="):
+            gd[_gd(k)] = gd.get(_gd(k), 0.0) + f(k)
+    if f("GD>5"):
+        gd[6] = gd.get(6, 0.0) + f("GD>5")
+    if f("GD<-5"):
+        gd[-6] = gd.get(-6, 0.0) + f("GD<-5")
+
     return {
         "p_home": p_home, "p_draw": p_draw, "p_away": p_away,
         "p_over": totals,
+        "gd": gd,
         # The score matrix is truncated at 6-6, so it does not sum to exactly 1. Carry
         # the mass so callers can decide whether the row is complete enough to trust.
         "score_mass": sum(f(k) for k in score_keys),
     }
+
+
+def handicap_probs(gd, line, side):
+    """(win, push) probability for a handicap at `line` from `side`'s point of view.
+
+    `line` is that side's own handicap: +1.5 means they may lose by one and still win the
+    bet. Whole-number lines can PUSH — "+1" refunds on an exact one-goal defeat — and a
+    push matters here rather than being a rounding detail: on a coupon a pushed leg is
+    returned at 1.00 instead of killing the slip, so it belongs in the safety measure and
+    not in the win probability.
+
+    Quarter lines (+0.25, +0.75) are two half-stake bets a quarter either side, so they
+    are priced as such: half the stake can push while the other half wins or loses.
+    """
+    if not gd:
+        return 0.0, 0.0
+    total = sum(gd.values()) or 1.0
+
+    def one(ln):
+        win = push = 0.0
+        for margin, p in gd.items():
+            # Margin is from the home side; flip it when pricing the away side's line.
+            m = margin if side == "home" else -margin
+            adj = m + ln
+            if adj > 0:
+                win += p
+            elif adj == 0:
+                push += p
+        return win / total, push / total
+
+    frac = abs(line) % 1
+    if abs(frac - 0.25) < 1e-9 or abs(frac - 0.75) < 1e-9:
+        w1, p1 = one(line - 0.25)
+        w2, p2 = one(line + 0.25)
+        return (w1 + w2) / 2.0, (p1 + p2) / 2.0
+    return one(line)
 
 
 def _gd(key):
@@ -122,6 +173,62 @@ def lookup(index, home, away, cutoff=0.82):
                  + difflib.SequenceMatcher(None, a, am[0]).ratio()) / 2
         return index[(hm[0], am[0])], score
     return None, 0.0
+
+
+def rung_probs(row, probs):
+    """(win, push) probability for one selection, or None where the model cannot reach it.
+
+    Covers every market the safety ladder can select: the 1X2, double chance, both
+    handicap families and the match total. Push is reported separately because a pushed
+    leg is refunded rather than lost, which is the difference between a coupon surviving
+    and dying, and no other market in the ladder has that property.
+    """
+    try:
+        group = int(str(row["market_key"][1]).split("|", 1)[0])
+        line_txt = str(row["market_key"][1]).split("|", 1)[1]
+    except (KeyError, ValueError, TypeError, IndexError):
+        return None
+    oid = row.get("outcome_id")
+    gd = probs.get("gd") or {}
+
+    if group == 1:
+        return ({1: (probs["p_home"], 0.0),
+                 2: (probs["p_draw"], 0.0),
+                 3: (probs["p_away"], 0.0)}).get(oid)
+
+    if group == 8:   # double chance
+        return ({4: (probs["p_home"] + probs["p_draw"], 0.0),
+                 5: (probs["p_home"] + probs["p_away"], 0.0),
+                 6: (probs["p_draw"] + probs["p_away"], 0.0)}).get(oid)
+
+    if group in (2, 2854):
+        side = "home" if oid in (7, 3829) else ("away" if oid in (8, 3830) else None)
+        if side is None:
+            return None
+        try:
+            stored = float(line_txt)
+        except (TypeError, ValueError):
+            return None
+        # market_key holds the line as the HOME side sees it; the away side's own
+        # handicap is its negation.
+        own = stored if side == "home" else -stored
+        return handicap_probs(gd, own, side)
+
+    if group == 17:
+        try:
+            ln = float(line_txt)
+        except (TypeError, ValueError):
+            return None
+        if ln not in probs["p_over"]:
+            return None
+        over = probs["p_over"][ln]
+        if oid == 9:
+            return (over, 0.0)
+        if oid == 10:
+            return (max(0.0, probs["score_mass"] - over), 0.0)
+        return None
+
+    return None
 
 
 # Betwinner market/outcome ids -> which model probability answers them.

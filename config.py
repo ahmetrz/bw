@@ -105,6 +105,34 @@ MAX_PER_FIXTURE = 4
 # so it must never be used to pick a side.
 MIN_ODDS = 1.10
 
+# The model must be THIS sure the leg survives before a selection is offered. Without a
+# floor the ladder happily returns the safest available form of a coin flip, which is
+# still a coin flip — it would just look conservative.
+#
+# Measured on survival, not on winning: a pushed leg is refunded at 1.00 rather than
+# killing the coupon, so a whole-number handicap that refunds on an exact one-goal defeat
+# really is safer than its win probability alone suggests, and finding that difference is
+# the entire point of a safety ladder.
+MIN_MODEL_SURVIVAL = 0.75
+
+# --- Daily run --------------------------------------------------------------
+# Windows reported each day. Both are pre-match only.
+DAILY_WINDOWS_HOURS = (24, 48)
+
+# Sports whose head-to-head events routinely span MORE THAN ONE DAY, excluded because the
+# daily slip is meant to settle the same day. The feed does not publish the match format,
+# so there is no way to tell a five-day Test from a three-hour T20, or a classical world
+# championship match from a blitz game — the whole sport goes rather than risk a leg that
+# sits unresolved for a week.
+#
+# Most multi-day competitions never reach this check: golf tournaments, cycling GC,
+# sailing series and surfing events are all OUTRIGHTS with no named opponent, and those
+# are already dropped structurally in engine/bwfeed.py.
+MULTI_DAY_SPORTS = {
+    66,   # Cricket — a Test runs five days; the feed does not distinguish format.
+    11,   # Chess — classical matches run over days or weeks.
+}
+
 # --- Output -----------------------------------------------------------------
 TOP_N = 50
 REPORT_PATH = "report.json"

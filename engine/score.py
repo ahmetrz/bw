@@ -27,6 +27,16 @@ def _overrounds(rows):
     return out
 
 
+def overrounds(rows):
+    """Per-market hold for a set of rows, keyed by market_key.
+
+    Public because the ladder path needs it: selections there are chosen from UNFILTERED
+    rows (every plus-handicap and every non-headline total is an alt line), so they never
+    pass through filter_and_score and would otherwise carry no hold at all.
+    """
+    return _overrounds(rows)
+
+
 def _staleness_seconds(rows):
     """Relative to the freshest line in the pull, so saved fixtures still filter."""
     times = [r["changed_at"] for r in rows if r["changed_at"]]
