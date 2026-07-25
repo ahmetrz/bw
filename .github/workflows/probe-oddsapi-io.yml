@@ -28,6 +28,13 @@ on:
         description: "Test edilecek bookmaker adi"
         required: false
         default: "Betwinner"
+  # workflow_dispatch yalnizca varsayilan dalda kayitli workflow'lar icin calisir; bu
+  # dosya henuz main'de olmadigindan dispatch 404 veriyor. Bu dalda dosyanin kendisine
+  # yapilan push ile tetiklenir. paths filtresi dar tutuldu: is adimi data/ altina
+  # commit ettigi icin genis bir filtre tetikleme dongusu yaratirdi.
+  push:
+    branches: [claude/betwinner-scanner-data-flow-60bitm]
+    paths: ['.github/workflows/probe-oddsapi-io.yml']
 
 permissions:
   contents: write
