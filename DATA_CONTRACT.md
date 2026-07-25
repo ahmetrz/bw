@@ -1,46 +1,82 @@
 # DATA_CONTRACT.md — OddsPapi v4
 
-Reverse-engineered from real pulls (Pinnacle + 22bet). Betwinner uses the same
-aggregator, so the same normalized schema applies — but Betwinner's coverage and its
-per-field behaviour (especially `limit`) are UNCONFIRMED until the probe runs.
+Reverse-engineered from real pulls (Pinnacle + 22bet), then corrected against the
+live coverage probe of 2026-07-25.
+
+> **Coverage gate: FAILED.** Betwinner is not served on this key — requesting it
+> returns 22bet's feed. Nothing below has been observed on actual Betwinner data.
+> See **PROBE_FINDINGS.md** for the evidence and the open vendor questions.
 
 ## Endpoint & auth
 - Host: `https://api.oddspapi.io`
 - Auth: API key as a **query parameter** `?apiKey=...` (no header).
 - Leagues: `GET /v4/tournaments?sportId=10&apiKey=...`   (sportId 10 = football)
 - Odds:   `GET /v4/odds-by-tournaments?bookmaker={slug}&tournamentIds={csv}&apiKey=...`
-- `bookmaker` is **required and single**. Missing/multiple/unknown slug → `400`.
-  The API does **not** silently fall back — a book you "see" without requesting it is
-  a stale browser tab, not the API. (This is why every design-phase Betwinner pull was
-  actually cached 22bet.)
+- `bookmaker` is **required and single**. Three distinct responses, confirmed live
+  on 2026-07-25 (see PROBE_FINDINGS.md):
+  - **unknown slug** → `INVALID_PARAMETER`, and the error body helpfully lists all
+    461 valid bookmakers.
+  - **valid slug, no coverage for these tournaments** → `404 FIXTURE_NOT_FOUND`
+    (`pinnacle` and `bet365` on tournament 34480).
+  - **valid slug with coverage** → `200` + odds keyed by the book's slug.
+- ⚠️ **`betwinner` is the exception and it is a trap.** It validates as a real slug
+  and returns `200`, but the payload is keyed `22bet` and every `fixturePath` points
+  at **22bet.com** (48/48 fixtures). Requesting `1xbet` returns 1xbet.com paths, so
+  the API does label books correctly in general — betwinner specifically delivers
+  another book's feed.
+- The earlier claim here that "the API does not silently fall back — a book you see
+  without requesting it is a stale browser tab" was **wrong**. The probe ran
+  server-side on a GitHub Actions runner with no browser in the loop. The
+  design-phase confusion was never a caching problem.
 
 ## Response shape
 Top level: array of fixtures.
 ```
 fixture.fixtureId, participant1Id, participant2Id, sportId, tournamentId,
         startTime (UTC), updatedAt, hasOdds
-fixture.bookmakerOdds.{slug}.markets.{marketId}
-        .bookmakerMarketId      # string; encodes market TYPE (parse THIS, not marketId)
+fixture.bookmakerOdds.{slug}
+        .bookmakerFixtureId     # aggregator-level id — IDENTICAL across books
+        .fixturePath            # deep link, e.g. https://22bet.com/line/353890790
+                                #   ← the domain here is the only reliable per-book
+                                #     identity signal; the {slug} key can lie
+        .bookmakerIsActive, .suspended
+        .markets.{marketId}
+        .bookmakerMarketId      # INTEGER, opaque. NOT a market-type string. See below.
         .marketActive           # bool
         .outcomes.{outcomeId}.players.0
               .price             # DECIMAL odds  ← use this
               .priceAmerican, .priceFractional
               .active            # bool
-              .bookmakerOutcomeId# label: "home"/"draw"/"away", "-1.0/home", "2.75/over"
-              .mainLine          # bool — main line vs alternative
+              .bookmakerOutcomeId# INTEGER-as-string, opaque. NOT a readable label.
+              .mainLine          # bool — main line vs alternative (RELIABLE)
               .limit             # max stake (present for Pinnacle; NULL for 22bet)
               .changedAt         # ISO ts ← staleness source
+              .bookmakerChangedAt, .playerName, .betslip, .exchangeMeta
 ```
 
-## Market type — from `bookmakerMarketId`
-`marketId` (numeric) is not semantic; parse the string. It contains one of
-`moneyline` / `spreads` / `totals` / `teamTotal`, with prefix `line/` (main) or
-`altLine/` (alternative).
-- **moneyline** → 1X2. Labels `home` / `draw` / `away`.
-- **spreads**   → handicap. Labels `-1.0/home`, `0.25/away`, …
-- **totals**    → over/under. Labels `2.75/over`, `3.0/under`, …
-- **teamTotal** → per-team O/U. Labels `home/1.5/over`, `away/0.5/under`, …
-- `mainLine=true` = primary line; else alternative.
+## Market type — UNRESOLVED, and `engine/parser.py` is built on the wrong shape
+This section previously described `bookmakerMarketId` as a string encoding the market
+type (`line/moneyline`, `altLine/totals`) and `bookmakerOutcomeId` as a readable label
+(`home`, `-1.0/home`, `2.75/over`). **The real payload has neither.** Measured across
+the full tournament-34480 pull:
+```
+bookmakerMarketId  : 30 distinct values — 17, 2854, 99, 2, 27, 15, 62 …  all INTEGERS
+bookmakerOutcomeId : 73 distinct values — '10', '9', '3830', '7', '425' … all INTEGERS
+```
+No value contains a letter or a `/`. Consequences, measured by running the current
+parser over that pull:
+- `_market_type()` returns `"other"` for **7233/7233** selections.
+- `_is_alt()` returns False for all of them, so **SUPPRESS rule 2 (drop alt lines when
+  a main line exists) is not enforced** and `config.INCLUDE_ALT_LINES` is dead code.
+- The report's `market_type` column would read `other` on every row.
+
+What *is* usable: **`mainLine`** is a real boolean and well populated (672 True /
+6561 False in that pull). Main-vs-alternative should key off `mainLine`, not off a
+string prefix that does not exist.
+
+Still missing: a reference mapping the numeric market/outcome ids to market types and
+outcome labels. Do not guess it from id frequencies — ask the vendor. Until it exists
+the scanner cannot label markets, and `ALLOWED_MARKET_TYPES` cannot filter.
 
 ## What we compute in single-book mode
 Within-book margin only (no external reference):
@@ -59,9 +95,16 @@ non-proportional method:
 Pick one **after** real Betwinner data confirms the asymmetry is worth modelling.
 
 ## Field notes / gotchas (paid-for lessons)
-- **`limit`**: Pinnacle yes, 22bet null. Betwinner UNKNOWN — the probe reports it.
-  If null, the limit score disables. Higher limit did NOT predict better pricing in
-  the 22bet sample, so don't overweight it even if present.
+- **`limit`**: Pinnacle yes, 22bet null. Betwinner **still UNKNOWN** — the 2026-07-25
+  probe never reached Betwinner, so it could not answer this. The 22bet pull it did
+  return was null on 7233/7233 selections, consistent with what was already recorded
+  for 22bet. If null, the limit score disables. Higher limit did NOT predict better
+  pricing in the 22bet sample, so don't overweight it even if present.
+- **Rate limit**: `/v4/odds-by-tournaments` rejects back-to-back requests with
+  `RATE_LIMITED` and a "wait ~0.7 s" message. The exact policy is undocumented. A
+  probe loop without spacing reads this as a plain non-200, which looks identical to
+  "no coverage" — a silent false negative. `probe-odds.yml` now spaces requests and
+  retries on `RATE_LIMITED`.
 - **Off-season = mostly closed.** In EPL (id 17) ~94% of 22bet markets were inactive
   (fixtures a month out). Target tournaments with `upcomingFixtures`/`liveFixtures` > 0
   (34480 Conference, 390 Brazil B, 325 Brazil A). PL 17 is off-season.
