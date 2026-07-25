@@ -1,0 +1,25 @@
+{
+  "source": "rules agent 2026-07-25",
+  "sports": [
+    "basketball",
+    "volleyball"
+  ],
+  "basketball_critical": [
+    "Full-game ML/spread/totals INCLUDE overtime; quarter/half/race-to-X EXCLUDE it. Three-way (1X2) settles at END OF REGULATION - never fold 1X2 prices into two-way implied probabilities.",
+    "Period structure differs: NBA 4x12, FIBA/EuroLeague 4x10, NCAA men 2x20 halves. Convert to per-100-possessions before porting anything across leagues; NCAA men have NO quarter markets.",
+    "Shot clock 24s vs 30s (NCAA) removes ~5-7 possessions/team - model pace by RULE SET, not league name.",
+    "Deliberate late fouling inflates totals in close games AND helps favourites cover marginal spreads - team FT% is a cover-probability input, not just a totals input.",
+    "Foul-out at 5 (FIBA/NCAA) vs 6 (NBA): player props carry a fatter left tail under 5.",
+    "3-point distance differs across leagues - shooting baselines cannot be ported unadjusted.",
+    "Shortened games have NO standard settlement - some books settle past a threshold, others void. Betwinner's completion threshold must be read."
+  ],
+  "volleyball_critical": [
+    "FIFTH SET IS TO 15: a 3-2 match is ~4x46+28 points, not 5x46. Per-set averages must EXCLUDE fifth sets. Over-points + underdog set-handicap is a partly self-cancelling position.",
+    "Set handicap IS a correct-score bet: -1.5 loses only on 3-2. Total sets 3.5 splits 3-0 vs rest; 4.5 splits 3-2 vs rest. Price the set distribution first.",
+    "Sets are UNCAPPED (win by 2): point totals are right-skewed, symmetric models underprice the over.",
+    "CEV golden set decides QUALIFICATION, not the match - including it in match markets corrupts both models. Betwinner treatment must be confirmed.",
+    "League points (3-2 win = 2pts, loser gets 1) raise 3-2 frequency late season when the bonus point matters - adjust set-count distribution on standings context.",
+    "Retirement is a VOID, not a win for the leader - importing the tennis convention overstates EV.",
+    "Beach volleyball: NOTHING transfers (21-pt sets, 2 players, wind compresses favourite edge). Never route a beach fixture into an indoor model."
+  ]
+}
