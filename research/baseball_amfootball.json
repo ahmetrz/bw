@@ -1,0 +1,104 @@
+{
+  "sports": [
+    "baseball",
+    "american_football"
+  ],
+  "researched": "2026-07-25",
+  "baseball": {
+    "verified": [
+      {
+        "id": "mlb_statsapi",
+        "url": "https://statsapi.mlb.com/api/v1/schedule",
+        "auth": "none",
+        "verified": true,
+        "coverage": "hydrate=probablePitcher,lineups,weather returns real SPs AND weather with WIND DIRECTION as text ('8 mph, In From RF') - free, no key. Weather populates on gameday.",
+        "note": "MLBAM copyright notice attaches"
+      },
+      {
+        "id": "baseball_savant",
+        "url": "https://baseballsavant.mlb.com",
+        "auth": "none",
+        "verified": true,
+        "coverage": "Statcast CSV (3MB/day), xwOBA leaderboards, park factors embedded as 'var data = [...]'",
+        "robots": "fully open (Disallow: blank)"
+      },
+      {
+        "id": "umpscorecards",
+        "url": "https://umpscorecards.com/api/games",
+        "auth": "none",
+        "verified": true,
+        "coverage": "30MB JSON, umpire name + accuracy per game back to 2015"
+      },
+      {
+        "id": "open_meteo",
+        "url": "https://api.open-meteo.com/v1/forecast",
+        "auth": "none",
+        "verified": true,
+        "coverage": "wind_direction_10m",
+        "license": "CC-BY 4.0, attribution required"
+      }
+    ],
+    "blocked": [
+      {
+        "id": "fangraphs",
+        "detail": "403 + Cloudflare 'Just a moment'. DATACENTER-IP block, not a robots rule - its robots.txt loads fine. Breaks pybaseball fg_* on GitHub Actions."
+      },
+      {
+        "id": "retrosheet",
+        "detail": "LICENCE/ROBOTS CONFLICT: licence permits commercial reuse with attribution, but robots.txt disallows /gamelogs/ and /boxesetc/ - the exact data dirs."
+      },
+      {
+        "id": "npb_kbo_statsapi",
+        "detail": "DEAD END: sportId 31/32 return teams but totalGames=0. No free structured feed for NPB/KBO."
+      }
+    ],
+    "key_findings": [
+      "Starting pitcher does NOT dominate the way a hockey goalie does: ~1/3 of run prevention vs a goalie's 100% of leverage, and already efficiently priced.",
+      "Never use ERA - SIERA/xFIP beat it at predicting next-season ERA. K% stabilises ~70 batters faced, BB% ~170, FIP ~400.",
+      "Individual batter platoon splits need ~1000 PA vs the minority hand - always use league-average platoon regressed, never raw.",
+      "Single-season park factors are noise; 3-year rolling minimum.",
+      "Wind DIRECTION matters far more than speed, and MLB StatsAPI gives it free."
+    ]
+  },
+  "american_football": {
+    "verified": [
+      {
+        "id": "nflverse",
+        "url": "https://github.com/nflverse/nflverse-data/releases",
+        "auth": "none",
+        "verified": true,
+        "coverage": "play_by_play_2025.csv.gz 19MB with EPA, CPOE, success, air yards; player_stats.csv 33MB",
+        "license": "NO LICENSE file at repo root (404 verified); nflfastR code is MIT; data free non-commercial with attribution - CONFIRM before commercial use"
+      },
+      {
+        "id": "nfldata_games",
+        "url": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
+        "auth": "none",
+        "verified": true,
+        "coverage": "THE single best file: away_rest, home_rest, moneylines, spread_line, total_line, roof, surface, temp, wind - rest+weather+dome+closing lines in one 2.17MB CSV"
+      },
+      {
+        "id": "collegefootballdata",
+        "url": "https://api.collegefootballdata.com",
+        "auth": "free_key",
+        "verified": true,
+        "coverage": "NOT IP-blocked, just needs a free Bearer key. Primary NCAAF EPA/PPA source since PFR is dead."
+      }
+    ],
+    "blocked": [
+      {
+        "id": "pro_football_reference",
+        "detail": "403 + Cloudflare on the data page AND on robots.txt itself - crawl rules are unreadable. Datacenter IPs challenged; will fail on GitHub Actions."
+      }
+    ],
+    "key_findings": [
+      "TURNOVER MARGIN MUST BE USED INVERTED: fumble recovery is ~50/50 with no demonstrated team skill, so a big positive margin flags an OVERVALUED team.",
+      "Defensive EPA stabilises materially slower than offensive EPA (~11-13 games vs ~8-10). Weighting them equally is a modelling error.",
+      "Red-zone TD% and 3rd-down conversion are among the most mean-reverting stats in football - use as a FADE flag, never a forward predictor.",
+      "Pressure rate is the stable input; sack rate is the noisy output that regresses toward it.",
+      "17 games carries roughly the signal of 15 baseball games. Below 4 games team stats are uninformative.",
+      "Wind >15-20mph is the ONLY reliably total-suppressing weather variable (~-1.5 to -2.5 pts).",
+      "NCAA has NO mandated injury report - NCAA QB status cannot be modelled from public data."
+    ]
+  }
+}

@@ -1,0 +1,81 @@
+{
+  "sport": "volleyball",
+  "researched": "2026-07-25",
+  "verified": [
+    {
+      "id": "fivb_vis",
+      "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
+      "auth": "none",
+      "verified": true,
+      "coverage": "1530 indoor + 9256 beach tournaments; VNL, Worlds, CEV, Italian Serie A M/W, Brazil National League. PER-SET points AND set duration.",
+      "note": "Does NOT cover PlusLiga or Turkish leagues. Silently drops unknown Fields, so it gives scores/schedule, not skill stats."
+    },
+    {
+      "id": "tvf",
+      "url": "https://tvf.org.tr/lig/efeler-ligi",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Efeler, Sultanlar, 1./2. Lig; per-set scores + XLSX fixtures"
+    },
+    {
+      "id": "plusliga",
+      "url": "https://www.plusliga.pl/games/id/{id}.html",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "per-set set1..set5pointsTeamA/B",
+      "note": "Scrape by MATCH ID, not index - list URLs 301 to tauronliga.pl"
+    },
+    {
+      "id": "legavolley",
+      "url": "https://www.legavolley.it/wp-json/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "SuperLega + A2/A3, WordPress REST JSON"
+    },
+    {
+      "id": "cev",
+      "url": "https://www.cev.eu/match-centres/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "CL, CEV Cup, Challenge, Euros; archives from 2019"
+    },
+    {
+      "id": "cbv",
+      "url": "https://cbv.com.br/volei-de-quadra/superliga-a-feminina",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Brazilian Superliga A M/W"
+    }
+  ],
+  "blocked": [
+    {
+      "id": "dataproject",
+      "detail": "RICHEST FREE SOURCE (per-set + per-skill team/player stats for SuperLega, PlusLiga, many federations). Blocked by OUR egress proxy (502 to CONNECT), NOT by the site - www.dataproject.com returned 200. HIGHEST-VALUE RETEST from a GitHub Actions runner."
+    },
+    {
+      "id": "volleybox",
+      "detail": "403 + Cloudflare"
+    },
+    {
+      "id": "sofascore",
+      "detail": "403 JSON"
+    },
+    {
+      "id": "bvbinfo",
+      "detail": "TLS connection reset"
+    },
+    {
+      "id": "thesportsdb",
+      "detail": "USELESS here: only sets-won, NO per-set scores, so it cannot serve set handicap / total sets / correct set score"
+    }
+  ],
+  "key_findings": [
+    "Per-set scores confirmed in FIVB VIS, ESPN, TVF, PlusLiga, legavolley, CEV. Absent in TheSportsDB - which makes it unusable for the set-based markets that dominate volleyball.",
+    "The 5th set is played to 15, which compresses the favourite's edge to near coin-flip (~50-53%). Total-sets and correct-set-score need a rally-level simulator, not a match-win probability.",
+    "Total sets O/U 3.5 is a function of the strength GAP, not team quality: evenly matched strong teams go long, a mismatch ends 3-0. Never feed it raw team ratings.",
+    "Side-out % is the master metric (65-72% in top leagues); break-point % is the scarcer skill that separates title teams.",
+    "Setter absence is the highest-leverage single injury, then opposite, then libero.",
+    "Home advantage is large: 55-62% in European leagues, higher in TUR/POL/BRA arenas.",
+    "Beach volleyball shares market names but nothing else - best-of-3, sets to 21, no rotation/libero stats, big wind effects. Separate model entirely."
+  ]
+}
