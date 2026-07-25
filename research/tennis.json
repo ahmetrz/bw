@@ -49,14 +49,6 @@
       "license": "no redistribution/commercial use"
     },
     {
-      "id": "itf_api",
-      "url": "https://www.itftennis.com/tennis/api/TournamentApi/GetCalendar?circuitCode=MT",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "ITF World Tennis Tour M/W calendar: category, surface, indoor/outdoor, prize money"
-    },
-    {
       "id": "tennisexplorer",
       "url": "https://www.tennisexplorer.com/results/?type=atp-challenger",
       "auth": "scraping",
@@ -101,6 +93,11 @@
     }
   ],
   "blocked_or_unverified": [
+    {
+      "id": "itf_api",
+      "status": "BLOCKED - FALSE 200",
+      "detail": "itftennis.com returns HTTP 200 but the body is a 212-byte Incapsula block page, not JSON. Confirmed directly, not taken from an agent report - one agent had marked it VERIFIED on the status code alone. Anything checking only the status code will record this source as working."
+    },
     {
       "id": "sackmann_atp_wta",
       "status": "PER-REPO PROXY BLOCK - RETEST FROM ACTIONS",
@@ -207,5 +204,35 @@
     "Tiebreak yes/no is almost entirely combined hold percentage.",
     "Best-of-5 amplifies the favourite's edge - the same Elo gap should price shorter than in Bo3."
   ],
-  "odds_note": "The Odds API is the only genuine free tier: 500 credits/month, and /v4/sports plus /v4/sports/{sport}/events cost ZERO credits. API-Tennis ($40/mo) and Goalserve ($150/mo) have no free tier. API-Tennis's bookmaker list does NOT include Betwinner."
+  "odds_note": "The Odds API is the only genuine free tier: 500 credits/month, and /v4/sports plus /v4/sports/{sport}/events cost ZERO credits. API-Tennis ($40/mo) and Goalserve ($150/mo) have no free tier. API-Tennis's bookmaker list does NOT include Betwinner.",
+  "verification_lesson": "Two sources in this file returned HTTP 200 while serving a block page: itftennis.com (Incapsula) and tennislive.net (Cloudflare JS challenge). Verify the BODY, never the status code, when qualifying a data source.",
+  "lower_tier_challenger_itf": {
+    "flashscore_feed": {
+      "url": "https://local-global.flashscore.ninja/2/x/feed/",
+      "auth": "none but requires x-fsign header",
+      "verified": true,
+      "note": "ONLY verified free source with Challenger/ITF MATCH STATISTICS. Returned aces, DFs, 1st serve %, 1st/2nd serve points won, break points saved, return points won for a Zug Challenger match. Undocumented internal API, no documented rate limits, ToS-grey. robots.txt does not list /x/feed/."
+    },
+    "protennislive": {
+      "url": "https://www.protennislive.com/posting/{year}/{tid}/mds.pdf",
+      "auth": "none",
+      "verified": true,
+      "note": "Official ATP/ITF draw posting: draw position, seed, rank, entry type (Q/WC/LL/Alt/Bye), last direct acceptance, withdrawals, prize ladder. NO INDEX - tournament ids must be discovered externally and are sparse. Needs a CMap-aware PDF parser (pypdf works)."
+    },
+    "tennisexplorer": {
+      "url": "https://www.tennisexplorer.com/results/?type=all",
+      "auth": "scraping",
+      "verified": true,
+      "note": "ATP/WTA/Challenger/ITF results, H2H, surface splits. Most permissive robots.txt of the scraping candidates - disallows only /redirect/, /terms-of-use/, /contact/."
+    },
+    "wta_api_itf_trap": {
+      "note": "WTA API lists ITF events with full metadata but /matches returns [] for every ITF event tested across 2 years. Real match data starts at WTA 125, where qualifying IS included."
+    },
+    "dead_ends": [
+      "ESPN exposes exactly 2 tennis leagues (atp, wta), tour-level only",
+      "TML-Database has no Challenger/ITF rows despite 1968-2026 coverage",
+      "tennis-data.co.uk is main-tour only",
+      "oddsportal robots.txt disallows all historical archive paths by design"
+    ]
+  }
 }
