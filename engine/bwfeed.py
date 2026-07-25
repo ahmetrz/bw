@@ -113,10 +113,17 @@ def normalize(data, book="betwinner"):
             continue
         ci = gm.get("CI")
         start = _start_iso(gm.get("S"))
-        # Sub-games ("First To Happen", halves, corners…) arrive as their own game ids
-        # carrying the parent's team names. Tag the selection so the table does not show
-        # two identical-looking rows for what are different propositions.
-        tag = (gm.get("TG") or "").strip()
+        # Sub-games (halves, "First To Happen", corners…) arrive as their own game ids
+        # carrying the parent's team names, which makes them dangerous in two ways: a
+        # full-match model would price a half as if it were the whole game, and a
+        # one-selection-per-match rule would count a match and its halves as three
+        # separate fixtures.
+        #
+        # CMG is the marker: null on a real fixture, the parent's id on a sub-game. TG
+        # alone is not enough — halves carry an empty TG and name themselves in PN.
+        parent = gm.get("CMG")
+        is_sub = parent is not None
+        tag = (gm.get("PN") or gm.get("TG") or "").strip()
         for grp in gm.get("GE") or []:
             g = grp.get("G")
             mtype = GROUP_TYPES.get(g, "other")
@@ -146,6 +153,11 @@ def normalize(data, book="betwinner"):
                     "sport_id": gm.get("SI"),
                     "champ_id": gm.get("LI"),
                     "league": gm.get("LE") or gm.get("L"),
+                    "sub_game": is_sub,
+                    # The real-world match this row belongs to. Anything that must not
+                    # double-count a fixture — the parlay's one-per-match rule, the
+                    # per-fixture cap — has to group on THIS, not on fixture_id.
+                    "match_id": parent if is_sub else ci,
                     # group + line, so each line is scored as its own market
                     "market_key": (ci, f"{g}|{p}"),
                     "market_type": mtype,

@@ -109,10 +109,17 @@ class TestRegression(unittest.TestCase):
         """The other half of that check — one cheap fixture must not fill the table."""
         fixtures = collections.Counter(r["fixture_id"] for r in self.actual)
         self.assertGreater(len(fixtures), 1, "top-N came from a single fixture")
+
+    def test_cap_counts_matches_not_game_ids(self):
+        """A fixture and its halves are three game ids for ONE match. Capping on the
+        game id let a single match take 6 of 50 rows — CSKA Sofia v Spartak Trnava did
+        exactly that — because each id got its own allowance. The cap has to bind on
+        the match, which is what a reader of the table sees."""
         cap = getattr(config, "MAX_PER_FIXTURE", 0)
-        if cap:
-            worst = fixtures.most_common(1)[0]
-            self.assertLessEqual(worst[1], cap, f"fixture {worst[0]} exceeded the cap")
+        if not cap:
+            self.skipTest("cap disabled")
+        worst = collections.Counter(r["match"] for r in self.actual).most_common(1)[0]
+        self.assertLessEqual(worst[1], cap, f"match {worst[0]!r} took {worst[1]} rows")
 
     def test_ranked_descending(self):
         s = [r["total_score"] for r in self.actual]

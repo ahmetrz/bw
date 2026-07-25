@@ -199,7 +199,8 @@ def _diversify(rows):
         return rows
     seen, primary, overflow = {}, [], []
     for r in rows:
-        fid = r["fixture_id"]
+        # Same reason as the parlay: cap per real match, not per game id.
+        fid = r.get("match_id", r["fixture_id"])
         seen[fid] = seen.get(fid, 0) + 1
         if seen[fid] <= cap:
             primary.append(r)

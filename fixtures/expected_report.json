@@ -680,26 +680,6 @@
     ]
   },
   {
-    "fixture_id": 353745362,
-    "match": "CSKA Sofia 1948 v Spartak Trnava",
-    "start": "2026-07-28T17:30:00+00:00",
-    "market_type": "spreads",
-    "main_line": true,
-    "selection": "H2",
-    "odds": 2.44,
-    "implied_prob": 0.4098,
-    "market_overround": 0.081,
-    "limit": null,
-    "staleness_seconds": null,
-    "margin_score": 0.9497,
-    "limit_score": null,
-    "range_score": 1.0,
-    "total_score": 0.9648,
-    "flags": [
-      "no_limit_data"
-    ]
-  },
-  {
     "fixture_id": 353890796,
     "match": "Levadia v Goteborg",
     "start": "2026-07-30T16:30:00+00:00",
@@ -795,26 +775,6 @@
     "limit_score": null,
     "range_score": 1.0,
     "total_score": 0.9631,
-    "flags": [
-      "no_limit_data"
-    ]
-  },
-  {
-    "fixture_id": 353745362,
-    "match": "CSKA Sofia 1948 v Spartak Trnava",
-    "start": "2026-07-28T17:30:00+00:00",
-    "market_type": "spreads",
-    "main_line": true,
-    "selection": "H1",
-    "odds": 1.49,
-    "implied_prob": 0.6711,
-    "market_overround": 0.081,
-    "limit": null,
-    "staleness_seconds": null,
-    "margin_score": 0.9497,
-    "limit_score": null,
-    "range_score": 0.99,
-    "total_score": 0.9618,
     "flags": [
       "no_limit_data"
     ]
@@ -995,6 +955,46 @@
     "limit_score": null,
     "range_score": 0.82,
     "total_score": 0.9317,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.736,
+    "implied_prob": 0.576,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.8969,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9278,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 2.043,
+    "implied_prob": 0.4895,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.8969,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9278,
     "flags": [
       "no_limit_data"
     ]

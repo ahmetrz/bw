@@ -25,13 +25,17 @@ def build(rows, legs=50, min_odds=1.10, max_odds=None):
     for r in rows:
         if len(picked) >= legs:
             break
-        if r["fixture_id"] in seen:
+        # Group on the real-world match, not the game id: a fixture and its halves are
+        # three game ids for one match, and taking all three would break the rule and
+        # stack three correlated legs.
+        key = r.get("match_id", r["fixture_id"])
+        if key in seen:
             continue
         if r["odds"] < min_odds:
             continue
         if max_odds is not None and r["odds"] > max_odds:
             continue
-        seen.add(r["fixture_id"])
+        seen.add(key)
         picked.append(r)
     return picked
 
