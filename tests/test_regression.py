@@ -215,6 +215,40 @@ class TestRegression(unittest.TestCase):
                         f"rung {r2} is {o2 / o1 - 1:.0%} dearer than {r1} — wrong side of the line?")
         self.assertGreater(checked, 5, "not enough fixtures carried a full ladder to test")
 
+    def test_excluded_sports_never_reach_the_ranking(self):
+        """RNG markets are the cheapest on the book, so the scorer would rank them first.
+
+        Betwinner's lottery markets measured a 3.09% median hold against football's 8.65%
+        — roughly three times cheaper than real sport. Since margin_score rewards a low
+        hold, a sweep that included them would be headed by lottery tickets, and no data
+        could ever justify one: past draws say nothing about the next, and the book can
+        compute the exact odds as well as we can.
+
+        Synthesises rows rather than requiring a live pull, so the guard holds offline.
+        """
+        excluded = getattr(config, "EXCLUDED_SPORTS", set())
+        self.assertTrue(excluded, "no sports are excluded — the RNG guard is off")
+
+        with open(SAMPLE) as f:
+            rows = bwfeed.normalize(json.load(f))
+        victim = sorted(excluded)[0]
+        # Copy real rows onto an excluded sport and make them the cheapest thing present,
+        # so they would sweep the table if the filter were not applied.
+        planted = []
+        for r in rows[:200]:
+            p = dict(r)
+            p["sport_id"] = victim
+            p["fixture_id"] = -abs(p["fixture_id"])
+            p["match_id"] = p["fixture_id"]
+            p["market_key"] = (p["fixture_id"], p["market_key"][1])
+            p["odds"] = 2.0
+            p["implied"] = 0.5      # two of these per market sum to 1.0 -> a 0% hold
+            planted.append(p)
+
+        scored = score.filter_and_score(rows + planted)
+        leaked = [r for r in scored if r.get("sport_id") in excluded]
+        self.assertFalse(leaked, f"{len(leaked)} rows from an excluded sport reached the ranking")
+
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must
         stay silent on this fixture."""

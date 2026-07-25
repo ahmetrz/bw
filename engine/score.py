@@ -111,9 +111,15 @@ def filter_and_score(rows):
     window = config.STALENESS_MINUTES * 60
 
     # --- hard filters ---
+    excluded = getattr(config, "EXCLUDED_SPORTS", set())
     kept = []
     for r in rows:
         if not (r["active"] and r["market_active"]):
+            continue
+        # Dropped before scoring, not after: these sports are cheap enough to distort the
+        # normalization itself, so letting them through and filtering the table later
+        # would still move every other row's margin_score. See config.EXCLUDED_SPORTS.
+        if excluded and r.get("sport_id") in excluded:
             continue
         s = stale[id(r)]
         if s is not None and s > window:

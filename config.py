@@ -19,6 +19,33 @@ STALENESS_MINUTES = 15          # drop selections whose line is older than this,
 INCLUDE_ALT_LINES = False       # False = main line only; True = include alternative lines
 ALLOWED_MARKET_TYPES = None     # None = all; or e.g. {"moneyline", "totals", "spreads"}
 
+# Sports that must never enter the ranking, because their prices carry no forecastable
+# information AND they are cheap enough to outrank everything real.
+#
+# This is not a taste judgement, it is a measured hazard. The scanner rewards a low hold,
+# and on a live pull Betwinner's LOTTERY markets came back at a 3.09% median hold against
+# football's 8.65% — RNG draws priced roughly three times cheaper than actual sport. Left
+# in a sweep they would head every run, and no amount of data could ever justify the
+# position: a lottery draw's past outcomes tell you nothing about the next one, and the
+# book can compute its exact odds as well as we can, so there is no asymmetry to find.
+# A ranking topped by lottery tickets is precisely the failure CLAUDE.md's first-run
+# sanity check exists to catch.
+#
+# Excluded here only where the outcome is genuinely uninformative. Weather (176) and
+# Politics (202) stay IN despite being non-sport: both settle on real-world events, both
+# price in line with football, and weather is the one market on the book whose settled
+# result can actually be observed for free — which makes it the most promising place to
+# close the results loop the product still lacks.
+EXCLUDED_SPORTS = {
+    82,   # Lottery — RNG draws. Measured 3.09% median hold, the cheapest on the book.
+    69,   # Toto — pool betting on Betwinner's own pool; the decisive input is the crowd's
+          #        entry distribution, which is never published. One draw in four is a
+          #        simulated football match rather than a real one.
+    314,  # Polybet — crypto price derivatives, not a sporting event at all.
+    87,   # Special Bets — one-off novelties. n=1 events have no repeatable structure to
+          #                model and nothing to backtest against.
+}
+
 # --- Composite score --------------------------------------------------------
 # Each component is 0..1. Weights are PROVISIONAL — tune against the first real
 # Betwinner fixture. If Betwinner returns no `limit`, the limit component disables
