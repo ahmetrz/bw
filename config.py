@@ -24,10 +24,26 @@ ALLOWED_MARKET_TYPES = None     # None = all; or e.g. {"moneyline", "totals", "s
 # Betwinner fixture. If Betwinner returns no `limit`, the limit component disables
 # and its weight is redistributed proportionally to the others.
 WEIGHTS = {
-    "margin": 0.5,   # lower per-market hold -> higher score
-    "limit":  0.3,   # higher limit -> higher score (auto-disables if limit absent)
-    "range":  0.2,   # closeness to ODDS_RANGE
+    "margin": 0.70,  # lower per-market hold -> higher score
+    "range":  0.30,  # closeness to ODDS_RANGE
 }
+# `limit` is deliberately absent. Betwinner's line feed publishes no stake limit, so the
+# component was never live — it was declared at 0.3 and silently redistributed, leaving
+# an effective 0.714/0.286 that no one had chosen. These are the weights that actually
+# apply. If a source that DOES carry limits is added, put the key back and re-tune;
+# leaving it out means limit data would be read and then ignored.
+
+# Normalize the hold WITHIN each market type rather than across the whole run.
+# Comparing a totals hold to a 1X2 hold compares different products: on the first real
+# pull, totals started at 6.38% while no moneyline market priced below 7.27%, so a
+# single global scale ranked every totals market above every 1X2 and the top 50 came
+# back 100% totals under every weighting tried — including margin 1.0 / range 0.0.
+# Per-type normalization asks the answerable question instead: how cheap is this market
+# against others of its own kind. Types with fewer than MIN_MARKETS_PER_TYPE distinct
+# markets fall back to the global scale, since a type with one or two markets would
+# otherwise normalize flat and score every one of its selections 1.0.
+MARGIN_NORM_PER_TYPE = True
+MIN_MARKETS_PER_TYPE = 5
 ODDS_RANGE = (1.50, 2.50)       # plateau band for range_score
 RANGE_DECAY = 1.00              # decimal-odds distance over which range_score fades to 0
 

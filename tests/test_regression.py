@@ -9,6 +9,7 @@ casually, and read the diff before you do:
 
     python tests/test_regression.py --update
 """
+import collections
 import json
 import os
 import sys
@@ -18,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import bwfeed, report, score  # noqa: E402
+from engine import bwfeed, score  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
@@ -95,6 +96,23 @@ class TestRegression(unittest.TestCase):
         squeezed every ordinary market into 0.95-1.00 and printed 1.000 for everything."""
         scores = {r["total_score"] for r in self.actual}
         self.assertGreater(len(scores), 5, f"only {len(scores)} distinct scores — flat again")
+
+    def test_more_than_one_market_type(self):
+        """CLAUDE.md's first-run sanity check: a table that is all one market type is a
+        red flag. It was 100% totals under every weighting tried, because one global
+        hold scale ranked every totals market above every 1X2. Scaling within each type
+        is what fixed it, and this is what would catch that regressing."""
+        types = collections.Counter(r["market_type"] for r in self.actual)
+        self.assertGreater(len(types), 1, f"top-N is a single market type: {dict(types)}")
+
+    def test_more_than_one_fixture(self):
+        """The other half of that check — one cheap fixture must not fill the table."""
+        fixtures = collections.Counter(r["fixture_id"] for r in self.actual)
+        self.assertGreater(len(fixtures), 1, "top-N came from a single fixture")
+        cap = getattr(config, "MAX_PER_FIXTURE", 0)
+        if cap:
+            worst = fixtures.most_common(1)[0]
+            self.assertLessEqual(worst[1], cap, f"fixture {worst[0]} exceeded the cap")
 
     def test_ranked_descending(self):
         s = [r["total_score"] for r in self.actual]

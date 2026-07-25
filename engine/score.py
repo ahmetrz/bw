@@ -60,6 +60,34 @@ def _clamp01(x):
     return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
 
 
+def _norms_by_type(kept, global_norm):
+    """One margin scale per market type, falling back to the global scale.
+
+    A totals hold and a 1X2 hold are not the same measurement. On the first real pull
+    every totals market was cheaper than every moneyline market, so one shared scale
+    made the ranking a market-type sort — the top 50 was 100% totals under every
+    weighting tried. Scaling each type against itself asks the question that can
+    actually be answered from a single book: how cheap is this market for its kind.
+
+    A type with too few markets is not normalized against itself: its scale would be
+    flat or near-flat and hand every one of its selections a perfect margin score.
+    """
+    if not getattr(config, "MARGIN_NORM_PER_TYPE", False):
+        return {}
+    floor = getattr(config, "MIN_MARKETS_PER_TYPE", 5)
+    markets_by_type = {}
+    for r in kept:
+        markets_by_type.setdefault(r["market_type"], {})[r["market_key"]] = r["overround"]
+    out = {}
+    for mtype, markets in markets_by_type.items():
+        if len(markets) < floor:
+            out[mtype] = global_norm
+            continue
+        nrm = _norm(list(markets.values()))
+        out[mtype] = nrm if nrm and not nrm["flat"] else global_norm
+    return out
+
+
 def _range_score(odds):
     lo, hi = config.ODDS_RANGE
     if lo <= odds <= hi:
@@ -103,6 +131,7 @@ def filter_and_score(rows):
     # distribution counts each market once per outcome. Exotics carry dozens of
     # outcomes each, which is exactly how they swamped the scale before.
     ov_norm = _norm(list({r["market_key"]: r["overround"] for r in kept}.values()))
+    ov_norms_by_type = _norms_by_type(kept, ov_norm)
     limits = [r["limit"] for r in kept if r["limit"] is not None]
     limit_live = len(limits) > 0
     lim_norm = _norm([r["limit"] for r in kept]) if limit_live else None
@@ -118,12 +147,13 @@ def filter_and_score(rows):
         w.setdefault("limit", 0.0)
 
     for r in kept:
-        # margin_score
-        if ov_norm["flat"]:
+        # margin_score, scaled against this market's own type where that is meaningful
+        nrm = ov_norms_by_type.get(r["market_type"], ov_norm)
+        if nrm["flat"]:
             ms = 1.0
         else:
             ms = _clamp01(
-                1.0 - (r["overround"] - ov_norm["lo"]) / (ov_norm["hi"] - ov_norm["lo"])
+                1.0 - (r["overround"] - nrm["lo"]) / (nrm["hi"] - nrm["lo"])
             )
         # limit_score
         if limit_live and r["limit"] is not None and not lim_norm["flat"]:
