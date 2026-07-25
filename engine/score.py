@@ -28,14 +28,64 @@ def _staleness_seconds(rows):
             for r in rows}
 
 
-def _norm(vals):
-    xs = [v for v in vals if v is not None]
+def _norm(vals, lo_pct=0.0, hi_pct=0.90):
+    """Normalize against a percentile ceiling rather than the raw maximum.
+
+    Min-max is destroyed by exotics. In the first real Betwinner pull the market holds
+    ran 4.67% to 233.9% — 109 markets over 100% (correct-score and similar). Scaling by
+    that max squeezed every ordinary market into 0.95-1.00: a 6.4% hold and a 15% hold
+    landed 0.037 apart, so every emitted score printed as 1.000 and the ranking carried
+    no information.
+
+    The outliers are one-sided — always a huge hold, never a tiny one — so only the
+    upper bound needs robustifying. The lower bound stays at the true minimum because
+    the cheapest markets are precisely what the scan exists to surface; clipping there
+    would tie the whole top of the ranking. Callers clamp, so values past the ceiling
+    pin to 0.
+    """
+    xs = sorted(v for v in vals if v is not None)
     if not xs:
         return None
-    lo, hi = min(xs), max(xs)
+
+    def pct(p):
+        return xs[min(len(xs) - 1, max(0, int(round(p * (len(xs) - 1)))))]
+
+    lo, hi = pct(lo_pct), pct(hi_pct)
     if hi == lo:
         return {"lo": lo, "hi": hi, "flat": True}
     return {"lo": lo, "hi": hi, "flat": False}
+
+
+def _clamp01(x):
+    return 0.0 if x < 0.0 else (1.0 if x > 1.0 else x)
+
+
+def _norms_by_type(kept, global_norm):
+    """One margin scale per market type, falling back to the global scale.
+
+    A totals hold and a 1X2 hold are not the same measurement. On the first real pull
+    every totals market was cheaper than every moneyline market, so one shared scale
+    made the ranking a market-type sort — the top 50 was 100% totals under every
+    weighting tried. Scaling each type against itself asks the question that can
+    actually be answered from a single book: how cheap is this market for its kind.
+
+    A type with too few markets is not normalized against itself: its scale would be
+    flat or near-flat and hand every one of its selections a perfect margin score.
+    """
+    if not getattr(config, "MARGIN_NORM_PER_TYPE", False):
+        return {}
+    floor = getattr(config, "MIN_MARKETS_PER_TYPE", 5)
+    markets_by_type = {}
+    for r in kept:
+        markets_by_type.setdefault(r["market_type"], {})[r["market_key"]] = r["overround"]
+    out = {}
+    for mtype, markets in markets_by_type.items():
+        if len(markets) < floor:
+            out[mtype] = global_norm
+            continue
+        nrm = _norm(list(markets.values()))
+        out[mtype] = nrm if nrm and not nrm["flat"] else global_norm
+    return out
 
 
 def _range_score(odds):
@@ -66,6 +116,9 @@ def filter_and_score(rows):
         r["overround"] = over.get(r["market_key"])
         if r["overround"] is None:
             continue  # can't score margin without a valid two+ sided market
+        max_ov = getattr(config, "MAX_OVERROUND", None)
+        if max_ov is not None and r["overround"] > max_ov:
+            continue
         r["staleness_seconds"] = s
         kept.append(r)
 
@@ -73,8 +126,12 @@ def filter_and_score(rows):
         return []
 
     # --- component normalization ---
-    # margin: lower overround -> higher score
-    ov_norm = _norm([r["overround"] for r in kept])
+    # margin: lower overround -> higher score. Normalized over DISTINCT MARKETS, not
+    # rows: the hold is a per-market quantity, so scaling it against a row-weighted
+    # distribution counts each market once per outcome. Exotics carry dozens of
+    # outcomes each, which is exactly how they swamped the scale before.
+    ov_norm = _norm(list({r["market_key"]: r["overround"] for r in kept}.values()))
+    ov_norms_by_type = _norms_by_type(kept, ov_norm)
     limits = [r["limit"] for r in kept if r["limit"] is not None]
     limit_live = len(limits) > 0
     lim_norm = _norm([r["limit"] for r in kept]) if limit_live else None
@@ -90,14 +147,19 @@ def filter_and_score(rows):
         w.setdefault("limit", 0.0)
 
     for r in kept:
-        # margin_score
-        if ov_norm["flat"]:
+        # margin_score, scaled against this market's own type where that is meaningful
+        nrm = ov_norms_by_type.get(r["market_type"], ov_norm)
+        if nrm["flat"]:
             ms = 1.0
         else:
-            ms = 1.0 - (r["overround"] - ov_norm["lo"]) / (ov_norm["hi"] - ov_norm["lo"])
+            ms = _clamp01(
+                1.0 - (r["overround"] - nrm["lo"]) / (nrm["hi"] - nrm["lo"])
+            )
         # limit_score
         if limit_live and r["limit"] is not None and not lim_norm["flat"]:
-            ls = (r["limit"] - lim_norm["lo"]) / (lim_norm["hi"] - lim_norm["lo"])
+            ls = _clamp01(
+                (r["limit"] - lim_norm["lo"]) / (lim_norm["hi"] - lim_norm["lo"])
+            )
         elif limit_live and r["limit"] is not None:
             ls = 1.0
         else:
@@ -118,4 +180,30 @@ def filter_and_score(rows):
             r["flags"].append("alt_line")
 
     kept.sort(key=lambda r: r["total_score"], reverse=True)
-    return kept
+    return _diversify(kept)
+
+
+def _diversify(rows):
+    """Cap how many selections one fixture contributes, preserving score order.
+
+    Every market inside a fixture shares roughly that fixture's hold, so the margin
+    component alone will stack one match's whole ladder at the top — the first real
+    Betwinner run returned a top 24 drawn entirely from a single fixture, which is the
+    failure mode CLAUDE.md's first-run sanity check is there to catch.
+
+    Capped rows are not discarded: they are appended after the capped ranking, so the
+    ordering changes but nothing silently vanishes from report.json.
+    """
+    cap = getattr(config, "MAX_PER_FIXTURE", 0)
+    if not cap:
+        return rows
+    seen, primary, overflow = {}, [], []
+    for r in rows:
+        fid = r["fixture_id"]
+        seen[fid] = seen.get(fid, 0) + 1
+        if seen[fid] <= cap:
+            primary.append(r)
+        else:
+            r["flags"].append("fixture_cap")
+            overflow.append(r)
+    return primary + overflow

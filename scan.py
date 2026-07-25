@@ -14,7 +14,7 @@ import json
 import sys
 
 import config
-from engine import parser, score, report
+from engine import bwfeed, parser, score, report
 
 
 def main():
@@ -40,10 +40,15 @@ def main():
         print("Unexpected payload: expected a list of fixtures.", file=sys.stderr)
         sys.exit(1)
 
-    found = parser.books_in(data)
+    # Two payload shapes are supported: an OddsPapi odds-by-tournaments response, and a
+    # direct pull from Betwinner's own line feed. The latter is unambiguous about which
+    # book it is — it came from betwinner.com — whereas OddsPapi keys Betwinner's prices
+    # as 22bet and needs the mismatch banner.
+    src = bwfeed if bwfeed.is_bwfeed(data) else parser
+    found = src.books_in(data)
     report.warn_book(args.book, found)
 
-    rows = parser.normalize(data, args.book)
+    rows = src.normalize(data, args.book)
     if not rows:
         print(f"No selections for book '{args.book}' in this file. "
               f"Books present: {', '.join(sorted(found)) or '<none>'}")

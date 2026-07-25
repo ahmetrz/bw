@@ -1,8 +1,19 @@
 name: fetch-odds
 
-# Betwinner oranlarini ceker ve data/ altina JSON yazar.
-# Once probe-odds ile Betwinner'in kapsamda oldugunu DOGRULA. Kapsamda degilse bu
-# workflow bos/400 doner.
+# OddsPapi'den oran ceker ve data/ altina JSON yazar.
+#
+# ARTIK ANA VERI YOLU DEGIL. Betwinner icin fetch-betwinner.yml kullanilir: kitabin
+# kendi feed'ini okur, anahtar istemez ve yaklasik iki kat market tasir. Bu workflow
+# OddsPapi tarafini yeniden test etmek ya da iki kaynagi karsilastirmak icin duruyor.
+#
+# Once probe-odds ile istedigin kitabin kapsamda oldugunu DOGRULA. Kapsamda degilse bu
+# workflow bos/400 doner ya da BASKA bir kitap dondurur.
+#
+# DOSYA ADI KURALI:
+#   Cikti dosyasi ISTENEN slug'a gore degil, payload'da GERCEKTEN donen kitaba gore
+#   adlandirilir. Sebep: 2026-07-25 probe'unda betwinner istendi, HTTP 200 dondu ama
+#   icerik 22bet'ti; dosya yine de betwinner_34480.json diye kaydedildi. Bir dosya adi
+#   asla tasimadigi kitabi vaat etmemeli (CLAUDE.md hard rule 5).
 #
 # KURULUM:
 #   Secret: ODDSPAPI_KEY  (Settings > Secrets and variables > Actions)
@@ -20,8 +31,11 @@ on:
         description: "Bookmaker slug"
         required: false
         default: "betwinner"
-  schedule:
-    - cron: "0 */6 * * *"   # 6 saatte bir; gerekmiyorsa sil
+  # Zamanlama KALDIRILDI. 6 saatlik cron her tetiklenisinde OddsPapi kotasi yakiyordu ve
+  # artik kullanilmayan bir kaynagi cekiyordu: Betwinner istendiginde OddsPapi 22bet
+  # anahtarli veri donduruyor, tarayici ise artik betwinner.com'un kendi feed'ini okuyor
+  # (fetch-betwinner.yml). Bu workflow yalnizca manuel dispatch ile, karsilastirma veya
+  # OddsPapi tarafini yeniden test etmek icin calisir.
 
 permissions:
   contents: write
@@ -45,21 +59,51 @@ jobs:
           set -uo pipefail
           BASE="https://api.oddspapi.io/v4/odds-by-tournaments"
           mkdir -p data
-          URL="${BASE}?bookmaker=${BOOK}&tournamentIds=${T}&apiKey=${KEY}"
-          OUT="data/${BOOK}_$(echo "$T" | tr ',' '-').json"
 
-          CODE=$(curl -sS -o "$OUT" -w "%{http_code}" -H "Accept: application/json" "$URL")
-          echo "HTTP ${CODE} -> ${OUT}"
+          # Payload'daki kitap anahtarlarini TAM parse ile bulur.
+          # Not: '"bookmakerOdds":{"..."' grep'i sadece ILK anahtari yakalar, ikinci bir
+          # kitap anahtarini sessizce kacirir — dosya adi buna bagli oldugu icin
+          # guvenilir bir parse sart.
+          cat > /tmp/books.py <<'PY'
+          import json, sys
+          try:
+              data = json.load(open(sys.argv[1]))
+          except Exception:
+              data = None
+          books = set()
+          for fx in (data if isinstance(data, list) else []):
+              books.update((fx.get("bookmakerOdds") or {}).keys())
+          print("%s|%d" % (" ".join(sorted(books)), len(data) if isinstance(data, list) else 0))
+          PY
+
+          URL="${BASE}?bookmaker=${BOOK}&tournamentIds=${T}&apiKey=${KEY}"
+          SLUG=$(echo "$T" | tr ',' '-')
+          TMP="$(mktemp)"
+
+          CODE=$(curl -sS -o "$TMP" -w "%{http_code}" -H "Accept: application/json" "$URL")
+          echo "HTTP ${CODE}"
           if [ "$CODE" != "200" ]; then
-            echo "Veri YOK (HTTP ${CODE}). Govde:"; head -c 400 "$OUT"; echo ""
+            # Hata govdesi kitap verisi degil; adinda ISTENEN slug'i tasir.
+            OUT="data/error-${BOOK}_${SLUG}.json"
+            mv "$TMP" "$OUT"
+            echo "Veri YOK (HTTP ${CODE}) -> ${OUT}. Govde:"; head -c 400 "$OUT"; echo ""
             exit 1
           fi
-          python3 -m json.tool "$OUT" > /dev/null || { echo "Bozuk JSON"; exit 1; }
+          python3 -m json.tool "$TMP" > /dev/null || { echo "Bozuk JSON"; exit 1; }
 
-          FOUND=$(grep -o '"bookmakerOdds":{"[a-z0-9_.-]*"' "$OUT" \
-                  | sed 's/.*{"//;s/"//' | sort -u | tr '\n' ' ')
-          FX=$(grep -o '"fixtureId"' "$OUT" | wc -l)
-          echo "Donen kitap: ${FOUND:-<yok>} | fixture: ${FX}"
+          INFO=$(python3 /tmp/books.py "$TMP")
+          FOUND="${INFO%%|*}"
+          FX="${INFO##*|}"
+          # Dosya adi DONEN kitaba gore verilir, istenen slug'a gore degil.
+          if [ -z "$FOUND" ]; then
+            OUT="data/empty_${SLUG}.json"
+          else
+            OUT="data/$(echo "$FOUND" | tr ' ' '+')_${SLUG}.json"
+          fi
+          mv "$TMP" "$OUT"
+
+          echo "Istenen kitap: ${BOOK} | Donen kitap: ${FOUND:-<yok>} | fixture: ${FX}"
+          echo "Yazilan dosya: ${OUT}"
           echo " ${FOUND} " | grep -q " ${BOOK} " \
             && echo "✓ ${BOOK} dondu" \
             || echo "✗ ${BOOK} istendi ama farkli dondu — kapsamda degil"

@@ -1,0 +1,1 @@
+{"error":{"message":"You are being rate limited. Please wait before making more requests to this endpoint.","code":"RATE_LIMITED","details":"Please wait 0.69 seconds before making another request to /v4/odds-by-tournaments.","retryAfter":"0.69 seconds","retryMs":690}}

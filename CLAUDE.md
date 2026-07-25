@@ -27,10 +27,20 @@ fixtures/          real pulls = regression anchors
 
 ## The composite score (per selection, each component 0–1, weighted)
 1. **margin_score** — from the selection's MARKET overround (lower hold → higher
-   score), normalized across the run. NOTE: under proportional de-vig every selection
-   in a market shares the same self-edge, so this is effectively a per-*market*
-   quantity. Per-selection vig asymmetry needs a non-proportional method (Shin /
-   additive) — a later refinement, not assumed here.
+   score), normalized **within the selection's market type** (`MARGIN_NORM_PER_TYPE`).
+   NOTE: under proportional de-vig every selection in a market shares the same
+   self-edge, so this is effectively a per-*market* quantity. Per-selection vig
+   asymmetry needs a non-proportional method (Shin / additive) — a later refinement,
+   not assumed here.
+   Normalizing across the whole run was tried first and made the ranking a market-type
+   sort: on real Betwinner data totals started at 6.38% hold while no moneyline market
+   priced below 7.27%, so the top 50 came back 100% totals under every weighting,
+   including margin 1.0 / range 0.0. A totals hold and a 1X2 hold measure different
+   products; the answerable question within one book is how cheap a market is for its
+   own kind. Types with fewer than `MIN_MARKETS_PER_TYPE` markets fall back to the
+   global scale, otherwise a sparse type would normalize flat and score every one of
+   its selections 1.0. Scaling also uses a percentile ceiling over DISTINCT markets —
+   raw min/max over rows let 100%+ hold exotics flatten every real score to 1.000.
 2. **limit_score** — normalized `limit` (higher → more liquid/confident). If Betwinner
    returns no limit (22bet returned null), this component **auto-disables** and its
    weight redistributes to the others. Do not fabricate a limit.

@@ -1,10 +1,16 @@
 name: probe-odds
 
 # NE YAPAR:
-#   Verdigin turnuvada Betwinner (ve karsilastirma icin Pinnacle) oranlarini ceker,
-#   data/ altina JSON yazar, ve EN ONEMLISI: log'a cagrilan tam URL'i, HTTP kodunu ve
-#   donen JSON'daki gercek bookmaker slug'ini basar. Boylece "Betwinner mi geldi
-#   yoksa baska kitap mi" sorusu kesin cevaplanir.
+#   Verdigin turnuvada istedigin bookmaker slug(lar)ini dener, data/ altina JSON yazar,
+#   ve EN ONEMLISI: log'a cagrilan tam URL'i, HTTP kodunu ve donen JSON'daki GERCEK
+#   bookmaker slug'ini basar. Boylece "istedigim kitap mi geldi yoksa baskasi mi"
+#   sorusu kesin cevaplanir.
+#
+# DOSYA ADI KURALI:
+#   Cikti dosyasi ISTENEN slug'a gore degil, payload'da GERCEKTEN donen kitaba gore
+#   adlandirilir. Sebep: 2026-07-25 probe'unda betwinner istendi, HTTP 200 dondu ama
+#   icerik 22bet'ti; dosya yine de betwinner_34480.json diye kaydedildi. Bir dosya adi
+#   asla tasimadigi kitabi vaat etmemeli (CLAUDE.md hard rule 5).
 #
 # KURULUM (hepsi tarayicidan, sirket makinesinden):
 #   1. Settings > Secrets and variables > Actions > New repository secret
@@ -12,6 +18,7 @@ name: probe-odds
 #   2. Bu dosyayi repoya koy: .github/workflows/probe-odds.yml
 #   3. Actions sekmesi > probe-odds > Run workflow
 #        tournament: 34480   (Konferans Ligi - canli maci var; ya da 390 Brezilya Serie B)
+#        books:      betwinner,pinnacle
 #   4. Calisma bitince: Actions > ilgili run > "probe" job > loglari oku.
 #      data/ altindaki JSON dosyalari repoya commit'lenir.
 
@@ -22,6 +29,10 @@ on:
         description: "Turnuva ID (canli maci olan: 34480 Konferans, 390 Brezilya B, 325 Brezilya A)"
         required: true
         default: "34480"
+      books:
+        description: "Denenecek bookmaker slug(lari), virgulle. Slug dogrulamasini test etmek icin var olmayan bir slug da verilebilir."
+        required: false
+        default: "betwinner,pinnacle"
 
 permissions:
   contents: write
@@ -36,10 +47,26 @@ jobs:
         env:
           KEY: ${{ secrets.ODDSPAPI_KEY }}
           T: ${{ inputs.tournament }}
+          BOOKS: ${{ inputs.books || 'betwinner,pinnacle' }}
         run: |
           set -uo pipefail
           BASE="https://api.oddspapi.io/v4/odds-by-tournaments"
           mkdir -p data
+
+          # Payload'daki kitap anahtarlarini TAM parse ile bulur.
+          # Not: '"bookmakerOdds":{"..."' grep'i sadece ILK anahtari yakalar, ikinci bir
+          # kitap anahtarini sessizce kacirir — kapsam sorusunda buna guvenilemez.
+          cat > /tmp/books.py <<'PY'
+          import json, sys
+          try:
+              data = json.load(open(sys.argv[1]))
+          except Exception:
+              data = None
+          books = set()
+          for fx in (data if isinstance(data, list) else []):
+              books.update((fx.get("bookmakerOdds") or {}).keys())
+          print("%s|%d" % (" ".join(sorted(books)), len(data) if isinstance(data, list) else 0))
+          PY
 
           probe () {
             BOOK="$1"
@@ -48,22 +75,48 @@ jobs:
             SAFE_URL="${BASE}?bookmaker=${BOOK}&tournamentIds=${T}&apiKey=***"
             echo "=================================================="
             echo "İstek: ${SAFE_URL}"
-            CODE=$(curl -sS -o "data/${BOOK}_${T}.json" -w "%{http_code}" \
-                   -H "Accept: application/json" "${URL}")
+            TMP="$(mktemp)"
+            # Endpoint arka arkaya isteklerde rate limit uyguluyor (~0.7 sn).
+            # Bekleme olmadan ardisik probe'lar RATE_LIMITED alir ve bu, kapsam
+            # yokmus gibi okunur — yani sessiz bir YANLIS NEGATIF. Bekle + tekrar dene.
+            ATTEMPT=1
+            while : ; do
+              CODE=$(curl -sS -o "$TMP" -w "%{http_code}" \
+                     -H "Accept: application/json" "${URL}")
+              grep -q 'RATE_LIMITED' "$TMP" 2>/dev/null || break
+              if [ "${ATTEMPT}" -ge 4 ]; then
+                echo "  (rate limit ${ATTEMPT} denemede asilamadi)"
+                break
+              fi
+              echo "  (rate limited — ${ATTEMPT}. deneme, 2 sn bekleniyor)"
+              sleep 2
+              ATTEMPT=$((ATTEMPT + 1))
+            done
             echo "HTTP kodu: ${CODE}"
             if [ "${CODE}" != "200" ]; then
-              echo "SONUÇ: ${BOOK} icin veri YOK (HTTP ${CODE})."
+              # Hata govdesi kitap verisi degil; adinda ISTENEN slug'i tasir ve
+              # 'error-' oneki ile veri dosyalarindan ayrilir.
+              OUT="data/error-${BOOK}_${T}.json"
+              mv "$TMP" "$OUT"
+              echo "SONUÇ: ${BOOK} icin veri YOK (HTTP ${CODE}). -> ${OUT}"
               echo "  -> Cevap govdesi:"
-              head -c 400 "data/${BOOK}_${T}.json"; echo ""
+              head -c 400 "$OUT"; echo ""
               return
             fi
-            # Donen JSON'da gercekte hangi kitap(lar) var?
-            FOUND=$(grep -o '"bookmakerOdds":{"[a-z0-9_.-]*"' "data/${BOOK}_${T}.json" \
-                    | sed 's/.*{"//;s/"//' | sort -u | tr '\n' ' ')
-            FIXTURES=$(grep -o '"fixtureId"' "data/${BOOK}_${T}.json" | wc -l)
+            INFO=$(python3 /tmp/books.py "$TMP")
+            FOUND="${INFO%%|*}"
+            FIXTURES="${INFO##*|}"
+            # Dosya adi DONEN kitaba gore verilir, istenen slug'a gore degil.
+            if [ -z "${FOUND}" ]; then
+              OUT="data/empty_${T}.json"
+            else
+              OUT="data/$(echo "${FOUND}" | tr ' ' '+')_${T}.json"
+            fi
+            mv "$TMP" "$OUT"
             echo "İstenen kitap : ${BOOK}"
             echo "DÖNEN kitap(lar): ${FOUND:-<hicbiri>}"
             echo "Fixture sayisi : ${FIXTURES}"
+            echo "Yazilan dosya : ${OUT}"
             if echo " ${FOUND} " | grep -q " ${BOOK} "; then
               echo "SONUÇ: ✓ ${BOOK} GERÇEKTEN dondu — kapsamda."
             else
@@ -71,8 +124,12 @@ jobs:
             fi
           }
 
-          probe betwinner
-          probe pinnacle
+          FIRST=1
+          for b in $(echo "${BOOKS}" | tr ',' ' '); do
+            [ "${FIRST}" -eq 1 ] || sleep 2   # endpoint rate limiti (~0.7 sn) icin pay birak
+            FIRST=0
+            probe "$b"
+          done
 
           echo "=================================================="
           echo "Ozet dosyalar:"
@@ -84,5 +141,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/
-          git commit -m "probe: tournament ${{ inputs.tournament }}" || echo "degisiklik yok"
+          git commit -m "probe: tournament ${{ inputs.tournament }} (${{ inputs.books || 'betwinner,pinnacle' }})" || echo "degisiklik yok"
           git push || echo "push atlandi"
