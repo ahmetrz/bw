@@ -44,7 +44,23 @@ EXCLUDED_SPORTS = {
     314,  # Polybet — crypto price derivatives, not a sporting event at all.
     87,   # Special Bets — one-off novelties. n=1 events have no repeatable structure to
           #                model and nothing to backtest against.
+
+    # Long-dated markets. Excluded at the operator's instruction: a bet that takes months
+    # to settle ties up the slip and returns nothing in the meantime, whatever its price.
+    202,  # Politics — election questions. Note the start timestamp does NOT reveal how
+          #            long-dated these are: the 2026 Senate markets are stamped 5 to 16
+          #            days out, because that is when the LINE runs, not when the seat is
+          #            decided. Filtering on the start time would have missed them.
+    132,  # Horse Racing AntePost — ante-post by definition, and its stakes are normally
+    133,  # Trotting AntePost      lost outright if the runner never starts, which is a
+    151,  # Greyhound AntePost     different bet from the same price on the day.
 }
+
+# Outrights are dropped structurally rather than by listing sports, in engine/bwfeed.py:
+# an entry with no second participant is not a head-to-head, so the parlay's
+# one-per-match rule has nothing to bind on and the safety ladder has no two-outcome
+# market to walk down. That single rule catches tournament winners, season questions,
+# novelty bundles and multi-runner races across all 64 sports at once.
 
 # --- Composite score --------------------------------------------------------
 # Each component is 0..1. Weights are PROVISIONAL — tune against the first real

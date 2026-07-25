@@ -112,6 +112,28 @@ def _is_placeholder(gm) -> bool:
     )
 
 
+def _is_outright(gm) -> bool:
+    """True when the entry has no second participant, so it is not a head-to-head.
+
+    The feed uses an empty O2 for everything that is not two named sides meeting: outright
+    winners ("Shanghai Masters. 2026. Winner"), season and election questions ("USA. Senate
+    Elections. 2026. Majority"), novelty bundles that appear even inside football ("Sunday
+    Enhanced Specials"), and multi-runner races, where the field is the opponent.
+
+    These are dropped because the product's core machinery assumes an opponent. The
+    parlay's one-selection-per-match rule has nothing to bind on, and the safety ladder
+    cannot run at all — there is no two-outcome side market to walk down from, which is
+    also why the animal-racing research found every race carrying a single "win" market
+    and nothing else.
+
+    They are also the long-dated bets, and the start timestamp does NOT reveal that. The
+    2026 Senate questions are stamped 5 to 16 days out because that is when the line was
+    scheduled, not when the seat is decided. A horizon filter on the start time would sail
+    straight past them; the missing opponent is what actually identifies them.
+    """
+    return not str(gm.get("O2") or "").strip()
+
+
 def is_bwfeed(data) -> bool:
     """True when this looks like a list of Betwinner GetGameZip Value objects."""
     return (
@@ -153,7 +175,7 @@ def normalize(data, book="betwinner"):
     """
     rows = []
     for gm in data:
-        if _is_placeholder(gm):
+        if _is_placeholder(gm) or _is_outright(gm):
             continue
         ci = gm.get("CI")
         start = _start_iso(gm.get("S"))

@@ -249,6 +249,36 @@ class TestRegression(unittest.TestCase):
         leaked = [r for r in scored if r.get("sport_id") in excluded]
         self.assertFalse(leaked, f"{len(leaked)} rows from an excluded sport reached the ranking")
 
+    def test_outrights_are_suppressed(self):
+        """An entry with no second participant is not a head-to-head, and must not parse.
+
+        The feed uses an empty O2 for tournament winners, election questions, novelty
+        bundles that appear even inside football, and multi-runner races. All of them
+        break the machinery downstream: the parlay's one-selection-per-match rule has
+        nothing to bind on, and the safety ladder has no two-outcome market to walk down.
+
+        They are also the long-dated bets, and crucially the start timestamp does not say
+        so — the 2026 Senate markets are stamped 5 to 16 days out because that is when the
+        line runs, not when the seat is decided. A horizon filter would miss them entirely,
+        which is why this is keyed on the missing opponent instead.
+        """
+        with open(SAMPLE) as f:
+            data = json.load(f)
+        base = len(bwfeed.normalize(data))
+        self.assertGreater(base, 0, "sample should normalize to something")
+
+        outright = dict(data[0])
+        outright["O2"] = ""
+        outright["O1"] = "Some Tournament. 2026. Winner"
+        outright["CI"] = -999
+        blank = dict(data[0])
+        blank["O2"] = "   "
+        blank["CI"] = -998
+
+        rows = bwfeed.normalize(data + [outright, blank])
+        self.assertEqual(len(rows), base, "an entry without an opponent reached the rows")
+        self.assertFalse([r for r in rows if r["fixture_id"] in (-999, -998)])
+
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must
         stay silent on this fixture."""
