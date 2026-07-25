@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import bwfeed, score  # noqa: E402
+from engine import bwfeed, score, settlement  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
@@ -124,6 +124,20 @@ class TestRegression(unittest.TestCase):
     def test_ranked_descending(self):
         s = [r["total_score"] for r in self.actual]
         self.assertEqual(s, sorted(s, reverse=True))
+
+    def test_settlement_is_stated_for_football(self):
+        """A prediction app must say what a bet means. Football settlement is confirmed
+        (90 minutes), so every football row must carry a settlement scope of 'regulation'
+        and must NOT be flagged as needing confirmation."""
+        with open(SAMPLE) as f:
+            rows = score.filter_and_score(bwfeed.normalize(json.load(f)))
+        settlement.annotate(rows)
+        football = [r for r in rows if r.get("sport_id") == 1]
+        self.assertTrue(football, "sample should contain football rows")
+        for r in football:
+            s = r["settlement"]
+            self.assertEqual(s["scope"], "regulation")
+            self.assertFalse(s["needs_confirmation"], "football settlement is confirmed")
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must

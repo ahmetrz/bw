@@ -21,7 +21,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import bwfeed, parlay, parser, score  # noqa: E402
+from engine import bwfeed, parlay, parser, score, settlement  # noqa: E402
 
 PAGE = """<!doctype html>
 <meta charset="utf-8">
@@ -61,6 +61,8 @@ PAGE = """<!doctype html>
            justify-content:space-between; gap:10px; }}
   .sel {{ font-size:14.5px; }}
   .odds {{ font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; }}
+  .settle {{ font-size:12px; color:var(--muted); margin-top:6px; line-height:1.35; }}
+  .settle.warn {{ color:var(--warn); }}
   a.go {{ display:block; margin-top:10px; text-align:center; text-decoration:none;
           background:var(--accent); color:#fff; padding:12px; border-radius:10px;
           font-weight:600; min-height:44px; }}
@@ -118,6 +120,7 @@ CARD = """<div class="card" data-id="{id}">
     <div><div class="match">{match}</div><div class="meta">{league} · {start}</div></div>
   </div>
   <div class="pick"><span class="sel">{mtype} — <b>{sel}</b></span><span class="odds">{odds}</span></div>
+  {settle}
   {link}
   <label class="chk"><input type="checkbox"> kupona ekledim</label>
 </div>"""
@@ -140,6 +143,7 @@ def main():
     data = load(args.input)
     src = bwfeed if bwfeed.is_bwfeed(data) else parser
     rows = score.filter_and_score(src.normalize(data, config.BOOK))
+    settlement.annotate(rows)
     legs = parlay.build(rows, legs=args.legs, min_odds=args.min_odds)
     s = parlay.summarize(legs)
     if not s:
@@ -152,6 +156,9 @@ def main():
         link = (f'<a class="go" href="{html.escape(url)}" target="_blank" '
                 f'rel="noopener">Betwinner\'da aç →</a>') if url else \
                '<div class="meta">bağlantı üretilemedi</div>'
+        st = r.get("settlement") or settlement.describe(r)
+        warn = " warn" if st.get("needs_confirmation") else ""
+        prefix = "⚠ " if st.get("needs_confirmation") else ""
         cards.append(CARD.format(
             id=f"{r['fixture_id']}-{r['market_key'][1]}-{r['selection']}",
             i=i,
@@ -161,6 +168,7 @@ def main():
             mtype=html.escape(r["market_type"]),
             sel=html.escape(str(r["selection"])),
             odds=f"{r['odds']:.2f}",
+            settle=f'<span class="settle{warn}">{prefix}{html.escape(st.get("detail", ""))}</span>',
             link=link,
         ))
 
