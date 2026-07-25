@@ -1,0 +1,103 @@
+{
+  "sport": "table_tennis",
+  "researched": "2026-07-25",
+  "headline": "737 fixtures make this the book's second-biggest sport, and 95% of those players have NO world ranking - fast circuits (Czech Liga Pro, TT Elite, Setka, TT Cup) run on internal ratings only. A self-maintained points-Elo is mandatory, not optional.",
+  "verified": [
+    {
+      "id": "setka_api",
+      "url": "https://tabletennis.setkacup.com/api",
+      "auth": "none",
+      "verified": true,
+      "coverage": "THE single best free source: live fixtures (/Matches/nearest/en), player ratings + career W/L + birth year (/Players/en), per-tournament set records, an explicit H2H compare endpoint, and session day-periods that make intra-session fatigue directly modelable.",
+      "rate_limit": "none observed in 15 rapid calls; self-throttle 1/s"
+    },
+    {
+      "id": "flashscore_feed",
+      "url": "https://2.flashscore.ninja/2/x/feed/",
+      "auth": "none (x-fsign header)",
+      "verified": true,
+      "coverage": "per-set POINT scores for Liga Pro CZ (608), Setka (1180), TT Cup archives 2022 - 2024-06-09. Historical training corpus, NOT a live fixture feed (current TT feed returns WTT only)."
+    },
+    {
+      "id": "results_ittf_link",
+      "url": "https://results.ittf.link/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "ITTF/WTT elite: profiles, H2H, rankings",
+      "rate_limit": "429 on 2nd rapid request - 1 req/5s"
+    },
+    {
+      "id": "kaggle_ligapro",
+      "url": "https://www.kaggle.com/datasets/medaxone/one-month-ligapro-table-tennis-dataset",
+      "auth": "free account",
+      "verified": true,
+      "coverage": "4272 Liga Pro Bo5 matches, one month of 2022"
+    }
+  ],
+  "blocked": [
+    {
+      "id": "ligapro_ttelite_official",
+      "detail": "NO OFFICIAL WEBSITE EXISTS - NXDOMAIN on every plausible domain. Only facebook.com/ligaprocz + YouTube. For Liga Pro / TT Elite there is no first-party feed at all."
+    },
+    {
+      "id": "tt_cup_official",
+      "detail": "tt-cup.com has a broken TLS chain even with the proxy CA - unfetchable"
+    },
+    {
+      "id": "cloudflare_false_200s",
+      "detail": "scores24.live, oddspedia, betsapi, aiscore, tabletennisdaily ALL return 200 serving a Cloudflare challenge body. Status-code checks would mark all five as live."
+    },
+    {
+      "id": "ittf_com",
+      "detail": "403 Cloudflare"
+    },
+    {
+      "id": "sofascore",
+      "detail": "403 JSON"
+    }
+  ],
+  "stat_to_bet": {
+    "match_winner": [
+      "points_elo",
+      "match_elo",
+      "h2h",
+      "session_match_load",
+      "recent_form"
+    ],
+    "set_handicap": [
+      "points_elo",
+      "set_score_distribution",
+      "h2h"
+    ],
+    "total_sets": [
+      "rating_gap_closeness",
+      "deciding_set_record",
+      "style_chopper"
+    ],
+    "total_points": [
+      "points_per_set_margin",
+      "style_chopper",
+      "deuce_rate"
+    ],
+    "correct_set_score": [
+      "points_elo",
+      "set_score_distribution"
+    ],
+    "first_set_winner": [
+      "session_match_load",
+      "slow_starter_term",
+      "points_elo"
+    ],
+    "player_total_points": [
+      "points_per_set_margin"
+    ]
+  },
+  "key_findings": [
+    "Model at POINT level: Bo5-to-11 makes match probability a steep convex function of per-point win prob (0.55/point ~ 0.85/match). Only a point model prices all markets consistently.",
+    "H2H is unusually strong here - the same 8-12 player pools meet 10-50 times. It beats the rating prior after ~8-10 meetings.",
+    "Intra-session fatigue is real and systematically underpriced: players play 4-6 matches in 2-3h round-robin sessions. The Setka API exposes session day-periods directly.",
+    "Setka's 'Paris/Tokyo/Rio locations' are branded TIME-SLOT channels, not cities. Do not model as venue.",
+    "Residual edge concentrates in: session fatigue, late-session retirement risk, and stale ratings on new circuit entrants - all recoverable from the Setka API.",
+    "Serve/receive stats DO NOT EXIST for fast circuits - no point-by-point serve tags. WTT/ITTF only."
+  ]
+}
