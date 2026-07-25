@@ -1,0 +1,11 @@
+# secrets — API anahtari asla repoya girmez
+.env
+*.key
+*.pem
+
+# python
+__pycache__/
+*.pyc
+.venv/
+
+# not: data/ ve fixtures/ altindaki JSON'lar KASITLI commit'lenir (repo ciktisi + regression capasi)
