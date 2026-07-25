@@ -115,6 +115,7 @@ def describe(row):
             "scope": "unknown",
             "detail": "Settlement rules for this sport are not yet documented; treat with caution.",
             "needs_confirmation": True,
+            "key": "unknown",
         }
 
     try:
@@ -122,11 +123,16 @@ def describe(row):
     except (KeyError, ValueError, TypeError, IndexError):
         group = None
 
-    detail = spec["by_group"].get(group, spec["detail"]) if spec["by_group"] else spec["detail"]
+    by_group = spec["by_group"] or {}
+    detail = by_group.get(group, spec["detail"])
+    # Stable identifier for the exact rule that was applied, so a presentation layer can
+    # localize it without re-deriving the lookup or string-matching the English text.
+    key = f"{sport}.{group}" if group in by_group else f"{sport}.*"
     return {
         "scope": spec["scope"],
         "detail": detail,
         "needs_confirmation": spec["needs_confirmation"],
+        "key": key,
     }
 
 

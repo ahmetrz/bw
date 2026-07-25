@@ -1,0 +1,465 @@
+{
+  "sport": "winter_sports",
+  "betwinner_sport_ids": [19, 22, 23, 24],
+  "sport_id_map": {
+    "19": "Biathlon",
+    "22": "Alpine Skiing",
+    "23": "Ski Jumping",
+    "24": "Skiing (cross-country + nordic combined + freestyle share one id)"
+  },
+  "researched": "2026-07-25",
+  "scope_note": "Four separate sports sharing a season, a weather regime and a governing body (FIS; biathlon is IBU). They share almost NO modelling structure: biathlon is time+shooting, ski jumping is a judged points event, alpine is a time trial, cross-country is part time-trial part tactical race. Never route a fixture from one id into another's model. Betwinner id 24 is the worst offender - it merges cross-country, nordic combined and freestyle, which are three different sports.",
+
+  "statistics": [
+    {
+      "id": "wc_points_form",
+      "disciplines": ["biathlon", "alpine", "ski_jumping", "cross_country"],
+      "what": "World Cup points accumulated this season, overall and per discipline; plus rolling last-N-race points.",
+      "source": "IBU api/CupResults (Score per athlete, RaceCount, TotalRaces, MaxPossiblePoints); FIS /DB/{sector}/cup-standings.html",
+      "modelling_note": "Season-total points are a STANDINGS measure, not a form measure - they are cumulative and therefore autocorrelated with races already run. For a single-race market use points-per-start over a trailing window. IBU CupResults exposes RaceCount and MaxPossiblePoints, so points-per-race and share-of-available are computable directly.",
+      "verified_fields": "IBU: Rank, IBUId, Name, Nat, Score, Bibs[].Color (yellow bib = leader), Diff, RnkDiff. FIS: per-discipline Rank+Points columns (Overall/DH/SL/GS/SG)."
+    },
+    {
+      "id": "discipline_specific_ranking",
+      "disciplines": ["alpine", "cross_country"],
+      "what": "FIS points per discipline: alpine DH/SL/GS/SG/AC; cross-country Distance (DI) and Sprint (SP). Lower FIS points = better. Includes position within discipline.",
+      "source": "FIS points list CSV export (verified: AL 10078 rows with DHpoints/DHpos/DHSta, SLpoints/SLpos, GSpoints/GSpos, SGpoints/SGpos, ACpoints/ACpos; CC 10675 rows with DIpoints/DIpos, SPpoints/SPpos)",
+      "modelling_note": "This is the single best cross-athlete strength measure below World Cup level and the only one that covers the whole entry list including athletes with zero WC points. The DH-vs-SL gap within one athlete IS the specialism signal - a skier with SLpos 5 and DHpos 400 must never be priced as a downhill contender. 'Sta' columns carry the status/confirmation flag.",
+      "gap": "SKI JUMPING AND NORDIC COMBINED HAVE NO FIS POINTS LIST AT ALL - verified, the page soft-404s to the calendar. For those two, ranking must come from World Cup / Grand Prix / Nations Cup / FIS Cup standings only."
+    },
+    {
+      "id": "start_number_bib",
+      "disciplines": ["alpine", "biathlon", "ski_jumping", "cross_country"],
+      "what": "Bib / start order and the advantage or penalty it carries. Present in every result feed tested.",
+      "source": "FIS results HTML (Bib column, verified in alpine, CC and JP tables); IBU api/Results (Bib, StartOrder, StartGroup, StartRow, StartLane, BibColor)",
+      "modelling_note": "The direction of the bib effect is DISCIPLINE-SPECIFIC and reverses between them - this is the classic modelling error. Alpine technical events (SL/GS): the top-7 seed group draws first and skis a clean course; ruts and course deterioration punish high bibs, so bib is a real negative covariate in SL and much weaker in DH/SG where the surface is injected and stable. Cross-country interval start: late bibs usually get a faster, more glazed track, so the effect runs the OTHER way, and in changing weather the draw is close to a lottery. Ski jumping round one is by reverse WC standing (best jump last), so bib correlates with strength by construction - never treat it as an independent variable there. Biathlon sprint: start group interacts with weather and wind windows more than with track speed.",
+      "caution": "Bib effects are conditional on weather. In a snowfall or a warming track the draw can dominate athlete quality outright, which fattens the tails of every outright and H2H price."
+    },
+    {
+      "id": "biathlon_shooting_pct",
+      "disciplines": ["biathlon"],
+      "what": "Season shooting hit percentage, total and split prone vs standing.",
+      "source": "IBU api/Stats?StatisticId=SHOOT_M_A|SHOOT_W_A&StatId=SHOOTWC (verified: 169 rows, Value = hit %, Extra = 'hits/shots' e.g. '419/456'); per-bout split derivable from api/Results field Shootings",
+      "modelling_note": "IBU's published SHOOT_* statistic is the AGGREGATE hit rate only - it does NOT ship the prone/standing split. The split must be derived from the per-race Results field `Shootings`, which is a plus-delimited miss count per bout ('0+0' for a 2-bout sprint, '0+0+0+0' for a 4-bout race). The bout ORDER differs by format, so the mapping from position to posture is format-dependent: sprint = P,S; pursuit and mass start = P,P,S,S; individual = P,S,P,S. Decoding a pursuit with the sprint's mapping silently mislabels half the data.",
+      "typical_values": "Elite WC prone runs roughly 90-95%, standing roughly 85-90%; the prone-standing gap is the discriminating quantity, not the total. Top of the 2025/26 men's list was 92% overall (419/456)."
+    },
+    {
+      "id": "shooting_wind_interaction",
+      "disciplines": ["biathlon"],
+      "what": "How wind at the range degrades hit rate, and how that degradation differs by posture.",
+      "source": "No direct feed. Wind must be joined from Open-Meteo (wind_speed_10m, wind_direction_10m) at the venue; venue altitude comes from IBU api/Events field Altitude.",
+      "modelling_note": "The interaction is the point, not the main effect. Standing is destabilised by body sway and degrades faster in gusts; prone is steadier but the bullet is exposed to crosswind drift over the full 50m. So wind compresses the field's shooting differently by posture, and it compresses it NON-LINEARLY - gusting, shifting wind is far worse than steady strong wind because athletes cannot read the flags. High wind is a variance amplifier: it flattens the favourite's edge and lengthens the tail, which systematically favours underdog outright and podium prices over favourites.",
+      "caution": "Wind is measured at the range and at the flags, not at a weather station. Any Open-Meteo join is a proxy with real error - treat it as a regime flag (calm / breezy / gusting) rather than a continuous covariate."
+    },
+    {
+      "id": "biathlon_ski_speed",
+      "disciplines": ["biathlon"],
+      "what": "Course/ski speed independent of shooting: seconds per km lost against the fastest, and percent deviation from the field average.",
+      "source": "IBU api/Stats StatisticId=RUNKMB_M/RUNKMB_W (seconds/km lost against fastest) and RUNPERF_M/RUNPERF_W (percent deviation from average course time)",
+      "modelling_note": "Biathlon result = ski speed + shooting, and the two are close to independent across athletes, so they must be modelled as separate components and then combined - never as one 'form' number. RUNKMB is the cleaner input because it is already normalised per km and therefore comparable across the 10km sprint and the 20km individual. The shooting component's WEIGHT changes with format (see the penalty-format rule), so the same two components produce different win probabilities per race type."
+    },
+    {
+      "id": "biathlon_format_metadata",
+      "disciplines": ["biathlon"],
+      "what": "Per-race structural facts: number of shooting bouts, shooting posture sequence, penalty regime, spare rounds, number of legs, start mode.",
+      "source": "IBU api/Competitions (verified fields: NrShootings, ShootingPositions e.g. 'PS', PenaltySeconds, NrSpareRounds, HasSpareRounds, NrLegs, StartMode, km, DisciplineId)",
+      "modelling_note": "PenaltySeconds is the field that tells you whether a miss costs a 150m loop or a flat added minute. It is machine-readable per race, so there is no excuse for applying the wrong miss-cost. Read it rather than inferring from the race name."
+    },
+    {
+      "id": "pursuit_start_gap",
+      "disciplines": ["biathlon"],
+      "what": "Time gap an athlete carries into the pursuit, inherited from the sprint result.",
+      "source": "IBU api/Results fields Behind, PursuitStartDistance, StartInfo, StartTime",
+      "modelling_note": "A pursuit is not an independent event - it is a conditional continuation of the sprint, and the start gaps are deterministic given the sprint. Any pursuit model that does not consume the sprint result is throwing away most of the information. PursuitStartDistance is exposed directly."
+    },
+    {
+      "id": "jumping_hill_specialisation",
+      "disciplines": ["ski_jumping"],
+      "what": "Athlete performance conditioned on hill size class: normal hill (HS ~85-109), large hill (HS ~110-184), ski flying (HS 185+), plus the specific hill's profile.",
+      "source": "FIS competition PDF Hill Data block (verified: HILL SIZE HS / (95%), K-POINT, METER VALUE, WC Hill Record); Wikidata P8622 hill size (verified via SPARQL: Vikersund and Planica HS 240, Kulm and Oberstdorf HS 235, Ruka HS 142)",
+      "modelling_note": "Hill class changes the SCORING as well as the technique: the meter value per metre differs by class (verified 1.8 pts/m on the Lillehammer large hill), so a metre is worth a different number of points on a normal hill than on a flying hill, and score spreads are not comparable across classes. Flying hills additionally select hard for aerodynamic athletes and produce much wider score gaps. Never pool an athlete's normal-hill and flying-hill history into one rating."
+    },
+    {
+      "id": "jumping_gate_wind_compensation",
+      "disciplines": ["ski_jumping"],
+      "what": "The per-jump gate compensation and wind compensation points that are added to or subtracted from distance and judges points.",
+      "source": "FIS official competition PDF, per jump. Verified columns: SPEED km/h, DISTANCE m, distance POINTS, JUDGES MARKS A-E, judges POINTS, GATE, gate POINTS, wind [m/s], wind POINTS, TOTAL. Hill header carries Gate Factor and Wind Factors head/tail.",
+      "verified_example": "Lillehammer LH, 22 Nov 2025, round 1. Hill data: HS 140m, K-point 123m, meter value 1.8 pts/m, Gate Factor 7.56 pts/m, Wind Factors head/tail 9.90 / 14.85 pts per m/s. KRAFT jumped 138.0m from gate 09 and scored 161.9 for 1st. RAIMUND jumped 139.5m - the LONGEST jump in the group - from gate 10 and scored 154.9 for 8th. A jump 1.5m longer finished 7.0 points behind.",
+      "modelling_note": "Sign convention, verified arithmetically against the PDF: a POSITIVE value in the wind [m/s] column is headwind and is compensated DOWNWARD at the head factor (Lanisek 0.20 m/s -> -2.0 pts = 0.20 x 9.90); a NEGATIVE value is tailwind and is compensated UPWARD at the tail factor (Hoffmann -0.72 m/s -> +10.7 pts = 0.72 x 14.85). The factors are ASYMMETRIC and tail is compensated far more generously than head, because a tailwind hurts a jumper more than a headwind helps. Gate compensation moves the other way from intuition too: the lower gate 09 earned 18.1 points where gate 10 earned only 12.0.",
+      "caution": "These are the hardest fields to source in all four sports. They exist ONLY in the per-competition PDF - the FIS HTML results table carries distance, points and round rank but NO gate or wind columns. Any pipeline that wants them must parse PDFs."
+    },
+    {
+      "id": "jumping_judges_marks",
+      "disciplines": ["ski_jumping"],
+      "what": "Five judges score style out of 20; highest and lowest are dropped and the middle three summed, max 60 points.",
+      "source": "FIS competition PDF, columns A B C D E and the summed judges POINTS (verified)",
+      "modelling_note": "Style points are a persistent athlete trait (telemark landing quality, flight stability) and are worth up to 60 points - comparable in magnitude to a large distance swing. In the verified Lillehammer round Kraft took 57.0 judges points and Raimund 52.5; that 4.5-point style gap was most of the reason the longer jump lost. A distance-only model omits a variable with real between-athlete variance."
+    },
+    {
+      "id": "jumping_inrun_speed",
+      "disciplines": ["ski_jumping"],
+      "what": "Inrun speed in km/h per jump, and the FIS 'Speed Analysis' document.",
+      "source": "FIS competition PDF SPEED column (verified, e.g. 90.4-91.5 km/h at Lillehammer); a separate 'Speed Analysis' PDF is published per competition",
+      "modelling_note": "Mostly a function of gate and athlete mass/equipment rather than skill, so it is a control variable for interpreting distance - not a predictor on its own."
+    },
+    {
+      "id": "alpine_run1_run2_conversion",
+      "disciplines": ["alpine"],
+      "what": "Run 1 time and rank, run 2 time and rank, and the conversion rate between them; plus each athlete's run-1 DNF rate.",
+      "source": "FIS results HTML, verified columns: Rank, Bib, FIS code, Athlete, Year, Nation, Run 1, Run 2, Tot. Time, Diff. Time, FIS Points, next-season points, Cup Points",
+      "verified_example": "Levi WC slalom 2025/26: SHIFFRIN 56.08 + 52.84 = 1:48.92; COLTURI 57.16 + 53.42 = 1:50.58; both runs exposed per athlete.",
+      "modelling_note": "Run 2 is run in REVERSED order for the top 30 (the run-1 leader starts last), so the leader skis the most deteriorated course. That is a systematic mean-reversion force, and it is why raw run-1 leads convert to wins at well under the naive rate. Model the conversion explicitly rather than treating a run-1 lead as a time advantage. Separately, run-1 DNF is not noise - it is a stable athlete trait, highest among aggressive slalom specialists, and it is the dominant term in any run-2 or winner market."
+    },
+    {
+      "id": "alpine_course_set_effects",
+      "disciplines": ["alpine"],
+      "what": "Who sets the course (each run is set by a different nation's coach), rhythm and turn count, terrain, and snow injection.",
+      "source": "Not in any structured free feed. Partially recoverable from FIS event PDFs and start lists; otherwise textual.",
+      "modelling_note": "A course set by a given nation's coach is widely believed to suit that nation's athletes, and run 1 and run 2 are set by DIFFERENT coaches - which is a second, independent reason run-2 performance decorrelates from run-1. Treat as an unmodelled variance term that widens the run-2 distribution rather than a point estimate you can price."
+    },
+    {
+      "id": "alpine_dnf_rate",
+      "disciplines": ["alpine"],
+      "what": "Per-athlete and per-race rate of DNF / DSQ / DNS, and the field-level attrition rate of the event.",
+      "source": "FIS results HTML status flags; IBU equivalent is the IRM field in api/Results",
+      "modelling_note": "Slalom attrition is extreme - a large fraction of a World Cup slalom field fails to record a second-run time. This makes 'top-10 finish' a fundamentally different bet in slalom than in downhill: in slalom you are partly betting on SURVIVAL, and the effective field is much smaller than the start list. Any top-N model must carry a completion probability per athlete, not just a conditional-on-finishing ranking."
+    },
+    {
+      "id": "cc_technique_specialism",
+      "disciplines": ["cross_country"],
+      "what": "Classic vs freestyle (skate) performance split, and distance vs sprint split.",
+      "source": "FIS points list CC CSV gives DIpoints/DIpos (distance) and SPpoints/SPpos (sprint), verified. Technique (classic/free) is NOT a column - it is a property of the RACE and must be joined from the race title/calendar.",
+      "modelling_note": "Classic and skate are close to different sports mechanically, and the specialist gap is large and persistent - a skate specialist can be a podium contender in free technique and outside the top 30 in classic. The free CSV gives you distance-vs-sprint but NOT classic-vs-skate, so classic/skate form has to be built by joining each athlete's race history to the technique of each race. That join is the single most valuable piece of derived cross-country data and nobody ships it ready-made."
+    },
+    {
+      "id": "cc_altitude",
+      "disciplines": ["cross_country", "biathlon"],
+      "what": "Venue elevation, and athlete performance conditioned on high-altitude venues.",
+      "source": "IBU api/Events field Altitude (verified: Kontiolahti 124m, Hochfilzen 1010m, Annecy 928m, Oberhof 814m); Open-Meteo /v1/elevation (verified) for FIS venues, which do not publish altitude in the results feed",
+      "modelling_note": "Altitude venues (Davos ~1560m, Seefeld, Hochfilzen) reorder endurance fields - some athletes are reliable altitude performers and others degrade badly, and the effect is repeatable enough to be a real covariate. It also interacts with the shooting component in biathlon, because elevated heart rate on arrival at the range degrades standing accuracy more than prone."
+    },
+    {
+      "id": "snow_temp_wax_sensitivity",
+      "disciplines": ["cross_country", "biathlon", "alpine"],
+      "what": "Snow temperature, air temperature, humidity, new snow and the resulting ski preparation (glide wax, and in classic the kick wax choice: hard wax vs klister).",
+      "source": "Open-Meteo forecast API (verified fields: temperature_2m, wind_speed_10m, wind_direction_10m, snowfall, soil_temperature_0cm). soil_temperature_0cm is the closest free proxy for snow-surface temperature.",
+      "modelling_note": "This is the largest unmodelled variance term in cross-country and it is a TEAM-level shock, not an athlete-level one: a nation's service crew gets the wax right or wrong for the whole team on the day, so errors are strongly CORRELATED WITHIN NATION. That correlation matters twice - it can move a whole national squad 20+ places, and it makes multi-athlete same-nation bets far more correlated than independence would suggest. It bites hardest around 0C and in classic technique, where the kick-wax window is narrow and a klister/hard-wax misjudgement is catastrophic. No public feed reports the wax chosen; treat it as an irreducible noise floor that argues against over-confident favourite pricing.",
+      "caution": "Do not attempt to predict wax outcomes. Use snow/air temperature only to widen the predicted distribution in marginal conditions."
+    },
+    {
+      "id": "venue_history",
+      "disciplines": ["biathlon", "alpine", "ski_jumping", "cross_country"],
+      "what": "Athlete's historical results at the specific venue/hill.",
+      "source": "IBU api/AllResults?IBUId= (full athlete career results); FIS athlete biography pages and per-event results; IBU api/Events OrganizerId for venue keying",
+      "modelling_note": "Genuine in ski jumping, where hill profiles differ materially and 'hill specialists' are a real and repeatable phenomenon. Much weaker and closer to noise in cross-country and biathlon, where apparent venue effects are mostly altitude and weather in disguise - control for those first before crediting a venue effect."
+    },
+    {
+      "id": "podium_and_win_base_rates",
+      "disciplines": ["biathlon", "alpine", "ski_jumping", "cross_country"],
+      "what": "Career and season counts of wins and podiums, overall and excluding relays/team events.",
+      "source": "IBU api/StatItems catalogue (57 items, verified) exposing WCPOD_M/W (podiums incl. relays), WCPODI_M/W (podiums WITHOUT relays), TOPPOD/TOPPODI, WCRNK_1 (all-time wins), MEDALSERIES, plus by-nation variants",
+      "modelling_note": "Use the 'I' variants (WCPODI, TOPPODI) for individual markets - the non-I variants include relay and team podiums, which are a NATION's achievement and will systematically inflate the apparent individual record of athletes from strong relay nations. Mixing them is a silent bias toward NOR/FRA/GER biathletes."
+    },
+    {
+      "id": "nation_depth",
+      "disciplines": ["biathlon", "alpine", "ski_jumping", "cross_country"],
+      "what": "Number and quality of a nation's athletes in the field; Nations Cup standing.",
+      "source": "IBU api/Cups (48 cups in 2025/26 incl. Nations Cup) and api/CupResults; FIS Nations Cup standings page (verified reachable)",
+      "modelling_note": "Drives nation markets directly and quota allocation indirectly. Also the correct unit for the wax-correlation effect described above."
+    },
+    {
+      "id": "staleness_and_status",
+      "disciplines": ["biathlon", "alpine", "ski_jumping", "cross_country"],
+      "what": "Whether a result is provisional or official, and whether a scheduled competition has been cancelled, moved or rescheduled.",
+      "source": "IBU api/Competitions (StatusText, ScheduleStatus, ResultStatus e.g. FINISHED/OFFICIAL, IsLive); FIS event-details page status column (verified showing 'Cancelled')",
+      "modelling_note": "Both feeds expose an explicit status. Given how routinely these events are cancelled (see rules), status must be a hard pre-filter on every market, not a post-hoc check."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "ibu_sportapi_results",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Results?RaceId=BT2425SWRLCP01SMSP",
+      "auth": "none",
+      "verified": true,
+      "coverage": "106 rows read. Per-athlete: StartOrder, ResultOrder, IRM (DNS/DNF/LAP/DSQ marker), IBUId, Name, Nat, Bib, Leg, Rank, Shootings ('0+0' misses per bout), ShootingTotal, RunTime, TotalTime, WC points, NC points, Behind, StartGroup, StartRow, StartLane, BibColor, PursuitStartDistance, TeamId, LegRank.",
+      "note": "THE BEST SOURCE IN THIS FILE. Fully open JSON, no key, no rate limit encountered, no robots.txt on the host at all (robots.txt 404s). Shootings gives the prone/standing split once decoded with the format's posture order."
+    },
+    {
+      "id": "ibu_sportapi_competitions",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Competitions?EventId=BT2526SWRLCP01",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Per race: RaceId, DisciplineId, km, StatusText, ScheduleStatus, ResultStatus, HasLiveData, StartTime, Description, NrShootings, NrSpareRounds, HasSpareRounds, PenaltySeconds, NrLegs, ShootingPositions ('PS'), StartMode, RSC, HasAnalysis.",
+      "note": "PenaltySeconds and ShootingPositions make the format's penalty regime and posture order machine-readable per race - the single most settlement-relevant metadata in biathlon."
+    },
+    {
+      "id": "ibu_sportapi_events",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Events?SeasonId=2526&Level=1",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Per event: EventId, SeasonId, Trimester, StartDate/EndDate, Description, ShortDescription (venue), Altitude, OrganizerId, Nat, Level, UTCOffset, EventStatusId. Verified altitudes: Kontiolahti 124m, Hochfilzen 1010m, Annecy 928m, Oberhof 814m, Oestersund 363m.",
+      "note": "Altitude ships free per venue - no geocoding needed for biathlon."
+    },
+    {
+      "id": "ibu_sportapi_stats",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Stats?StatisticId=SHOOT_M_A&StatId=SHOOTWC&byWhat=ATH&SeasonId=2526&OrganizerId=&GenderId=M&IBUId=&Nat=",
+      "auth": "none",
+      "verified": true,
+      "coverage": "169 rows read for 2025/26 men's shooting. Fields: Season, SortOrder, Rank, IBUId, Name, Nat, Value (hit % e.g. '92'), Extra (hits/shots e.g. '419/456'), Details.",
+      "note": "ALL SEVEN query params are mandatory - omitting byWhat/GenderId/IBUId/Nat returns an ASP.NET route 404 ('No HTTP resource was found'), which reads like a dead endpoint but is not. Aggregate hit % only; no prone/standing split here."
+    },
+    {
+      "id": "ibu_sportapi_statitems",
+      "url": "https://biathlonresults.com/modules/sportapi/api/StatItems?Availability=2",
+      "auth": "none",
+      "verified": true,
+      "coverage": "57 statistic definitions with StatisticId, StatId, Category, byAthlete/byNation, naviSeasons, Explanation. Includes SHOOT_M/W_A (shooting), RUNPERF_M/W (percent deviation from average course time), RUNKMB_M/W (seconds per km lost to fastest), WCPOD/WCPODI (podiums with/without relays), TOPPOD/TOPPODI, WCRNK_1 (all-time wins), medals tables, plus IBU Cup and Junior Cup variants.",
+      "note": "This is the catalogue that tells you which StatisticId/StatId pairs are legal for api/Stats, and its naviSeasons flag tells you whether SeasonId is accepted."
+    },
+    {
+      "id": "ibu_sportapi_cups",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Cups?SeasonId=2526 and /api/CupResults?CupId=BT2526SWRLCP__SMTS",
+      "auth": "none",
+      "verified": true,
+      "coverage": "48 cups for 2025/26 including per-discipline score cups (Total, Sprint, Pursuit, Individual, Mass Start), Nations Cup and Para variants. CupResults returned final 2025/26 men's standings: CupName, CupInfo ('FINAL STANDINGS AFTER 21 COMPETITIONS'), AsOf, RaceCount, TotalRaces, MaxPossiblePoints 1263, and Rows with Rank, IBUId, Name, Nat, Score, Bibs[].Color.",
+      "note": "RaceCount + MaxPossiblePoints allow points-per-race normalisation without extra calls."
+    },
+    {
+      "id": "ibu_sportapi_seasons",
+      "url": "https://biathlonresults.com/modules/sportapi/api/Seasons",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Season list with SeasonId, Description, IsCurrent, IsCurrentResults, IsCurrentScheduled. As of 2026-07-25: 2627 IsCurrent=true, 2526 IsCurrentResults=true. Seasons listed forward to 2930.",
+      "note": "Use IsCurrentResults, not IsCurrent, to find the season that actually has results in it."
+    },
+    {
+      "id": "fis_db_results",
+      "url": "https://www.fis-ski.com/DB/general/results.html?sectorcode={AL|JP|CC}&raceid={id}",
+      "auth": "none (plain curl, server-rendered HTML)",
+      "verified": true,
+      "coverage": "ALPINE (raceid 127333, Levi WC SL): Rank, Bib, FIS code, Athlete, Year, Nation, Run 1, Run 2, Tot. Time, Diff. Time, FIS Points, next-season points, Cup Points. CROSS-COUNTRY (raceid 49462, Ruka): Rank, Bib, FIS code, Athlete, Year, Nation, Time, Diff, FIS Points. SKI JUMPING (raceid 7462, Lillehammer): Rank, Bib, FIS code, Athlete, Year, Nation, Round Distance, Points, Round Rank, Tot. Points, Diff. Points.",
+      "note": "Alpine per-run splits are in the HTML - no PDF needed for run1/run2 conversion. Ski jumping HTML has distance and points but NO gate or wind columns."
+    },
+    {
+      "id": "fis_db_event_details",
+      "url": "https://www.fis-ski.com/DB/general/event-details.html?sectorcode={sec}&eventid={id}&seasoncode={yyyy}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Per-event competition table with date, codex, event name, category, gender, runs, and STATUS. Verified reading 'Cancelled' for all five Lake Placid ski jumping competitions of 12-14 Dec 2025, and 'Replaces 31.07.2026' rescheduling notes at Cerro Castor.",
+      "note": "The status column is the free cancellation/rescheduling feed. Also yields the raceid list per event and links to all competition PDFs."
+    },
+    {
+      "id": "fis_competition_pdf",
+      "url": "https://www.fis-ski.com/DB/v2/download/competition-attachment/{uuid}.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official Swiss Timing documents per competition: Start List, Intermediate/Official Results, Rankings, Standings, Speed Analysis, Event Program. SKI JUMPING RESULTS PDF carries the Hill Data header (HILL SIZE HS and 95%, K-POINT, METER VALUE pts/m, Gate Factor pts/m, Wind Factors head/tail pts per m/s, WC Hill Record) and per jump: SPEED km/h, DISTANCE m, distance POINTS, JUDGES MARKS A-E, judges POINTS, GATE, gate POINTS, wind m/s, wind POINTS, TOTAL.",
+      "note": "THE ONLY FREE SOURCE FOR GATE AND WIND COMPENSATION POINTS. UUIDs are discoverable only by parsing the results.html page - there is no index. Text extracts cleanly with pypdf but columns are run together, so parsing needs positional/regex work."
+    },
+    {
+      "id": "fis_points_list_csv",
+      "url": "https://www.fis-ski.com/DB/fis_athletes/ajax/fispointslistfunctions/export_fispointslist.html?export_csv=true&sectorcode={AL|CC}&seasoncode={yyyy}&listid={id}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "ALPINE listid=436: 1.8 MB, 10078 rows. Header: Listid, Listname, listPublished, Published, Sectorcode, Status, Competitorid, Fiscode, Lastname, Firstname, Nationcode, Gender, Birthdate, Skiclub, Nationalcode, Competitorname, Birthyear, Calculationdate, DHpoints, DHpos, DHSta, SLpoints, SLpos, SLSta, GSpoints, GSpos, GSSta, SGpoints, SGpos, SGSta, ACpoints, ACpos, ACSta. CROSS-COUNTRY listid=300205: 1.78 MB, 10675 rows, same spine with DIpoints/DIpos/DISta and SPpoints/SPpos/SPSta.",
+      "note": "listid is SECTOR-SPECIFIC and must be scraped from /DB/{sector}/fis-points-lists.html; passing an alpine listid with sectorcode=CC returns HTTP 200 with a ZERO-BYTE body, and with sectorcode=JP returns a 404 HTML page. A 200 here is not evidence of data - check the byte count."
+    },
+    {
+      "id": "fis_cup_standings",
+      "url": "https://www.fis-ski.com/DB/{sector}/cup-standings.html?sectorcode={sec}&seasoncode=2026&cupcode=WC&disciplinecode=ALL&gendercode=M",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Alpine verified: per-athlete Overall/Downhill/Slalom/Giant Slalom/Super G rank and points (ODERMATT Overall 1 / 1'626, DH 1 / 706, GS 2 / 495, SG 1 / 425, SL '---'). Ski jumping verified: World Cup, Nations Cup, Grand Prix, FIS Cup and Prize Money standings, labelled 'After Men's Individual Flying Hill Planica (SLO) 29-03-2026 (33/33)'.",
+      "note": "The per-discipline columns give the specialism signal directly, and a '---' marks an athlete who does not contest that discipline at all. For ski jumping and nordic combined this REPLACES the missing FIS points list."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php?action=parse&page=2025%E2%80%9326_FIS_Ski_Jumping_World_Cup&prop=wikitext&format=json&formatversion=2",
+      "auth": "none",
+      "verified": true,
+      "coverage": "119,263 chars of wikitext for the 2025-26 ski jumping season: full calendar, per-competition winners, overall/Nations Cup outcomes, and explicit cancellation/rescheduling footnotes. Also verified for the alpine (106,641 chars), cross-country (77,638) and biathlon (99,144) 2025-26 season pages.",
+      "note": "Best free source for SEASON-LEVEL narrative that no structured feed carries - specifically which competitions were cancelled and where they were moved to. robots.txt names no AI bots and does not disallow /w/api.php. Licence CC BY-SA, attribution required."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql?format=json&query={SPARQL}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "8 bindings returned for ski jumping hills (Q1109069) with hill size (P8622): Letalnica Bratov Gorisek 240, Vikersundbakken 240, Heini Klopfer 235, Kulm 235, Muhlenkopfschanze 147, Ruka HS142 142, Paul-Ausserleitner-Schanze 142.",
+      "note": "VERIFIED-BY-BODY CAUTION: my first query returned HTTP 200, valid SPARQL JSON, and an EMPTY bindings array because the class QID was wrong. The status code and content-type were both perfect. Only reading the array length revealed the failure. Use wbsearchentities to resolve QIDs/PIDs first (ski jumping hill = Q1109069, hill size = P8622). Licence CC0."
+    },
+    {
+      "id": "open_meteo",
+      "url": "https://api.open-meteo.com/v1/forecast and /v1/elevation",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Elevation verified (Lillehammer 198.0m). Forecast verified returning hourly temperature_2m, wind_speed_10m, wind_direction_10m, snowfall, soil_temperature_0cm.",
+      "note": "soil_temperature_0cm is the nearest free proxy for snow-surface temperature. Free tier is non-commercial; commercial use needs a paid plan."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "fis_json_api",
+      "detail": "ROBOTS-DISALLOWED, NOT FETCHED. https://www.fis-ski.com/robots.txt contains 'Disallow: /api/' (also /_next/, /search, /portal/, /public/, /data-page-integration/, /visual-editor/, /webview/). The modern FIS JSON API therefore must not be used. Everything in this file comes from the ALLOWED /DB/ tree instead, which is server-rendered and fully sufficient."
+    },
+    {
+      "id": "fis_ski_jumping_points_list",
+      "detail": "DOES NOT EXIST. /DB/ski-jumping/fis-points-lists.html and /DB/nordic-combined/fis-points-lists.html both return HTTP 404 with a ~250 KB body that is the Calendar & Results page (a soft-404). There is no FIS points list for these two sectors at all. Use cup-standings.html instead. Note the trap: the response is large and looks successful."
+    },
+    {
+      "id": "ibu_analyticresults",
+      "detail": "ROUTE EXISTS BUT RETURNED NO DATA. /api/AnalyticResults?RaceId=..&TypeId=.. is called by the datacenter's own JS (both params required) and returns a well-formed envelope with Competition and SportEvt populated and HasAnalysis=true, but Results was an EMPTY ARRAY for every TypeId tried (1-5, CT, ST, RT, PT, TT, COURSE, RANGE, SHOOTING_TIME, SKI) on both a 2024/25 and a 2025/26 race. The valid TypeId vocabulary was not recovered from the minified bundle. This is the endpoint that would give per-athlete course/range/shooting-time splits - worth one more attempt via browser devtools."
+    },
+    {
+      "id": "berkutschi",
+      "detail": "TLS FAILURE. https://www.berkutschi.com/en/ - 'SSL certificate problem: certificate has expired'. Nothing retrieved. Not a proxy or bot block; the site's own certificate is expired. Its robots.txt (fetched over the still-valid apex) bans nothing."
+    },
+    {
+      "id": "fis_and_ibu_document_libraries",
+      "detail": "CLIENT-RENDERED, RULEBOOKS NOT REACHED. https://www.fis-ski.com/inside-fis/document-library/ski-jumping and https://www.biathlonworld.com/inside-ibu/documents both return HTTP 404 with a ~130 KB JavaScript app shell and zero PDF links in the HTML. The FIS ICR and IBU Event & Competition Rules PDFs were therefore NOT read. Every rule in rules_critical below is stated from domain knowledge plus what could be corroborated from result documents and season pages - see open_questions."
+    },
+    {
+      "id": "espn",
+      "detail": "NOT FETCHED BY POLICY. ESPN's robots.txt disallows anthropic-ai by name. No request was made."
+    },
+    {
+      "id": "biathlonworld_live_and_profile",
+      "detail": "ROBOTS-DISALLOWED, NOT FETCHED. https://www.biathlonworld.com/robots.txt disallows /live, /profile (and /de/, /ru/ variants), /news/personalized and /previews/*. The rest of the host is allowed. Irrelevant in practice because biathlonresults.com carries the same data via open JSON."
+    },
+    {
+      "id": "skisprungschanzen",
+      "detail": "PARTIAL / NOT CONFIRMED. robots.txt allows crawling but sets 'Crawl-delay: 60', so only one page was fetched. That fetch returned HTTP 200 and 62 KB but the URL guessed for Lysgardsbakken resolved to a generic listing whose extracted text was only ~2.7 KB; 'K-point' and 'Hill record' labels were present but the per-hill schema was NOT confirmed. Marked unverified deliberately. Wikidata P8622 already supplies hill size under CC0 with no crawl-delay, so this source is optional."
+    },
+    {
+      "id": "national_federations",
+      "detail": "NOT PURSUED AS DATA SOURCES. skiforbundet.no returned a 404 error page for robots.txt; usskiandsnowboard.org's robots.txt is a stock Drupal file allowing crawl. Neither, nor the German/Austrian/Polish federations, is expected to publish machine-readable results that FIS does not already carry - federation sites are news and selection announcements. Their real unique value is SQUAD AND NON-STARTER NEWS (illness, withdrawal, selection), which is textual and cannot be relied on programmatically."
+    },
+    {
+      "id": "betwinner_terms",
+      "detail": "NOT VERIFIED. Betwinner's own winter-sport settlement rules - non-starter treatment in head-to-heads, shortened/abandoned-event terms, dead-heat handling, whether settlement follows the official podium or a later appeal - were NOT read. The WebSearch budget for this session was exhausted (200/200) before those pages could be located, and no rules URL was confirmed by body. Everything said about book settlement below is INDUSTRY CONVENTION, not Betwinner's text. This is the top open question."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_market_structure_note": "HEAD-TO-HEAD IS THE ONLY TWO-OUTCOME MARKET IN ANY OF THESE FOUR SPORTS. Outright winner, podium, top-6/top-10 and nation markets are all many-outcome fields of 30-120 competitors. Any staking or safety-ladder logic that assumes a two-outcome, near-even-money market can therefore ONLY be applied to head-to-heads - and even there only once the non-starter void rule is confirmed, because a void leg breaks a ladder's assumed sequence. Do not port two-outcome logic onto podium or top-10 markets; they are multinomial and their prices do not complete to a simple complement.",
+    "outright_winner": [
+      "wc_points_form",
+      "discipline_specific_ranking",
+      "podium_and_win_base_rates",
+      "biathlon_ski_speed",
+      "biathlon_shooting_pct",
+      "biathlon_format_metadata",
+      "jumping_hill_specialisation",
+      "jumping_judges_marks",
+      "jumping_gate_wind_compensation",
+      "alpine_dnf_rate",
+      "alpine_run1_run2_conversion",
+      "cc_technique_specialism",
+      "cc_altitude",
+      "start_number_bib",
+      "snow_temp_wax_sensitivity",
+      "venue_history",
+      "staleness_and_status"
+    ],
+    "podium_finish": [
+      "podium_and_win_base_rates",
+      "wc_points_form",
+      "discipline_specific_ranking",
+      "biathlon_ski_speed",
+      "biathlon_shooting_pct",
+      "jumping_hill_specialisation",
+      "alpine_dnf_rate",
+      "cc_technique_specialism",
+      "shooting_wind_interaction",
+      "snow_temp_wax_sensitivity",
+      "start_number_bib"
+    ],
+    "head_to_head": [
+      "discipline_specific_ranking",
+      "wc_points_form",
+      "alpine_dnf_rate",
+      "alpine_run1_run2_conversion",
+      "biathlon_shooting_pct",
+      "biathlon_ski_speed",
+      "cc_technique_specialism",
+      "jumping_hill_specialisation",
+      "start_number_bib",
+      "venue_history",
+      "staleness_and_status"
+    ],
+    "_head_to_head_note": "The only two-outcome market here, and the only one where a favourite's edge is not diluted by field size. Two effects dominate and both are structural rather than skill-based: (1) NON-STARTER RISK - if either named athlete does not start the market almost certainly voids, so the real question is P(both start), which federation news drives and no feed reports; (2) DNF/DSQ ASYMMETRY - in slalom and in ski jumping a H2H is substantially a bet on which athlete completes, and completion probability differs far more between athletes than finishing position does. Rank-based models systematically misprice H2Hs containing one high-variance athlete.",
+    "top_10_finish": [
+      "discipline_specific_ranking",
+      "wc_points_form",
+      "alpine_dnf_rate",
+      "biathlon_shooting_pct",
+      "biathlon_format_metadata",
+      "cc_technique_specialism",
+      "cc_altitude",
+      "start_number_bib",
+      "shooting_wind_interaction",
+      "snow_temp_wax_sensitivity"
+    ],
+    "_top_10_note": "Field size and attrition rate change this bet completely between disciplines. In a World Cup slalom a large share of the field records no second run, so a top-10 is heavily a survival bet and the effective field is far smaller than the start list. In biathlon a top-10 is dominated by the shooting component, and the number of bouts (2 in a sprint, 4 elsewhere) sets how much shooting variance is in play. In a ski jumping competition only the top 30 after round 1 jump again, so a top-10 requires clearing that cut first - a two-stage conditional, not a single ranking draw.",
+    "nation_markets": [
+      "nation_depth",
+      "podium_and_win_base_rates",
+      "wc_points_form",
+      "snow_temp_wax_sensitivity",
+      "biathlon_format_metadata",
+      "discipline_specific_ranking"
+    ],
+    "_nation_note": "Relay and team events are the natural nation market. Use the relay-INCLUSIVE podium statistics (WCPOD, TOPREL, TOPSMR) here, and the relay-EXCLUSIVE ones (WCPODI, TOPPODI) for individual markets - IBU ships both and mixing them biases toward strong relay nations. Nation markets are also where the wax-correlation effect is a genuine edge rather than noise, because service-crew quality is a nation-level trait that persists across a season. In biathlon relays, spare rounds mean a nation's shooting depth matters more than its best shooter."
+  },
+
+  "rules_critical": [
+    "WEATHER CANCELLATION AND SHORTENING IS ROUTINE, NOT EXCEPTIONAL - never assume an event will be classified. Verified from FIS's own database: all FIVE ski jumping competitions at Lake Placid on 12-14 Dec 2025 (two qualifications, two individual World Cups, one team event) carry status 'Cancelled'. The 2025-26 ski jumping season page contains 16 separate cancellation references and 5 reschedulings; the 2025-26 alpine season page contains 16 cancellations and 19 reschedulings. A model that prices P(athlete wins) without a P(event is held and classified) factor is wrong before it starts, and every outright price needs the book's abandonment term attached to it.",
+    "SKI JUMPING: THE LONGEST JUMP DOES NOT WIN - any model built on distance alone is broken. Score = distance points + judges points + gate compensation + wind compensation. VERIFIED at Lillehammer LH on 22 Nov 2025: RAIMUND jumped 139.5m, the longest in the group, and placed 8th with 154.9 points, while KRAFT won on 138.0m with 161.9 - a 1.5m longer jump finishing 7.0 points behind, because Kraft took 57.0 judges points to Raimund's 52.5 and jumped from the lower gate 09 (worth 18.1 compensation points) against Raimund's gate 10 (worth 12.0).",
+    "SKI JUMPING WIND COMPENSATION IS SIGNED AND ASYMMETRIC. At Lillehammer the published factors were head 9.90 and tail 14.85 points per m/s. A HEADWIND helps the jumper and so points are DEDUCTED; a TAILWIND hurts and so points are ADDED, at a materially larger factor. Verified arithmetically: 0.20 m/s headwind cost Lanisek 2.0 points (0.20 x 9.90) while 0.72 m/s tailwind gained Hoffmann 10.7 points (0.72 x 14.85). Getting the sign backwards inverts the entire correction.",
+    "SKI JUMPING IS TWO ROUNDS WITH A TOP-30 CUT, AND ROUND TWO RUNS IN REVERSE ORDER, so the round-one leader jumps last into whatever conditions have developed. A top-10 or podium bet is a two-stage conditional - clear the cut, then survive the reversed final round - not a single draw from a ranking.",
+    "SKI JUMPING: IF ROUND TWO CANNOT BE HELD, A COMPLETED ROUND ONE STANDS AS THE OFFICIAL RESULT AND FULL WORLD CUP POINTS ARE AWARDED. Corroborated by the 2025-26 season record, where the cancelled Ruka men's individual was rescheduled to Lahti on 6 March and explicitly run as 'one round only'. This means a one-round competition is a NORMAL outcome, not a void - the field is far more compressed and the favourite's edge much smaller than a two-round model predicts, yet the bet still settles.",
+    "ALPINE TWO-RUN EVENTS: A DNF OR DSQ IN RUN ONE MEANS THERE IS NO RUN-TWO TIME AT ALL, so every run-two and combined-time market on that athlete is dead on the spot. This is not an edge case - slalom attrition is severe, and run-one DNF is a stable athlete trait concentrated among exactly the aggressive specialists who are short-priced. Completion probability must be a separate term from finishing position.",
+    "ALPINE RUN TWO REVERSES THE TOP 30 - the run-one leader starts 30th and skis the most rutted course, and the two runs are set by DIFFERENT nations' coaches. Both forces push run-two performance to decorrelate from run-one, so a run-one lead converts to victory at well below the naive time-advantage rate. Never treat a run-one margin as a straight head start.",
+    "ALPINE ONE-RUN VERSUS TWO-RUN IS A FORMAT SPLIT, NOT A COSMETIC ONE: slalom and giant slalom are two runs aggregated on total time; downhill and super-G are decided on a single run. Markets named identically ('winner', 'top 10') therefore have completely different variance and completely different DNF exposure between the technical and the speed events.",
+    "ALPINE DOWNHILL CAN BE SHORTENED BY LOWERING THE START and still stand as a valid, fully classified World Cup race. A shortened downhill compresses times and reduces the specialist's edge, so it changes the true probabilities without changing the settlement - the opposite of the intuition that a shortened event is a void.",
+    "BIATHLON'S PENALTY REGIME CHANGES WITH THE FORMAT AND CHANGES THE COST OF A MISS BY ROUGHLY THREEFOLD. In the INDIVIDUAL (20km men / 15km women) each miss adds ONE FULL MINUTE to the finishing time. In the sprint, pursuit, mass start and relay each miss instead costs a 150m PENALTY LOOP, worth only about 20-25 seconds. The same shooting percentage therefore implies a completely different win probability in an individual than in a sprint. The IBU api/Competitions field PenaltySeconds exposes this per race - read it rather than inferring from the race name.",
+    "BIATHLON SHOOTING BOUT ORDER DIFFERS BY FORMAT AND SILENTLY MISLABELS PRONE/STANDING DATA IF ASSUMED. Sprint is prone then standing (2 bouts). Pursuit and mass start are prone, prone, standing, standing (4 bouts). The individual is prone, standing, prone, standing (4 bouts). The api/Results field Shootings is a positional plus-delimited miss string, so decoding a pursuit with the individual's order swaps half the postures.",
+    "BIATHLON PURSUIT IS NOT AN INDEPENDENT EVENT - the start list is the top 60 from the sprint and the start gaps are the sprint's time deficits. A pursuit market priced without the sprint result is discarding the dominant input, and a sprint cancellation removes the basis for the pursuit entirely.",
+    "BIATHLON MASS START HAS A FIXED, RESTRICTED FIELD of 30 athletes selected by World Cup standing and weekend results, so most of the start list is unavailable for markets and the field size differs fundamentally from a 100+ athlete sprint. Field size drives every top-N price.",
+    "BIATHLON RELAYS GIVE THREE HAND-LOADED SPARE ROUNDS PER SHOOTING BOUT, and only misses remaining AFTER the spares send the athlete to the penalty loop. This makes relay shooting far more forgiving than individual shooting, so individual hit percentages badly overstate relay penalty-loop risk. Relays and single mixed relays can also LAP trailing teams, which ends their race - the IRM field in api/Results carries LAP alongside DNS/DNF/DSQ.",
+    "CROSS-COUNTRY INTERVAL START VERSUS MASS START ARE DIFFERENT BETS ON THE SAME ATHLETES. An interval start is a pure time trial where the fastest skier usually wins and the draw affects track conditions; a mass start or skiathlon is tactical, frequently decided by a bunch sprint from a large lead group, which compresses the favourite's edge dramatically and fattens the underdog tail. Never carry a rating between the two without re-weighting variance.",
+    "CROSS-COUNTRY SPRINT IS A HEATS TOURNAMENT, NOT A RACE: a timed qualification cuts to 30, then quarterfinals, semifinals and a final, with LUCKY LOSERS advancing on time rather than placing. Progression is therefore partly a function of which heat an athlete draws, and the fastest qualifier can be eliminated in a semifinal without ever losing to the eventual winner on time. Time-based models do not transfer to sprint markets.",
+    "CROSS-COUNTRY TECHNIQUE (CLASSIC VERSUS FREESTYLE) IS A HARD SPLIT and the free FIS points list does NOT encode it - it gives distance versus sprint only. Technique is a property of the race, so classic/skate form must be built by joining each athlete's history to each race's technique. Pricing a classic race off a skater's aggregate season form is one of the easiest large errors available in this sport.",
+    "CROSS-COUNTRY HAS A COLD-WEATHER FLOOR: races are not started in extreme cold (around -20C at the coldest point of the course is the working limit) and the jury may shorten a course or postpone instead. Cold cancellation is a scheduled-event risk concentrated in exactly the Scandinavian and North American venues that host mid-season World Cups.",
+    "A NATION'S WAX ERROR IS A CORRELATED, TEAM-WIDE SHOCK, not independent athlete noise - it moves a whole squad together and is most violent in classic technique near 0C, where a kick-wax misjudgement can drop a favourite tens of places. This breaks independence assumptions in any multi-athlete bet and is the main reason same-nation combinations are far more correlated than their individual prices imply.",
+    "PROVISIONAL RESULTS CAN CHANGE AFTER THE PODIUM CEREMONY. Ski jumping suit and equipment disqualifications are applied after the jump and have decided World Cup competitions; alpine and cross-country carry jury decisions and appeals. IBU api/Competitions distinguishes ResultStatus OFFICIAL from provisional states, and FIS marks 'official results' on the page - whether the book settles on the first published result or the final official one is a live settlement question that must be read in its terms.",
+    "BETWINNER'S OWN SHORTENED-EVENT, POSTPONEMENT AND NON-STARTER TERMS MUST BE READ BEFORE ANY OF THIS IS TRADED - they were NOT verified in this research. The industry convention is that a head-to-head VOIDS if either named competitor does not start but SETTLES if one starts and fails to finish, and that outrights on an abandoned event are voided while a shortened-but-classified event stands. Both halves of that convention are load-bearing here given how often these events are shortened rather than cancelled, and neither was confirmed in Betwinner's text."
+  ],
+
+  "open_questions": [
+    "Betwinner's actual settlement rules for winter sports were never read - the session's WebSearch budget was exhausted (200/200) before a rules page could be located and no URL was confirmed by body. Highest priority next step: retrieve Betwinner's winter-sport terms and confirm (a) head-to-head non-starter treatment, (b) shortened/abandoned event handling, (c) dead-heat rules for tied places, which are common in alpine where identical times to 1/100s occur, (d) whether settlement follows the first official result or a later appeal.",
+    "Whether an ALPINE two-run race with a completed run one but a cancelled run two is ANNULLED or stands on run one. This is stated in rules_critical as a ski-jumping rule only, because ski jumping's one-round fallback was corroborated from the 2025-26 season record but the alpine equivalent was NOT. The FIS ICR could not be fetched (document library is a client-rendered soft-404). If alpine annuls where ski jumping stands, that asymmetry is a settlement trap in its own right and must be confirmed against the ICR.",
+    "The IBU api/AnalyticResults TypeId vocabulary. The route exists and the datacenter's own JS calls it with RaceId+TypeId, but every value tried returned an empty Results array. This endpoint should hold per-athlete course-time, range-time, shooting-time and penalty-time splits - the richest biathlon data available anywhere for free. Recover the parameter values from browser devtools on biathlonresults.com.",
+    "Whether the FIS points-list CSV export endpoint tolerates automated repeat use. It is reached via an AJAX path whose on-page trigger is marked rel='nofollow' and driven by JavaScript, so it is not a documented download. It is not robots-disallowed (only /api/ and a few app paths are), but its terms of use are unstated.",
+    "Ski jumping gate and wind compensation exist ONLY inside per-competition PDFs, and the attachment UUIDs are discoverable only by scraping each results page. Confirm whether a full-season backfill of these PDFs is practical, since without them no ski jumping model can be calibrated on anything but raw distance.",
+    "Betwinner's market inventory for ids 19/22/23/24 has not been pulled. The bet types mapped here (outright, podium, head-to-head, top-10, nation) are assumed from general winter-sport books. Run the existing probe against these four sport ids to confirm which markets actually appear and whether head-to-heads are offered at all - the safety-ladder question depends entirely on that.",
+    "Sport id 24 merges cross-country, nordic combined and freestyle. Confirm from a real pull how Betwinner labels tournaments under it, because freestyle (judged aerials/moguls/slopestyle) shares nothing with cross-country and would need a separate model again."
+  ],
+
+  "key_findings": [
+    "The IBU sport API at biathlonresults.com/modules/sportapi/api/ is the single best source in this file: fully open JSON, no key, no robots.txt on the host at all, and it ships results, per-race format metadata, season shooting and skiing statistics, cup standings and venue altitude. Endpoint list recovered from the site's own JS bundle: Results, Competitions, Events, Seasons, Cups, CupResults, Stats, StatItems, Athletes, AllResults, CISBios, AnalyticResults, MedalResults, Reports2, SearchResults, Categories, Disciplines, EventTypes, Organizers, SessionInfo, Updates.",
+    "FIS's ASP.NET-style 404s are a verification trap in both directions. Missing a REQUIRED query parameter on the IBU API returns 'No HTTP resource was found that matches the request URI' - which reads as a dead endpoint but is really a missing-parameter route failure; api/Stats needs all seven of StatisticId, StatId, byWhat, SeasonId, OrganizerId, GenderId, IBUId, Nat before it returns its 169 rows. Conversely FIS serves HTTP 404 with a 190-250 KB body of the WRONG page for URLs that do not exist. Neither status codes nor body size qualify a source here - only reading the content does.",
+    "Wikidata SPARQL returned HTTP 200, correct content-type and perfectly valid JSON with an EMPTY bindings array on my first query, purely because the class QID was wrong. This is the cleanest example in this research of why a source must be qualified on its payload: every signal short of counting the array said success.",
+    "Ski jumping gate and wind compensation points - the fields without which no ski jumping model is valid - exist in NO free structured feed. They are published only inside the per-competition Swiss Timing PDFs on fis-ski.com, together with the hill's Gate Factor, head/tail Wind Factors, meter value, K-point and HS. The FIS HTML results table carries distance, points and round rank but no gate or wind columns at all.",
+    "The distance-only model is empirically refuted, not just theoretically: at Lillehammer on 22 Nov 2025 Raimund's 139.5m was the longest jump in the group and finished 8th, while Kraft won on 138.0m, the difference coming from 4.5 judges points and a one-gate compensation gap worth 6.1 points.",
+    "Ski jumping and nordic combined have NO FIS points list whatsoever - verified, the page soft-404s. Alpine and cross-country both export a full CSV free (10,078 and 10,675 rows) with per-discipline points AND positions: DH/SL/GS/SG/AC for alpine, Distance/Sprint for cross-country. For jumping and nordic combined, cup-standings.html is the only ranking source.",
+    "Cancellation is the base case, not the tail. All five ski jumping competitions at Lake Placid in December 2025 were cancelled outright; the 2025-26 ski jumping season page records 16 cancellations and 5 reschedulings, and the alpine season page 16 and 19. A 'will be classified' assumption is unsafe in every one of these four sports, and the cancelled Ruka event was eventually run at Lahti as ONE ROUND ONLY - which settles normally while behaving statistically like a different competition.",
+    "Head-to-head is the ONLY two-outcome market in these disciplines; outright, podium, top-10 and nation markets are all 30-120-runner multinomials. Any safety-ladder or two-outcome staking logic is confined to head-to-heads - and even there a non-starter void breaks the ladder's sequence, so the void rule must be confirmed before that logic is trusted.",
+    "Biathlon's miss cost varies about threefold by format - a full added minute in the individual versus a ~20-25s penalty loop everywhere else - and the IBU exposes it machine-readably as PenaltySeconds per race. Shooting percentage therefore cannot be converted into win probability without first reading the format.",
+    "Prone versus standing shooting percentage is NOT published as a split. IBU's SHOOT_* statistic is aggregate only; the split must be derived from the per-race Shootings string, whose positional order is format-dependent (sprint P,S; pursuit and mass start P,P,S,S; individual P,S,P,S). Decoding with the wrong order silently mislabels half the observations.",
+    "Wax and ski preparation is a nation-level correlated shock rather than athlete-level noise, which both widens the whole field's distribution in marginal conditions near 0C and makes same-nation multi-athlete positions far more correlated than their individual prices imply.",
+    "Betwinner's own terms remain unread and are the largest single gap in this file. Every settlement statement here is industry convention, and in sports where shortening and one-round fallbacks are routine, the shortened-event and non-starter clauses are the difference between a live bet and a void."
+  ]
+}
