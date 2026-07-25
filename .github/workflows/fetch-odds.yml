@@ -1,6 +1,11 @@
 name: fetch-odds
 
-# Oranlari ceker ve data/ altina JSON yazar.
+# OddsPapi'den oran ceker ve data/ altina JSON yazar.
+#
+# ARTIK ANA VERI YOLU DEGIL. Betwinner icin fetch-betwinner.yml kullanilir: kitabin
+# kendi feed'ini okur, anahtar istemez ve yaklasik iki kat market tasir. Bu workflow
+# OddsPapi tarafini yeniden test etmek ya da iki kaynagi karsilastirmak icin duruyor.
+#
 # Once probe-odds ile istedigin kitabin kapsamda oldugunu DOGRULA. Kapsamda degilse bu
 # workflow bos/400 doner ya da BASKA bir kitap dondurur.
 #
@@ -26,8 +31,11 @@ on:
         description: "Bookmaker slug"
         required: false
         default: "betwinner"
-  schedule:
-    - cron: "0 */6 * * *"   # 6 saatte bir; gerekmiyorsa sil
+  # Zamanlama KALDIRILDI. 6 saatlik cron her tetiklenisinde OddsPapi kotasi yakiyordu ve
+  # artik kullanilmayan bir kaynagi cekiyordu: Betwinner istendiginde OddsPapi 22bet
+  # anahtarli veri donduruyor, tarayici ise artik betwinner.com'un kendi feed'ini okuyor
+  # (fetch-betwinner.yml). Bu workflow yalnizca manuel dispatch ile, karsilastirma veya
+  # OddsPapi tarafini yeniden test etmek icin calisir.
 
 permissions:
   contents: write
