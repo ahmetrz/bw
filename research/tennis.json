@@ -25,8 +25,9 @@
       "url": "https://www.ultimatetennisstatistics.com/",
       "auth": "scraping",
       "api": false,
-      "verified": true,
-      "coverage": "Open Era ATP ~99%; Elo by surface, indoor/outdoor, set, game, service/return game, tiebreak; 100+ stat categories"
+      "verified": false,
+      "coverage": "Open Era ATP; JSON endpoints clean and unauthenticated BUT season dropdown maxes at 2024",
+      "note": "CORRECTED: STALE. statsLeadersTable?season=2025 returns 0 rows; Elo shows bestRankDate 2024-06-24. Published Docker DB dump only goes to 2019. Historical baselines only, never a live feed."
     },
     {
       "id": "sackmann_mcp",
@@ -69,8 +70,8 @@
       "auth": "none",
       "api": true,
       "verified": true,
-      "coverage": "ATP/WTA tour-level only; atp-challenger returns 400",
-      "note": "no historical depth"
+      "coverage": "ATP/WTA schedule, results, set scores, venue, round. NO match statistics at all.",
+      "note": "CORRECTED: competitors[].statistics is empty in every row across 5 dates 2010-2026 (~4800 rows incl. Wimbledon/AO main draws); core API reports statsSource=none. summary?event= 400s on every variant. Use as schedule/results spine ONLY."
     },
     {
       "id": "open_meteo",
@@ -79,18 +80,51 @@
       "api": true,
       "verified": true,
       "coverage": "venue altitude + weather; verified Denver 1612m"
+    },
+    {
+      "id": "sackmann_mcp_verified",
+      "url": "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/charting-m-stats-Overview.csv",
+      "auth": "none",
+      "api": false,
+      "verified": true,
+      "coverage": "REACHABLE from here. Per-set AND total: serve_pts, aces, dfs, first_in, first_won, second_in, second_won, bk_pts, bp_saved, return_pts, return_pts_won, winners(+fh/bh), unforced(+fh/bh). 7566 matches 1960-2026-05-21; charting-m-matches.csv adds surface, court, best-of, hands, umpire.",
+      "note": "Volunteer-charted: a SAMPLE of matches, not full-tour coverage. 184 matches in 2026, 769 in 2024."
+    },
+    {
+      "id": "wta_api",
+      "url": "https://api.wtatennis.com/tennis/tournaments/",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "Unauthenticated Pulselive JSON. 18709 tournaments back to 1960 with surface, inOutdoor, city, country, drawSize, level, prizeMoney; 36041 players",
+      "note": "/tennis/players/rankings returns 400 not 404 - route exists, query params undiscovered. ATP equivalent is Cloudflare-403 on every path."
     }
   ],
   "blocked_or_unverified": [
     {
       "id": "sackmann_atp_wta",
-      "status": "BLOCKED BY EGRESS",
-      "detail": "github raw 404 / github.com 403 / codeload 403 / jsDelivr >50MB. Repo exists; this is our proxy. It is the ONLY free source with Challenger/ITF match statistics at scale - re-verify from an unrestricted network."
+      "status": "PER-REPO PROXY BLOCK - RETEST FROM ACTIONS",
+      "detail": "404 for tennis_atp while tennis_MatchChartingProject on the SAME account/host returns 200, so this is a per-repo block in our egress, not the repo. This project already runs pulls from GitHub Actions; test there before writing it off. It is the single best free tennis dataset: full ATP results 1968-present with aces/DF/breakpoints per match."
+    },
+    {
+      "id": "atp_tour",
+      "status": "BLOCKED",
+      "detail": "403 on atptour.com and all 4 API paths incl. app.atptour.com gateway (Cloudflare)"
     },
     {
       "id": "sofascore",
       "status": "BLOCKED",
       "detail": "403 from this environment"
+    },
+    {
+      "id": "api_sports_tennis",
+      "status": "NO TENNIS COVERAGE",
+      "detail": "Cloudflare 403 on every path; DNS shows no tennis subdomain while all 12 known sports have one"
+    },
+    {
+      "id": "tennis_abstract_jsfrags",
+      "status": "ROBOTS-DISALLOWED",
+      "detail": "The rich per-player files (/jsfrags/, /jsmatches/, /jsplayers/) are all Disallow in robots.txt. /reports/ and /cgi-bin/ are permitted - Elo reports are fair game. /jsmatches/ is a stale 2018 snapshot anyway."
     }
   ],
   "licensing_warning": "Sackmann datasets are CC BY-NC-SA and TML forbids commercial use. Both are NON-COMMERCIAL only - relevant if anything here is ever monetised.",
@@ -164,11 +198,14 @@
     ]
   },
   "key_findings": [
+    "ESPN carries NO tennis match statistics - verified across ~4800 rows. Schedule/results spine only.",
+    "Match Charting Project is the reachable deep-stats layer: point-level serve/return/rally splits per set.",
     "Surface Elo is the primary predictor; clay/grass specialists diverge 100-200 points from overall.",
     "Break points converted is the noisiest common stat - near-random year to year. Shrink hard.",
     "Tiebreak and deciding-set records are almost pure noise beyond serve quality. Use as prior, not signal.",
     "For over/under games, CLOSENESS matters more than level: near-equal Elo -> OVER, large gap -> UNDER.",
     "Tiebreak yes/no is almost entirely combined hold percentage.",
     "Best-of-5 amplifies the favourite's edge - the same Elo gap should price shorter than in Bo3."
-  ]
+  ],
+  "odds_note": "The Odds API is the only genuine free tier: 500 credits/month, and /v4/sports plus /v4/sports/{sport}/events cost ZERO credits. API-Tennis ($40/mo) and Goalserve ($150/mo) have no free tier. API-Tennis's bookmaker list does NOT include Betwinner."
 }
