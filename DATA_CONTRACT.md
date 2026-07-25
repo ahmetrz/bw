@@ -74,9 +74,21 @@ What *is* usable: **`mainLine`** is a real boolean and well populated (672 True 
 6561 False in that pull). Main-vs-alternative should key off `mainLine`, not off a
 string prefix that does not exist.
 
-Still missing: a reference mapping the numeric market/outcome ids to market types and
-outcome labels. Do not guess it from id frequencies — ask the vendor. Until it exists
-the scanner cannot label markets, and `ALLOWED_MARKET_TYPES` cannot filter.
+**Resolved by reading Betwinner directly.** The numeric ids are the 1xBet platform's own
+group/type codes, and betwinner.com publishes them in a form that can be decoded:
+`GE[].G` is the market group and `E[][].T` the outcome type — the same numbers OddsPapi
+emits as `bookmakerMarketId` / `bookmakerOutcomeId`. `G=1, T=1/2/3` is 1X2
+home/draw/away, matching OddsPapi's `bookmakerMarketId=1` exactly. The mapping now lives
+in `engine/bwfeed.py` (`GROUP_TYPES`, `OUTCOME_LABELS`), covering the groups established
+from real payloads; anything unconfirmed stays `other` rather than being guessed.
+
+Main-vs-alternative is likewise solved: the feed sets `CE = 1` on the book's own main
+line for each group. Checked against OddsPapi's `mainLine` labels for the same fixture,
+it agrees to the decimal on the team-total groups.
+
+Scanning Betwinner's own feed (`engine/bwfeed.py`) therefore enforces SUPPRESS rule 2
+properly. The OddsPapi path still cannot — that limitation is specific to reading
+Betwinner's prices through OddsPapi's `22bet` key.
 
 ## What we compute in single-book mode
 Within-book margin only (no external reference):
