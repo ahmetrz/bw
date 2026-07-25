@@ -1,0 +1,88 @@
+name: probe-odds
+
+# NE YAPAR:
+#   Verdigin turnuvada Betwinner (ve karsilastirma icin Pinnacle) oranlarini ceker,
+#   data/ altina JSON yazar, ve EN ONEMLISI: log'a cagrilan tam URL'i, HTTP kodunu ve
+#   donen JSON'daki gercek bookmaker slug'ini basar. Boylece "Betwinner mi geldi
+#   yoksa baska kitap mi" sorusu kesin cevaplanir.
+#
+# KURULUM (hepsi tarayicidan, sirket makinesinden):
+#   1. Settings > Secrets and variables > Actions > New repository secret
+#        ODDSPAPI_KEY = <yeni anahtarin>
+#   2. Bu dosyayi repoya koy: .github/workflows/probe-odds.yml
+#   3. Actions sekmesi > probe-odds > Run workflow
+#        tournament: 34480   (Konferans Ligi - canli maci var; ya da 390 Brezilya Serie B)
+#   4. Calisma bitince: Actions > ilgili run > "probe" job > loglari oku.
+#      data/ altindaki JSON dosyalari repoya commit'lenir.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tournament:
+        description: "Turnuva ID (canli maci olan: 34480 Konferans, 390 Brezilya B, 325 Brezilya A)"
+        required: true
+        default: "34480"
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe bookmakers
+        env:
+          KEY: ${{ secrets.ODDSPAPI_KEY }}
+          T: ${{ inputs.tournament }}
+        run: |
+          set -uo pipefail
+          BASE="https://api.oddspapi.io/v4/odds-by-tournaments"
+          mkdir -p data
+
+          probe () {
+            BOOK="$1"
+            URL="${BASE}?bookmaker=${BOOK}&tournamentIds=${T}&apiKey=${KEY}"
+            # Anahtari log'da gizle
+            SAFE_URL="${BASE}?bookmaker=${BOOK}&tournamentIds=${T}&apiKey=***"
+            echo "=================================================="
+            echo "İstek: ${SAFE_URL}"
+            CODE=$(curl -sS -o "data/${BOOK}_${T}.json" -w "%{http_code}" \
+                   -H "Accept: application/json" "${URL}")
+            echo "HTTP kodu: ${CODE}"
+            if [ "${CODE}" != "200" ]; then
+              echo "SONUÇ: ${BOOK} icin veri YOK (HTTP ${CODE})."
+              echo "  -> Cevap govdesi:"
+              head -c 400 "data/${BOOK}_${T}.json"; echo ""
+              return
+            fi
+            # Donen JSON'da gercekte hangi kitap(lar) var?
+            FOUND=$(grep -o '"bookmakerOdds":{"[a-z0-9_.-]*"' "data/${BOOK}_${T}.json" \
+                    | sed 's/.*{"//;s/"//' | sort -u | tr '\n' ' ')
+            FIXTURES=$(grep -o '"fixtureId"' "data/${BOOK}_${T}.json" | wc -l)
+            echo "İstenen kitap : ${BOOK}"
+            echo "DÖNEN kitap(lar): ${FOUND:-<hicbiri>}"
+            echo "Fixture sayisi : ${FIXTURES}"
+            if echo " ${FOUND} " | grep -q " ${BOOK} "; then
+              echo "SONUÇ: ✓ ${BOOK} GERÇEKTEN dondu — kapsamda."
+            else
+              echo "SONUÇ: ✗ ${BOOK} istendi ama DÖNEN farkli (${FOUND}). Planda YOK, fallback gelmis."
+            fi
+          }
+
+          probe betwinner
+          probe pinnacle
+
+          echo "=================================================="
+          echo "Ozet dosyalar:"
+          ls -la data/
+
+      - name: Commit data
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          git commit -m "probe: tournament ${{ inputs.tournament }}" || echo "degisiklik yok"
+          git push || echo "push atlandi"
