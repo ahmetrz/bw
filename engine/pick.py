@@ -85,14 +85,38 @@ def best(rows, sport_id, probs, min_odds=None, min_survival=None):
     return c[0] if c else None
 
 
-def for_fixtures(rows, index, min_odds=None, min_survival=None, min_name_score=0.82):
+def resolve(sample, index=None, elo_model=None, min_name_score=0.82):
+    """Probabilities for one fixture from whichever model can reach it.
+
+    Our own Elo model is tried FIRST. It is fitted on 38,598 results across 22 divisions
+    and can price a fixture in or out of season, whereas ClubElo publishes only near-term
+    fixtures for the leagues it covers — which is why it reached 0 of 58 matches on a
+    late-July card. ClubElo remains as the fallback because it covers competitions our
+    divisions list does not, including European ties.
+
+    Returns (probs, name_score, source) or (None, 0.0, None).
+    """
+    from engine import model_elo, model_football as mf
+
+    home, away = sample.get("p1"), sample.get("p2")
+    if elo_model:
+        probs, score = model_elo.lookup(elo_model, home, away)
+        if probs and score >= 0.86:
+            return probs, score, "elo"
+    if index:
+        probs, score = mf.lookup(index, home, away, cutoff=min_name_score)
+        if probs and score >= min_name_score:
+            return probs, score, "clubelo"
+    return None, 0.0, None
+
+
+def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=None,
+                 min_name_score=0.82):
     """Run the whole selection over a scan's worth of rows, one pick per match.
 
     `rows` should be UNFILTERED normalized rows, not the scored top-N: the ladder needs
     alternative lines, and every plus-handicap and every non-headline total is an alt line.
     """
-    from engine import model_football as mf
-
     by_match = {}
     for r in rows:
         if r.get("sub_game"):
@@ -101,15 +125,15 @@ def for_fixtures(rows, index, min_odds=None, min_survival=None, min_name_score=0
             continue
         by_match.setdefault(r.get("match_id", r["fixture_id"]), []).append(r)
 
-    picks, skipped = [], {"no_model": 0, "no_confident_rung": 0}
+    picks = []
+    skipped = {"no_model": 0, "no_confident_rung": 0, "unmodelled_sport": 0}
     for match_id, match_rows in by_match.items():
         sample = match_rows[0]
-        if sample.get("sport_id") != 1:      # ClubElo is football only
-            skipped["no_model"] += 1
+        if sample.get("sport_id") != 1:      # both football models; other sports pending
+            skipped["unmodelled_sport"] += 1
             continue
-        probs, name_score = mf.lookup(index, sample.get("p1"), sample.get("p2"),
-                                      cutoff=min_name_score)
-        if not probs or name_score < min_name_score:
+        probs, name_score, source = resolve(sample, index, elo_model, min_name_score)
+        if not probs:
             skipped["no_model"] += 1
             continue
         chosen = best(match_rows, sample["sport_id"], probs, min_odds, min_survival)
@@ -117,6 +141,8 @@ def for_fixtures(rows, index, min_odds=None, min_survival=None, min_name_score=0
             skipped["no_confident_rung"] += 1
             continue
         chosen["name_match"] = round(name_score, 3)
+        chosen["model_source"] = source
+        chosen["division"] = probs.get("_division")
         picks.append(chosen)
 
     picks.sort(key=lambda r: -r["model_survival"])

@@ -17,6 +17,7 @@ are left alone rather than guessed at.
 import csv
 import difflib
 import io
+import math
 import urllib.request
 
 FIXTURES_URL = "http://api.clubelo.com/Fixtures"
@@ -96,6 +97,36 @@ def _probs(row):
         # the mass so callers can decide whether the row is complete enough to trust.
         "score_mass": sum(f(k) for k in score_keys),
     }
+
+
+def poisson_pmf(lam, k):
+    if lam <= 0:
+        return 1.0 if k == 0 else 0.0
+    return math.exp(-lam + k * math.log(lam) - math.lgamma(k + 1))
+
+
+def score_matrix(lam_h, lam_a, draw_boost=1.0, max_goals=10):
+    """Joint scoreline distribution from two Poisson means, with a draw correction.
+
+    Independent Poissons systematically underproduce draws — the classic weakness of this
+    model, and measurable: across 22 divisions the observed draw rate ran 23.7% to 32.8%
+    while independent Poissons predicted 20.7% to 26.9%. Rather than leave that error in,
+    the diagonal is scaled by a factor fitted per division against its own history and the
+    matrix is renormalized.
+
+    Lives here rather than in the build script because both the fitter and the live model
+    must use exactly the same construction; two copies would drift apart.
+    """
+    ph = [poisson_pmf(lam_h, i) for i in range(max_goals + 1)]
+    pa = [poisson_pmf(lam_a, j) for j in range(max_goals + 1)]
+    m = [[ph[i] * pa[j] for j in range(max_goals + 1)] for i in range(max_goals + 1)]
+    if draw_boost != 1.0:
+        for i in range(max_goals + 1):
+            m[i][i] *= draw_boost
+    total = sum(sum(row) for row in m)
+    if total > 0:
+        m = [[v / total for v in row] for row in m]
+    return m
 
 
 def handicap_probs(gd, line, side):

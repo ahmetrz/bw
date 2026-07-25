@@ -86,6 +86,9 @@ jobs:
             --out daily_report.json \
             ${FLAG}
 
+      - name: Grade yesterday's predictions
+        run: python3 tools/grade_predictions.py || echo "notlandirma atlandi"
+
       - name: Build mobile coupon
         run: |
           python3 tools/make_coupon.py \
@@ -101,7 +104,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Ham cekim repoya girmiyor; sadece rapor ve kupon versiyonlaniyor.
-          git add daily_report.json coupon.html || true
+          git add daily_report.json coupon.html data/predictions.jsonl data/scoreboard.json || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
           git pull --rebase origin main || true
           git push || echo "push atlandi"

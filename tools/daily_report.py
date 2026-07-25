@@ -26,7 +26,8 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import bwfeed, model_football, parlay, pick, score, settlement, telegram, tr  # noqa: E402
+from engine import (bwfeed, model_elo, model_football, parlay, pick, score,  # noqa: E402
+                    settlement, telegram, tr)
 
 
 def load(path):
@@ -54,7 +55,7 @@ def within(rows, hours, now=None):
     return out
 
 
-def analyse(rows, hours, index):
+def analyse(rows, hours, index, elo_model=None):
     """One window's worth of analysis."""
     windowed = within(rows, hours)
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
@@ -63,7 +64,7 @@ def analyse(rows, hours, index):
     if not windowed:
         return {"hours": hours, "matches": 0, "picks": [], "skipped": {}}
 
-    picks, skipped = pick.for_fixtures(rows=windowed, index=index)
+    picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model)
     settlement.annotate(picks)
     # Picks come from the unfiltered rows, so they carry no hold yet. Attach it here so
     # the parlay's hard-rule-4 figures can be computed from the same numbers as the scan.
@@ -152,9 +153,69 @@ def build_message(results, source_note=""):
     return "\n".join(head + body + tail)
 
 
+def log_predictions(results, path):
+    """Append every selection to the permanent prediction log, for later grading.
+
+    Written the moment the pick is made, never reconstructed afterwards. A record built
+    after the fact could quietly be a record of what we WOULD have picked, which is how a
+    backtest flatters itself; this is what was actually offered, at the odds actually
+    available, before the result was known.
+
+    Deduplicated on (date, match, market, selection) so re-running a day is harmless.
+    """
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    seen = set()
+    if os.path.exists(path):
+        with open(path) as f:
+            for line in f:
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                seen.add((r.get("date"), r.get("match_id"), r.get("market_line"),
+                          r.get("outcome_id")))
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    stamp = datetime.now(timezone.utc).isoformat()
+    added = 0
+    # The longest window is the full card; shorter windows are subsets of it, so logging
+    # only the last window records each pick once.
+    for p in (results[-1]["picks"] if results else []):
+        key = (today, p.get("match_id", p.get("fixture_id")),
+               p["market_key"][1], p.get("outcome_id"))
+        if key in seen:
+            continue
+        with open(path, "a") as f:
+            f.write(json.dumps({
+                "date": today,
+                "logged_at": stamp,
+                "match_id": p.get("match_id", p.get("fixture_id")),
+                "sport_id": p.get("sport_id"),
+                "division": (p.get("model_probs") or {}).get("_division")
+                            or p.get("division"),
+                "league": p.get("league"),
+                "start": p.get("start"),
+                "p1": p.get("p1"), "p2": p.get("p2"),
+                "market_line": p["market_key"][1],
+                "outcome_id": p.get("outcome_id"),
+                "selection": p.get("selection"),
+                "selection_tr": tr.pick(p),
+                "ladder_rung": p.get("ladder_rung"),
+                "direction": p.get("direction"),
+                "odds": p.get("odds"),
+                "model_survival": p.get("model_survival"),
+                "model_source": p.get("model_source"),
+                "result": None,
+            }, ensure_ascii=False) + "\n")
+        seen.add(key)
+        added += 1
+    return added
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
+    ap.add_argument("--predictions-log", default="data/predictions.jsonl")
     ap.add_argument("--windows", default=",".join(str(h) for h in config.DAILY_WINDOWS_HOURS))
     ap.add_argument("--out", default="daily_report.json")
     ap.add_argument("--no-telegram", action="store_true")
@@ -168,15 +229,22 @@ def main():
     rows = bwfeed.normalize(data)
     print(f"normalized rows: {len(rows)} from {len(data)} feed entries")
 
+    # Our own model first — it is fitted from history and works out of season.
+    elo_model = model_elo.load()
+    if elo_model:
+        print(f"Elo model: {len(elo_model['divisions'])} divisions, "
+              f"{elo_model['matches']} matches fitted")
+    else:
+        print("Elo model absent — run tools/build_football_model.py", file=sys.stderr)
     try:
         index = model_football.build_index()
         print(f"ClubElo fixtures indexed: {len(index)}")
     except Exception as e:
-        print(f"model unavailable: {e}", file=sys.stderr)
+        print(f"ClubElo unavailable: {e}", file=sys.stderr)
         index = {}
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = [analyse(rows, h, index) for h in windows]
+    results = [analyse(rows, h, index, elo_model) for h in windows]
 
     for r in results:
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "
@@ -215,6 +283,9 @@ def main():
     with open(args.out, "w") as f:
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out}")
+
+    logged = log_predictions(results, args.predictions_log)
+    print(f"prediction log: {logged} new rows in {args.predictions_log}")
 
     message = build_message(results, source_note=f"kaynak: {os.path.basename(args.input)}")
     if args.no_telegram:

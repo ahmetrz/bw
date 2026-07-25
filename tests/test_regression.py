@@ -19,7 +19,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import bwfeed, ladder, pick, score, settlement, telegram  # noqa: E402
+from engine import bwfeed, grade, ladder, pick, score, settlement, telegram  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
@@ -359,6 +359,63 @@ class TestRegression(unittest.TestCase):
             self.assertLessEqual(len(p), telegram.MAX_LEN)
         # Nothing may be dropped on the way through.
         self.assertEqual(sum(len(p) for p in parts) + len(parts) - 1, len(text))
+
+    def test_grader_settles_every_ladder_market(self):
+        """The grader is what makes everything else falsifiable, so its arithmetic is
+        pinned case by case.
+
+        The push cases matter most. A grader that scores a returned stake as a loss makes
+        whole-number handicaps look worse than they are, and the next round of
+        "improvements" would then strip the safest rungs out of the ladder — the
+        measurement would quietly destroy the thing it is measuring.
+
+        Scores are written home-first and the direction is stated in the label, because
+        getting that backwards is exactly the mistake these cases were written to catch.
+        """
+        def row(group, oid, line):
+            return {"market_key": (1, f"{group}|{line}"), "outcome_id": oid}
+
+        cases = [
+            ("1X2 home, home wins 2-1", row(1, 1, "None"), 2, 1, grade.WIN),
+            ("1X2 home, drawn 1-1", row(1, 1, "None"), 1, 1, grade.LOSS),
+            ("DC 1X, drawn 1-1", row(8, 4, "None"), 1, 1, grade.WIN),
+            ("DC X2, home wins 2-0", row(8, 6, "None"), 2, 0, grade.LOSS),
+            ("away +1.5, away loses by 2", row(2, 8, "-1.5"), 2, 0, grade.LOSS),
+            ("away +1.5, away loses by 1", row(2, 8, "-1.5"), 1, 0, grade.WIN),
+            ("away +1, away loses by exactly 1", row(2, 8, "-1"), 1, 0, grade.PUSH),
+            ("away +1, away loses by 2", row(2, 8, "-1"), 2, 0, grade.LOSS),
+            ("home +2.5, home loses by 2", row(2, 7, "2.5"), 0, 2, grade.WIN),
+            ("home +2.5, home loses by 3", row(2, 7, "2.5"), 0, 3, grade.LOSS),
+            ("home +0.25, drawn 1-1", row(2, 7, "0.25"), 1, 1, grade.HALF),
+            ("home +0.25, home loses 0-1", row(2, 7, "0.25"), 0, 1, grade.LOSS),
+            ("over 2.5, 2-1", row(17, 9, "2.5"), 2, 1, grade.WIN),
+            ("under 2.5, 2-1", row(17, 10, "2.5"), 2, 1, grade.LOSS),
+            ("over 3.0 exact, 2-1", row(17, 9, "3.0"), 2, 1, grade.PUSH),
+        ]
+        for label, r, hg, ag, expected in cases:
+            self.assertEqual(grade.settle(r, hg, ag), expected, label)
+
+    def test_grader_leaves_unknown_markets_ungraded(self):
+        """A market the grader does not understand must return None, not a verdict.
+
+        Scoring a market on a guess is worse than not scoring it: it puts a fabricated
+        number into the hit rate that every later decision is steered by."""
+        unknown = {"market_key": (1, "9999|None"), "outcome_id": 12345}
+        self.assertIsNone(grade.settle(unknown, 2, 1))
+
+    def test_push_is_neither_a_win_nor_a_loss(self):
+        """A returned stake must not be counted in either column."""
+        s = grade.summarize([
+            {"result": grade.WIN, "odds": 2.0},
+            {"result": grade.PUSH, "odds": 1.5},
+            {"result": grade.LOSS, "odds": 1.8},
+        ])
+        self.assertEqual((s["win"], s["push"], s["loss"]), (1, 1, 1))
+        # Hit rate is over DECIDED legs, so the push is excluded from the denominator.
+        self.assertAlmostEqual(s["hit_rate"], 0.5)
+        # Staked 3, returned 2.0 (win) + 1.0 (push) + 0 = 3.0 -> break even.
+        self.assertAlmostEqual(s["returned"], 3.0)
+        self.assertAlmostEqual(s["roi_pct"], 0.0)
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must
