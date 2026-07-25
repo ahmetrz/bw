@@ -1,0 +1,263 @@
+{
+  "source": "betwinner LineFeed GetSportsShortZip partner=159",
+  "pulled": "2026-07-25",
+  "count": 64,
+  "sports": [
+    {
+      "id": 1,
+      "name": "Football"
+    },
+    {
+      "id": 2,
+      "name": "Ice Hockey"
+    },
+    {
+      "id": 3,
+      "name": "Basketball"
+    },
+    {
+      "id": 4,
+      "name": "Tennis"
+    },
+    {
+      "id": 5,
+      "name": "Baseball"
+    },
+    {
+      "id": 6,
+      "name": "Volleyball"
+    },
+    {
+      "id": 7,
+      "name": "Rugby"
+    },
+    {
+      "id": 8,
+      "name": "Handball"
+    },
+    {
+      "id": 9,
+      "name": "Boxing"
+    },
+    {
+      "id": 10,
+      "name": "Table Tennis"
+    },
+    {
+      "id": 11,
+      "name": "Chess"
+    },
+    {
+      "id": 12,
+      "name": "Billiards"
+    },
+    {
+      "id": 13,
+      "name": "American Football"
+    },
+    {
+      "id": 14,
+      "name": "Futsal"
+    },
+    {
+      "id": 16,
+      "name": "Badminton"
+    },
+    {
+      "id": 17,
+      "name": "Water Polo"
+    },
+    {
+      "id": 18,
+      "name": "Motorsport"
+    },
+    {
+      "id": 19,
+      "name": "Biathlon"
+    },
+    {
+      "id": 20,
+      "name": "TV Games"
+    },
+    {
+      "id": 21,
+      "name": "Darts"
+    },
+    {
+      "id": 22,
+      "name": "Alpine Skiing"
+    },
+    {
+      "id": 23,
+      "name": "Ski Jumping"
+    },
+    {
+      "id": 24,
+      "name": "Skiing"
+    },
+    {
+      "id": 25,
+      "name": "Beach Soccer"
+    },
+    {
+      "id": 26,
+      "name": "Formula 1"
+    },
+    {
+      "id": 27,
+      "name": "Field Hockey"
+    },
+    {
+      "id": 28,
+      "name": "Australian Rules"
+    },
+    {
+      "id": 29,
+      "name": "Beach Volleyball"
+    },
+    {
+      "id": 30,
+      "name": "Snooker"
+    },
+    {
+      "id": 31,
+      "name": "Motorbikes"
+    },
+    {
+      "id": 36,
+      "name": "Bicycle Racing"
+    },
+    {
+      "id": 37,
+      "name": "Swimming"
+    },
+    {
+      "id": 38,
+      "name": "Poker"
+    },
+    {
+      "id": 40,
+      "name": "Esports"
+    },
+    {
+      "id": 41,
+      "name": "Golf"
+    },
+    {
+      "id": 44,
+      "name": "Horse Racing"
+    },
+    {
+      "id": 48,
+      "name": "Lacrosse"
+    },
+    {
+      "id": 56,
+      "name": "Martial Arts"
+    },
+    {
+      "id": 60,
+      "name": "Fencing"
+    },
+    {
+      "id": 63,
+      "name": "Sailing"
+    },
+    {
+      "id": 64,
+      "name": "Shooting"
+    },
+    {
+      "id": 66,
+      "name": "Cricket"
+    },
+    {
+      "id": 68,
+      "name": "Greyhound Racing"
+    },
+    {
+      "id": 69,
+      "name": "Toto"
+    },
+    {
+      "id": 80,
+      "name": "Gaelic Football"
+    },
+    {
+      "id": 81,
+      "name": "Sumo"
+    },
+    {
+      "id": 82,
+      "name": "Lottery"
+    },
+    {
+      "id": 87,
+      "name": "Special Bets"
+    },
+    {
+      "id": 92,
+      "name": "Trotting"
+    },
+    {
+      "id": 102,
+      "name": "Speedway"
+    },
+    {
+      "id": 112,
+      "name": "Weightlifting"
+    },
+    {
+      "id": 126,
+      "name": "Hurling"
+    },
+    {
+      "id": 132,
+      "name": "Horse Racing AntePost"
+    },
+    {
+      "id": 133,
+      "name": "Trotting AntePost"
+    },
+    {
+      "id": 138,
+      "name": "Surfing"
+    },
+    {
+      "id": 151,
+      "name": "Greyhound Racing AntePost"
+    },
+    {
+      "id": 155,
+      "name": "Arm Wrestling"
+    },
+    {
+      "id": 176,
+      "name": "Weather"
+    },
+    {
+      "id": 189,
+      "name": "UFC"
+    },
+    {
+      "id": 202,
+      "name": "Politics"
+    },
+    {
+      "id": 278,
+      "name": "Bare-knuckle Boxing"
+    },
+    {
+      "id": 303,
+      "name": "Games of the Future"
+    },
+    {
+      "id": 307,
+      "name": "Pro Wrestling"
+    },
+    {
+      "id": 314,
+      "name": "Polybet"
+    }
+  ]
+}

@@ -44,7 +44,11 @@ _RULES = {
     BASKETBALL: {
         "scope": "includes_ot",
         "detail": "Moneyline, handicap and totals include overtime; quarter/half markets do not.",
-        "by_group": {},
+        "by_group": {
+            101: "Two-way moneyline. Includes overtime, so there is no draw.",
+            2: "Handicap on the full game, overtime included.",
+            17: "Total points on the full game, overtime included.",
+        },
         # 1xBet-family books usually include OT on full-game basketball, but the label
         # must be read before this is stated as fact.
         "needs_confirmation": True,
@@ -52,7 +56,13 @@ _RULES = {
     TENNIS: {
         "scope": "match",
         "detail": "Settles on the completed match. Retirement VOIDS set-handicap, totals and correct-score unless already decided.",
-        "by_group": {},
+        "by_group": {
+            1: "Match winner. Two-way — tennis has no draw.",
+            109: "SET handicap. In a best-of-3, +1.5 sets loses only to an 0-2 defeat, so it is the 'wins a set' bet.",
+            2: "GAME handicap, not sets. The line counts games.",
+            17: "Total GAMES, not sets.",
+            182: "Total SETS.",
+        },
         "needs_confirmation": True,
     },
     ICE_HOCKEY: {
@@ -60,14 +70,33 @@ _RULES = {
         "detail": ("1xBet-family trap: totals and handicaps frequently default to REGULATION "
                    "time unless the label says 'incl. OT'. Moneyline includes OT/shootout; the "
                    "three-way is regulation. The same 'Over 5.5' can be two different bets."),
-        "by_group": {},
+        # Confirmed on a real NHL payload: the feed carries BOTH markets on the same game.
+        # Group 1 priced 1 / X / 2 at 2.357 / 4.315 / 2.667 — a draw is a live outcome, so
+        # it settles at 60 minutes. Group 101 priced two ways at 1.853 / 2.035 with no draw
+        # available, which is only possible once overtime and the shootout decide it. Both
+        # carried the same 3.1% hold, so nothing but the outcome count distinguishes them
+        # in the raw feed. A ladder that walked from one to the other would silently change
+        # what the bet settles on.
+        "by_group": {
+            1: "Three-way result, settles at the end of REGULATION (60 minutes). A draw is a real outcome.",
+            101: "Two-way moneyline, INCLUDES overtime and the shootout. No draw. Same game as the three-way, different bet.",
+            8: "Double chance on the REGULATION three-way — 'does not lose' means not losing after 60 minutes.",
+            2: "Handicap. Scope NOT confirmed on Betwinner: this family often settles hockey handicaps on regulation.",
+            17: "Total goals. Scope NOT confirmed on Betwinner: may exclude overtime.",
+        },
         "needs_confirmation": True,
     },
     TABLE_TENNIS: {
         "scope": "match",
         "detail": ("Settles on the completed match. Format (Bo5 vs Bo7) must be read PER MATCH — "
                    "playoffs switch to Bo7. Retirement voids undetermined markets."),
-        "by_group": {},
+        "by_group": {
+            1: "Match winner. Two-way — no draw.",
+            7099: "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
+            2: "POINT handicap, not sets. The line counts points.",
+            17: "Total POINTS, not sets.",
+            2604: "Total SETS.",
+        },
         "needs_confirmation": True,
     },
 }

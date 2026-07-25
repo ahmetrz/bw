@@ -1,0 +1,333 @@
+{
+  "sport": "badminton_beachvolley_fencing",
+  "betwinner_sport_ids": [16, 29, 60],
+  "researched": "2026-07-25",
+  "headline": "Three two-outcome sports that look alike on a bet slip and behave oppositely in the tail. Badminton games are CAPPED at 30, so the right tail is truncated and a symmetric totals model overprices the over. Beach sets are UNCAPPED (win by 2), so the same model underprices the over. Fencing has no games or sets at all - the middle rung of the safety ladder does not exist - and its POOL (5 touches) and DIRECT-ELIMINATION (15 touches) stages are a 3x difference in touch count on the same nominal 'total touches' market.",
+
+  "statistics": [
+    {
+      "id": "bad_rally_length",
+      "sport": "badminton",
+      "definition": "Mean shots per rally and mean rally duration in seconds; also the share of rallies over ~20 shots.",
+      "drives": "Match DURATION and attrition, not points. Two long-rally grinders produce the same 21-19 as two shot-makers but take 40% longer, which is what feeds third-game collapse and next-round fatigue.",
+      "availability": "NOT in any free source verified here. BWF publishes it only inside broadcast graphics and the paid BWF data feed. Derive a proxy from match duration / total points where duration is published.",
+      "caution": "Do not use rally length as a totals input directly - it is near-orthogonal to points scored. It is a fatigue and live-duration input."
+    },
+    {
+      "id": "bad_points_on_serve",
+      "sport": "badminton",
+      "definition": "Share of rallies won when serving, under 21-point rally scoring.",
+      "drives": "The structural asymmetry of the sport. Unlike tennis, table tennis or volleyball, the badminton serve is NOT an advantage: the low serve must be struck upward below the 1.15 m fixed service height, so the receiver attacks first and in elite men's singles wins slightly MORE than half of rallies.",
+      "availability": "Not published free. Must be assumed near-neutral-to-negative and calibrated, never imported from a tennis hold model.",
+      "caution": "The single highest-value structural correction in badminton. Any serve-hold model ported from tennis is wrong in sign, not just in magnitude."
+    },
+    {
+      "id": "bad_error_rate",
+      "sport": "badminton",
+      "definition": "Unforced errors per game; net-cord and long/wide errors separated where available.",
+      "drives": "Deuce frequency and the size of the deuce tail. High-error pairs generate more 21-19/22-20 endings than clean players at the same win rate.",
+      "availability": "Not free. Proxy from the observed share of that player's games decided past 21 (derivable from Wikipedia draw scores)."
+    },
+    {
+      "id": "bad_deciding_game",
+      "sport": "badminton",
+      "definition": "Win rate in third games, and share of matches that reach a third game.",
+      "drives": "Total games over/under 2.5 and the +1.5 game handicap. It is the closest thing badminton has to a directly observable market driver.",
+      "availability": "DERIVABLE FREE from Wikipedia draw brackets - each match carries the full per-game score, so third-game reach and third-game win rate both fall out of the bracket parse.",
+      "caution": "Third-game reach is a function of the RANKING GAP, not of player quality - two elite players go three, an elite versus a qualifier does not. Never feed raw player strength."
+    },
+    {
+      "id": "bad_h2h",
+      "sport": "badminton",
+      "definition": "Head-to-head record and per-game scores between the two players.",
+      "drives": "Match winner, and materially so - badminton has strong style match-ups (defensive retriever versus steep attacker) that persist across years.",
+      "availability": "tournamentsoftware.com has a dedicated /head-2-head endpoint but it is ROBOTS-DISALLOWED. Reconstruct H2H yourself from accumulated Wikipedia bracket parses.",
+      "caution": "Elite badminton fields are small and repeat-meeting counts are high, so H2H overtakes a ranking prior faster here than in a large-field sport."
+    },
+    {
+      "id": "bad_ranking_gap",
+      "sport": "badminton",
+      "definition": "Difference in BWF World Ranking points (not ranks) between the two players.",
+      "drives": "Match winner and, through closeness, total games. Points gap is far more informative than rank gap - the points curve is steeply convex at the top.",
+      "availability": "BWF rankings live at bwfbadminton.com (Cloudflare 403) and tournamentsoftware /ranking/ (robots-disallowed). BOTH BLOCKED. Wikipedia carries seeding lists per tournament as a partial substitute.",
+      "caution": "BWF points are a 52-week rolling accumulation weighted by tournament tier, so they encode SCHEDULE VOLUME as well as strength. A player who enters more events outranks an equal player who enters fewer."
+    },
+    {
+      "id": "bad_congestion_fatigue",
+      "sport": "badminton",
+      "definition": "Matches played in the trailing 7 and 14 days, count of back-to-back tournament weeks, and travel legs between them.",
+      "drives": "Third-game fade, retirement risk, and early-round upsets. The BWF World Tour deliberately schedules paired weeks in one region (the Asian and European swings), so a player can fence a full main draw, fly, and start again four days later.",
+      "availability": "DERIVABLE FREE from Wikipedia tournament dates plus bracket depth reached - no dedicated feed needed.",
+      "caution": "Qualifiers arrive having already played 2-3 extra matches before the main draw; this is systematically underpriced in first-round markets."
+    },
+    {
+      "id": "bad_shuttle_and_hall",
+      "sport": "badminton",
+      "definition": "Shuttle speed grade selected for the venue, hall temperature and altitude, and measured court drift.",
+      "drives": "Rally length and the attack/defence balance. Feather shuttles are speed-graded and chosen so that a full underhand stroke from the back line lands 530-990 mm short of the far back line; at altitude or in heat the shuttle flies longer, so a slower grade is used.",
+      "availability": "NOT published as data anywhere free. Venue drift is discussed only in press and player interviews.",
+      "caution": "Drift is end-dependent within a single hall, which is why ends are changed at 11 in the third game. It is a within-match effect, not a match-level one - do not model it as a venue constant."
+    },
+
+    {
+      "id": "bv_sideout",
+      "sport": "beach_volleyball",
+      "definition": "Share of rallies won when receiving serve (side-out %), and its complement, break-point %.",
+      "drives": "Everything. As in indoor, side-out is the master metric; a two-player side-out engine determines set totals and the set distribution simultaneously.",
+      "availability": "FIVB VIS is the only free carrier of beach match data and it is ROBOTS-RESTRICTED for us (see blocked). Volleyball World renders it client-side behind a disallowed API.",
+      "caution": "Beach side-out baselines are NOT indoor baselines. Only two players cover 16x8 m, the block counts as a team touch, and open-hand tips are illegal - the whole rally economy differs. Never port an indoor side-out prior."
+    },
+    {
+      "id": "bv_wind",
+      "sport": "beach_volleyball",
+      "definition": "Pair performance split by wind speed band and by windward/leeward end; serve-error rate in wind.",
+      "drives": "Favourite edge compression and total points. Wind raises serve error and reception error for BOTH pairs, which lengthens sets and pushes the underdog's set-win probability up.",
+      "availability": "No free feed publishes wind per match. Reconstructable only by joining match times and venue coordinates to a free weather history API - an inference, not a source.",
+      "caution": "Sides are switched every 7 points in sets 1-2 and every 5 in set 3 precisely to neutralise wind, so wind does NOT create a persistent one-sided edge - it creates VARIANCE. Model it as a variance term, not a mean shift."
+    },
+    {
+      "id": "bv_sand_conditions",
+      "sport": "beach_volleyball",
+      "definition": "Sand depth, grain coarseness and moisture; indoor-sand versus outdoor-sand events.",
+      "drives": "Jump height and defensive range, so it moves the attack/defence balance and therefore rally length and totals. Deep or wet sand suppresses blocking and lengthens rallies.",
+      "availability": "Not published anywhere as data. Qualitative only.",
+      "caution": "Treat as an event-level unknown, not a modelled variable. Its main use is to widen intervals at unfamiliar venues."
+    },
+    {
+      "id": "bv_pair_ranking",
+      "sport": "beach_volleyball",
+      "definition": "FIVB/Beach Pro Tour team entry ranking, plus the two individual player rankings that compose it.",
+      "drives": "Match winner and seeding. Entry ranking is built from the two players' points, so it is a SUM, not a measure of the pair.",
+      "availability": "Ranking pages exist on Volleyball World but the underlying API is robots-disallowed; VIS is robots-restricted. BLOCKED for automated use.",
+      "caution": "Because entry rank sums two individuals, a newly-formed pair of two strong players seeds high with zero joint history. This is the single biggest systematic mispricing in beach - see bv_pair_stability."
+    },
+    {
+      "id": "bv_pair_stability",
+      "sport": "beach_volleyball",
+      "definition": "Number of tournaments and matches this exact pair has played together, and time since the pair was formed.",
+      "drives": "Match winner and set totals, through defence/block coordination which is pair-specific and takes months to build.",
+      "availability": "Derivable from any archive of beach results by grouping on the player-pair key - but that requires an archive, and every free beach archive is currently blocked to us.",
+      "caution": "Beach partnerships dissolve and re-form constantly, including mid-season and between the national and world tours. A pair key must be the UNORDERED PAIR of player ids; treating 'Team X' as a stable entity across seasons corrupts every history-based feature."
+    },
+    {
+      "id": "bv_session_time",
+      "sport": "beach_volleyball",
+      "definition": "Scheduled session: morning, afternoon or evening/floodlit.",
+      "drives": "Interacts with wind and sun. Afternoon sessions at most coastal venues carry the strongest thermal wind; evening sessions under lights remove the sun-in-eyes factor that drives serve-reception error on one end.",
+      "availability": "Free from any published schedule, including the Volleyball World schedule pages (HTML is permitted; the API is not).",
+      "caution": "This is the cheapest real beach feature available - it needs only a schedule, not a stats feed."
+    },
+
+    {
+      "id": "fe_weapon",
+      "sport": "fencing",
+      "definition": "The weapon: foil, epee or sabre. Determines target area, whether right-of-way applies, and whether both fencers can score on one action.",
+      "drives": "The entire scoring process, and therefore every totals and correct-score market. This is not a feature - it is a model selector.",
+      "availability": "FREE and VERIFIED - fie.org event titles state weapon and gender explicitly ('Senior Women's Individual Epee').",
+      "caution": "In EPEE there is no right of way and a double touch scores for BOTH fencers, so one action can add 2 to the total. In foil and sabre, priority means one action can only ever add 1. An epee totals model and a foil totals model are different stochastic processes, not the same process with different parameters."
+    },
+    {
+      "id": "fe_touch_rates",
+      "sport": "fencing",
+      "definition": "Touches scored (TS) and touches received (TR) per pool bout, plus the indicator IND = TS - TR.",
+      "drives": "Touch handicaps, total touches, and the winner market via a touch-level model.",
+      "availability": "FREE and VERIFIED by body on fie.org pool-results pages, which tabulate Athlete, V, M, V/M, TS, TR, IND and Status per fencer.",
+      "caution": "Pool TS is bounded by 5 x matches, so TS is censored at the top - a fencer who wins every pool bout 5-x has TS exactly 5M and their true scoring rate is unobserved. Use TR and IND, which are uncensored, in preference to TS."
+    },
+    {
+      "id": "fe_priority_conversion",
+      "sport": "fencing",
+      "definition": "In foil and sabre, the share of exchanges in which a fencer is awarded priority (right of way); and separately, the share of tied direct-elimination bouts won after the one-minute overtime.",
+      "drives": "Foil and sabre winner markets, and the 15-14 correct-score cell specifically.",
+      "availability": "NOT published free at action level - FIE publishes only final bout scores, never touch-by-touch with priority attribution.",
+      "caution": "Overtime priority is assigned by RANDOM DRAW before the extra minute, so a tied bout is decided by a coin flip if nobody scores. That is irreducible variance no rating can capture, and it lands disproportionately in the 15-14 cell."
+    },
+    {
+      "id": "fe_bout_format",
+      "sport": "fencing",
+      "definition": "Stage of the competition: pool bout (5 touches, 3 minutes), individual direct elimination (15 touches, three 3-minute periods), or team relay (45 touches over 9 bouts).",
+      "drives": "Every total-touches line. A pool bout maxes at 9 total touches; a DE bout runs to 15-14 = 29; a team relay to 45+.",
+      "availability": "FREE and VERIFIED - fie.org exposes 'Pools', 'Pool Results', 'Preliminary' and 'Tableau' as separate tabs per event, so the stage is unambiguous.",
+      "caution": "THE headline fencing trap. A 'total touches' line without a stage tag is uninterpretable."
+    },
+    {
+      "id": "fe_ranking_gap",
+      "sport": "fencing",
+      "definition": "Difference in FIE world ranking points between the two fencers; and the seeding gap, which drives who meets whom in the tableau.",
+      "drives": "Match winner and touch handicap.",
+      "availability": "fie.org /athletes is reachable (HTTP 200, 216 KB) and robots-permitted; ranking figures render on athlete pages.",
+      "caution": "Fencing is the highest-variance of the three. In the Asian Championships women's epee event sampled here, the fencer who topped the pools at 6/6 with a +21 indicator lost her T32 bout 10-15. Pool dominance does not transfer to the tableau - do not let pool form dominate a DE prior."
+    },
+    {
+      "id": "fe_stage_variance",
+      "sport": "fencing",
+      "definition": "Empirical distribution of the loser's touch count in direct-elimination bouts.",
+      "drives": "Touch handicap and total touches.",
+      "availability": "DERIVABLE FREE from fie.org tableau pages. Measured directly here: across all completed DE bouts of one senior women's epee event, the winner's score was exactly 15 in 58 of 58 cases, while loser scores spread across 1-14 with mass concentrated at 9, 11 and 13.",
+      "caution": "Winner-side touches are almost a constant at 15; ALL the information in a DE totals market lives in the loser's score. Model the loser's touch count, then add 15 - do not model the sum directly."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "fie_org",
+      "url": "https://fie.org/tournaments/{year}/{tid}/event/{eid}/{results|pools|pool-results|tableau}",
+      "auth": "none (scraping; server-rendered HTML)",
+      "verified": true,
+      "coverage": "THE best source found for any of the three sports. Body-read on the 2026 Championnats Asiatiques (Delhi, Senior Women's Individual Epee, 23 nations / 67 athletes). Four separate server-rendered tabs per event: final Results (rank, name, country, ranking points), Pool Results (Athlete, V, M, V/M, TS, TR, IND, Status), Preliminary, and Tableau (per-bout touch scores by round T64/T32/T16/QF/SF/Final, with byes explicitly marked). Also /athletes and /events. Sibling event ids on the same tournament expose all 12 senior individual and team events.",
+      "note": "robots.txt is 'User-Agent: * / Disallow:' - fully permitted. BUT the page footer carries an explicit all-rights-reserved notice: 'No part of this site may be reproduced, stored in a retrieval system or transmitted in any way or by any means ... without the written permission of FIE'. robots.txt PERMITS crawling while the terms FORBID storage - operator must resolve this before building a persistent archive. Site is a Nuxt app whose /_payload.json endpoints return empty (56 bytes) and whose /api/* is a live RFC-7807 service with no discoverable resource names - scrape the rendered HTML, do not hunt for the API."
+    },
+    {
+      "id": "wikipedia_action_api",
+      "url": "https://en.wikipedia.org/w/api.php?action=parse&page={title}&prop=wikitext&format=json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "The ONLY working free carrier of badminton per-game scores found. Body-read on '2024 All England Open': 62 KB of wikitext containing full draws for all five disciplines as {{4TeamBracket-Tennis3}} and {{8TeamBracket-Tennis3}} templates. Extracted 930 RD*-score*-* parameters, 699 numeric, giving per-GAME scores plus seeds, venue, dates and tier.",
+      "note": "TWO TRAPS. (1) The obvious title '2024 All England Open Badminton Championships' is MISSING - the real title is '2024 All England Open'; resolve titles via action=query&list=search first. (2) prop=extracts with explaintext returns 1942 chars and ZERO scores because it strips tables and templates - scores exist ONLY in the raw wikitext template parameters, so a naive extracts-based check would wrongly conclude Wikipedia has no badminton scores. Licence CC BY-SA, attribution required."
+    },
+    {
+      "id": "volleyballworld_schedule_html",
+      "url": "https://en.volleyballworld.com/beachvolleyball/competitions/{comp}/schedule/",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "PARTIAL AND WEAK. Body-read: HTTP 200, 148 KB, correct <title> ('Beach Volleyball Olympic Games Paris 2024 Schedule'), and the sitemap carries 6069 beach URLs of which 1011 are schedule/results/standings pages. But only 1862 chars of the 148 KB are visible text, and that text is UI scaffolding plus literal placeholders - 'Loading Matches', 'Loading Competitions', 'There are no matches that meet your criteria', and a dummy ranking row reading '+10.2 / -10.2'. NO match data is server-rendered.",
+      "note": "Verified as REACHABLE AND PERMITTED, explicitly NOT verified as data-bearing. The real match data loads from the site API, and robots.txt contains 'Disallow: */api/*', so the data path is closed to us by robots even though the HTML shell is open. Usable today only for COMPETITION AND SESSION SCHEDULES (which feeds bv_session_time); useless for scores. A textbook 200-with-an-empty-body."
+    },
+    {
+      "id": "fivb_vis",
+      "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
+      "auth": "none",
+      "verified": true,
+      "coverage": "9256 BEACH tournaments plus 1530 indoor, with per-set points and set duration. REUSED from /home/user/bw/research/volleyball.json, cross-checked not re-derived, per instruction.",
+      "note": "PROVENANCE AND COMPLIANCE FLAG - this entry is NOT verified by body in this session and was deliberately not fetched. https://www.fivb.org/robots.txt was read and names us directly: 'User-agent: ClaudeBot / Disallow: /', alongside a Content-Signal of 'search=yes, ai-train=no, use=reference' asserted as an Article 4 EU DSM reservation of rights. VIS remains the only substantial free beach archive in existence, and it is now off-limits to automated fetching by us. The operator must decide the compliance path - fetch from their own infrastructure under their own user-agent, or request FIVB permission - before any beach model can be built. This restriction is new information that volleyball.json does not record."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "bwfbadminton_estate",
+      "detail": "TOTAL CLOUDFLARE LOCKOUT of every BWF first-party host. bwfbadminton.com HTTP 403 with a 4550-byte 'Sorry, you have been blocked' Cloudflare interstitial - returned even for /robots.txt, so BWF's crawl policy is itself unreadable. extranet-lv.bwfbadminton.com (the live-scoring host) HTTP 403 / 4551 bytes and api.bwfbadminton.com HTTP 403 / 4552 bytes - identical block pages. There is NO free first-party badminton feed: no rankings, no live scores, no match statistics."
+    },
+    {
+      "id": "tournamentsoftware",
+      "detail": "COMPLIANCE-BLOCKED, NOT FETCHED. bwf.tournamentsoftware.com and www.tournamentsoftware.com serve a readable robots.txt whose 'User-agent: *' block disallows every path that carries data: /ranking/, /player/, /player-profile/, /profile/, /head-2-head, /tournament/, /sport/, /match-info/, /league/, /organization/, /visual-livescore/ and /download.aspx. No Allow directive anywhere overrides them. The site is technically reachable and hosts exactly the draws, rankings and H2H this project wants, and every one of those paths is off-limits. This is the single biggest badminton blocker."
+    },
+    {
+      "id": "fencingtimelive",
+      "detail": "COMPLIANCE-BLOCKED, NOT FETCHED. fencingtimelive.com/robots.txt is 30 bytes and reads 'User-agent: * / Disallow: /' - a blanket disallow of the whole site. It is the richest free source of bout-by-bout fencing results outside FIE and it is entirely closed to us."
+    },
+    {
+      "id": "fivb_robots",
+      "detail": "COMPLIANCE-BLOCKED, NOT FETCHED. www.fivb.org/robots.txt names 'User-agent: ClaudeBot / Disallow: /' plus Content-Signal 'ai-train=no, use=reference' as an EU DSM Article 4 reservation. Also disallows GPTBot, CCBot, Google-Extended, Amazonbot, Applebot-Extended, Bytespider and meta-externalagent. See the fivb_vis entry in verified for why this matters more than any other single finding for beach."
+    },
+    {
+      "id": "beachvolleyballworld_dead",
+      "detail": "DOMAIN IS DEAD AND REPURPOSED. www.beachvolleyballworld.com - the former FIVB Beach Pro Tour property - 301-redirects off-host to missionbeachvolleyball.com, which serves HTTP 200 and 10573 bytes of 'Default Parallels Plesk Panel Page / Web Server's Default Page'. /robots.txt is HTTP 404 with 0 bytes. A status-code-only or redirect-following check would score this domain as live and healthy."
+    },
+    {
+      "id": "bvbinfo",
+      "detail": "TLS 'Recv failure: Connection reset by peer' on both bvbinfo.com and www.bvbinfo.com, at HTTP 000 with 0 bytes. Independently confirms the finding already recorded in volleyball.json. bvbinfo is the deepest historical beach archive on the open web and it has now failed for two separate sessions."
+    },
+    {
+      "id": "ophardt",
+      "detail": "www.ophardt.online failed with 'CONNECT tunnel failed, response 502' - this is OUR egress proxy issuing a policy denial at CONNECT time, NOT the site refusing us. Same signature the proxy status endpoint logs for other hosts. Ophardt Team Sportevent runs FIE licensing and much national-federation fencing ranking data. HIGH-VALUE RETEST from a GitHub Actions runner, exactly as volleyball.json flags for dataproject."
+    },
+    {
+      "id": "badmintonstatistics_net",
+      "detail": "badmintonstatistics.net and www.badmintonstatistics.net both return an IIS 10.0 'Detailed Error - 455.0 - ModSecurity Action' page for /robots.txt. WAF-blocked at the edge; the crawl policy cannot even be read."
+    },
+    {
+      "id": "volleyballworld_api",
+      "detail": "en.volleyballworld.com/robots.txt (453 bytes) contains 'Disallow: */api/*' and 'Disallow: */en/*'. The HTML shell is permitted and was verified; the JSON that actually carries beach match data is not. Also note en.volleyballworld.com/sitemap-match.xml is 675 KB and contains essentially zero beach fixtures - it is an INDOOR match index (/volleyball/competitions/...). Beach lives only in the main sitemap.xml, and only as client-rendered pages."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_safety_ladder_note": "The 'wins at least one game/set' rung is the underdog +1.5 handicap, and ONLY that. It is not 'total games over 2.5': over 2.5 requires the match to go the distance, whereas +1.5 also collects when the underdog wins 2-0. In Bo3, underdog +1.5 loses on exactly one scoreline - a 0-2 sweep.",
+    "badminton": {
+      "_rung": "GAME HANDICAP underdog +1.5 == 'underdog wins at least one game'. Betwinner also lists this directly as 'player to win a game'; price the two against each other, they must agree.",
+      "_unmapped": "bad_rally_length is deliberately mapped to NO bet type here. It drives match duration and attrition, which feed live and in-play duration markets that are outside the five pre-match bet types listed. Feeding it into total POINTS is the mistake it exists to warn against - long rallies lengthen a 21-19, they do not change it.",
+      "match_winner": ["bad_ranking_gap", "bad_h2h", "bad_congestion_fatigue", "bad_points_on_serve"],
+      "game_handicap": ["bad_deciding_game", "bad_ranking_gap", "bad_h2h"],
+      "total_games_2_5": ["bad_ranking_gap", "bad_deciding_game"],
+      "total_points": ["bad_error_rate", "bad_ranking_gap", "bad_shuttle_and_hall"],
+      "correct_score": ["bad_ranking_gap", "bad_deciding_game", "bad_h2h"],
+      "player_to_win_a_game": ["bad_deciding_game", "bad_ranking_gap"]
+    },
+    "beach_volleyball": {
+      "_rung": "SET HANDICAP underdog +1.5 == 'underdog wins at least one set'. The 15-point third set makes this rung notably cheaper than the equivalent in badminton, because the decider is closer to a coin flip than the first two sets are.",
+      "match_winner": ["bv_pair_ranking", "bv_pair_stability", "bv_sideout", "bv_wind"],
+      "set_handicap": ["bv_sideout", "bv_pair_stability", "bv_wind"],
+      "total_sets_2_5": ["bv_pair_ranking", "bv_wind", "bv_sideout"],
+      "total_points": ["bv_sideout", "bv_wind", "bv_sand_conditions", "bv_session_time"],
+      "correct_score": ["bv_sideout", "bv_pair_ranking"],
+      "player_to_win_a_set": ["bv_sideout", "bv_wind", "bv_pair_stability"]
+    },
+    "fencing": {
+      "_rung": "THERE IS NO GAME/SET RUNG IN FENCING. A bout is one continuous race to 5 or 15 touches - there is no partition into games or sets, so the middle rung of the safety ladder DOES NOT EXIST. Any Betwinner market labelled 'to win a set' on sport id 60 is a corrupt or mis-templated feed and must be suppressed, not priced. The nearest genuine analogue is the underdog touch handicap (e.g. +4.5 touches in DE), which is a materially different and much less forgiving bet.",
+      "match_winner": ["fe_ranking_gap", "fe_touch_rates", "fe_weapon", "fe_priority_conversion"],
+      "touch_handicap": ["fe_stage_variance", "fe_touch_rates", "fe_bout_format", "fe_weapon"],
+      "total_touches": ["fe_bout_format", "fe_weapon", "fe_stage_variance"],
+      "correct_score": ["fe_stage_variance", "fe_priority_conversion", "fe_bout_format"],
+      "to_win_a_set": ["SUPPRESS - market cannot exist in fencing"]
+    }
+  },
+
+  "rules_critical": [
+    "BADMINTON - A game is to 21 but must be won by 2, EXCEPT that at 29-29 the next point wins outright. Maximum game score is 30-29. The cap truncates the right tail, so a symmetric or normal totals model puts mass above 59 points where the sport allows none and systematically OVERPRICES the over. This is the headline badminton trap.",
+    "BADMINTON - The game-total support HAS HOLES. Without deuce the game ends 21-k, giving totals 21 through 40. With deuce it ends (m+2, m) for m from 20 to 28, giving ONLY the even totals 42, 44, ..., 58 - plus 59 from the 30-29 cap. A game total of 41 is IMPOSSIBLE, and so is every odd total from 41 to 57. Any continuous distribution fitted to game totals is wrong on the support, not merely in the tail.",
+    "BADMINTON - Measured on one full Super 1000 draw (699 per-game scores from the 2024 All England Open), only 42 score-cells exceeded 21 and the maximum reached was 26. Roughly one game in eight goes past 21 and the 30 cap almost never binds. Price the deuce tail as thin AND bounded; do not inflate it to make a symmetric model fit.",
+    "BADMINTON - Best of 3 games, so the underdog +1.5 game handicap loses on exactly one scoreline (0-2) and 'total games over 2.5' is a DIFFERENT event from it. Do not treat the two as interchangeable expressions of closeness.",
+    "BADMINTON - The serve is not an advantage. The low serve must be struck below the 1.15 m fixed service height so the receiver attacks first; in elite men's singles the receiver wins slightly more than half of rallies. A serve-hold model ported from tennis or table tennis is wrong in SIGN.",
+    "BADMINTON - Ends change at the end of every game and again in the third game when the leading score reaches 11, specifically because hall drift is end-dependent. Drift is therefore a within-match variance effect, never a venue-level constant applied to one player.",
+    "BADMINTON - There is a 60-second interval at 11 points in every game and 120 seconds between games. These are fixed structural breaks that reset momentum and must be modelled as such in any live or run-based market.",
+
+    "BEACH - Sets 1 and 2 are to 21 and the third set is to 15, ALL win-by-2 and ALL UNCAPPED. Unlike badminton there is no ceiling, so beach point totals are right-skewed and a symmetric model UNDERPRICES the over. Badminton and beach need opposite tail corrections - never share a totals engine between sport 16 and sport 29.",
+    "BEACH - The third set to 15 compresses the favourite's edge toward a coin flip exactly as the indoor fifth set does. Per-set point averages must EXCLUDE third sets or every total-points line inherits a 15-point set as though it were a 21-point one.",
+    "BEACH - One technical timeout fires in sets 1 and 2 when the COMBINED score reaches 21, and there is NO technical timeout in the third set. Teams additionally hold one 30-second timeout per set. The set-3 asymmetry means the decider has a different stoppage structure, not just a shorter target.",
+    "BEACH - Sides switch every 7 points in sets 1-2 and every 5 points in the third set, to equalise wind and sun. Wind therefore raises VARIANCE and compresses the favourite's edge; it does not hand a persistent advantage to either pair. Modelling wind as a mean shift is backwards.",
+    "BEACH - The block COUNTS as one of the team's three contacts, and open-hand tips are illegal. Two players cover a 16x8 m court with no rotation, no libero and no substitutions. Nothing in an indoor rally model transfers - this restates and extends the warning already in volleyball.json.",
+    "BEACH - A pair is an UNORDERED PLAYER PAIR, not a franchise. Partnerships dissolve and re-form mid-season, while FIVB entry ranking is the SUM of two individual rankings - so a brand-new pair of two strong players seeds high with zero joint history. Keying history on a team name instead of the player pair corrupts every form feature.",
+    "BEACH - Outdoor events are weather-suspendable and can be moved, delayed across days, or relocated between courts. Suspension and resumption handling differs from an indoor postponement and Betwinner's own rule must be read before any beach market is trusted.",
+
+    "FENCING - POOL bouts are to 5 touches in 3 minutes; DIRECT-ELIMINATION bouts are to 15 touches over three 3-minute periods. A pool bout can total at most 9 touches while a DE bout can reach 29. A 'total touches' line is MEANINGLESS without knowing the stage, and Betwinner's fixture label may not disclose it. This is the headline fencing trap - suppress the market rather than guess the stage.",
+    "FENCING - EPEE has no right of way and a double touch scores for BOTH fencers, so a single action can add 2 to the total. FOIL and SABRE use priority, so an action can only ever add 1. Epee and foil totals are different stochastic processes; one parameterised model cannot serve both.",
+    "FENCING - Target area differs by weapon: foil is torso only, sabre is everything above the waist including head and arms, epee is the entire body. Touch rates are not comparable across weapons and must never be pooled into one rating.",
+    "FENCING - A tied DE bout at the end of regulation goes to ONE MINUTE of sudden death with priority assigned by RANDOM DRAW beforehand; if nobody scores, the fencer holding priority wins. A coin flip decides the bout, and it lands disproportionately in the 15-14 correct-score cell. No rating can price that away.",
+    "FENCING - A DE bout CAN end below 15 if time expires with the scores unequal, which breaks any 'player to reach 15 touches' market even for the winner. Empirically rare: across all completed DE bouts of one senior women's epee championship, the winner scored exactly 15 in 58 of 58 cases. Treat sub-15 wins as a thin but real tail, thickest in epee where the non-combativity rule can advance the clock with no touches at all.",
+    "FENCING - Winner-side touches in DE are effectively a constant at 15, so ALL the information in a DE totals market lives in the LOSER's score. Model the loser's touch count and add 15; modelling the sum directly discards the structure.",
+    "FENCING - BYES are real fixtures in a tableau - 10 of them appeared in a single T64 round sampled here - and a bye means NO BOUT IS FENCED and NO touches are scored. Any market attached to a bye must void, not settle.",
+    "FENCING - Pool ranking is by V/M, then indicator (TS-TR), then TS, and pool TS is CENSORED at 5 x matches for a fencer who wins everything. Use TR and IND for rating; TS alone understates the strongest fencers.",
+    "FENCING - Pool form does not carry to the tableau. In the event sampled, the fencer who topped the pools 6/6 with a +21 indicator lost her first DE bout 10-15. Weight pool results as weak evidence over a short race to 15.",
+    "FENCING - TEAM events are a relay to 45 touches across 9 bouts, each running to a cumulative multiple of 5. Nothing about an individual bout model applies. Team and individual fixtures must be routed to different models and never share a totals line.",
+
+    "ALL THREE - RETIREMENT AND WALKOVER CONVENTIONS DIFFER AND ARE THE MOST COMMON SETTLEMENT SURPRISE. Badminton and beach follow the racket/net-sport pattern where already-determined markets may stand and undetermined ones void; fencing has its own instruments - a 10-minute injury break, withdrawal, and BLACK-CARD DISQUALIFICATION which removes a fencer from the entire competition rather than just the bout. Importing the tennis 'leader wins' assumption overstates EV in all three.",
+    "ALL THREE - These are two-outcome sports with NO DRAW, so a three-way price on sport 16, 29 or 60 is a corrupt feed and must be suppressed rather than normalised into two-way probabilities.",
+    "ALL THREE - BETWINNER'S OWN TERMS MUST BE READ before any of these markets is trusted, specifically for: retirement and walkover, minimum play for a bet to stand, weather suspension and resumption in beach, fencing byes and disqualifications, and whether fencing totals are quoted per bout or per match. None of this is inferable from the odds feed."
+  ],
+
+  "open_questions": [
+    "Does Betwinner tag the fencing STAGE (pool versus direct elimination) anywhere in the fixture or market name? If not, total-touches on sport 60 is unpriceable and should be hard-suppressed. This is the first thing to check in the first real pull.",
+    "Does Betwinner list fencing TEAM events under the same sport id 60 as individual bouts? A 45-touch relay landing in an individual-bout totals model is a silent catastrophe.",
+    "Confirm the current BWF Laws version still specifies 21-point rally scoring, best of 3, with the 29-29 cap. BWF has repeatedly tabled alternative formats (notably 5x11) and proposals have been voted on more than once; the cap and target must be re-read against the live Laws rather than assumed.",
+    "Confirm whether the FIVB technical timeout at combined score 21 is still applied at all Beach Pro Tour tiers - TTOs have been trimmed at some event levels, and their presence changes the stoppage structure of sets 1 and 2.",
+    "Resolve the FIE compliance conflict: robots.txt fully permits crawling while the site footer reserves all rights against storage in a retrieval system. Operator decision needed before building a persistent fencing archive.",
+    "Resolve the FIVB VIS compliance path for beach - fetch from operator infrastructure under their own user-agent, or seek FIVB permission. Without VIS there is NO free beach match archive at all, since bvbinfo is dead and Volleyball World's API is robots-disallowed.",
+    "Retest www.ophardt.online from a GitHub Actions runner - the 502 was our egress proxy, not the site, so it may be the second real fencing source.",
+    "In epee, what is the current FIE resolution of a DOUBLE TOUCH at 14-14 in an individual DE bout - both fencers reaching 15, or annulment and continuation? This determines whether the 15-15 cell exists at all and must be read from the FIE rulebook, not assumed.",
+    "Betwinner fencing correct-score: is it the exact touch score (e.g. 15-12) or a bucketed margin? The two need completely different models."
+  ],
+
+  "key_findings": [
+    "FENCING IS THE ONLY ONE OF THE THREE WITH A GENUINELY OPEN FIRST-PARTY SOURCE. fie.org is robots-permitted, server-renders everything, and exposes pool results (V, M, V/M, TS, TR, IND) and full tableau touch scores per bout as separate tabs. That is richer per-bout data than the other two sports have at any price.",
+    "BADMINTON HAS NO FIRST-PARTY SOURCE AT ALL. Every bwfbadminton.com host is Cloudflare 403 including the live-scoring and api subdomains, and tournamentsoftware.com robots-disallows /ranking/, /player/, /head-2-head and /tournament/ - literally every path that carries data. The fallback is Wikipedia wikitext, which does carry full per-game draw scores but arrives days late and only for notable tournaments.",
+    "BEACH IS THE BIGGEST BLOCKER. FIVB VIS is the only substantial free archive and www.fivb.org/robots.txt now names 'User-agent: ClaudeBot / Disallow: /' with an EU DSM Article 4 reservation. beachvolleyballworld.com is a parked Plesk default page, bvbinfo.com resets the connection for the second session running, and Volleyball World robots-disallows */api/*. Beach modelling is blocked on an operator compliance decision, not on engineering.",
+    "BADMINTON AND BEACH NEED OPPOSITE TAIL CORRECTIONS. Badminton games are capped at 30 so a symmetric model overprices the over; beach sets are uncapped win-by-2 so the same model underprices it. Two sports, adjacent on the bet slip, requiring corrections in opposite directions.",
+    "THE FENCING SAFETY LADDER HAS NO MIDDLE RUNG. Badminton and beach both give 'underdog +1.5 games/sets' as the wins-at-least-one rung. A fencing bout is one continuous race to 5 or 15 touches with no partition, so that rung does not exist - and any 'to win a set' market appearing on sport id 60 is a corrupt feed to suppress, not a bet to price.",
+    "THE BODY-NOT-STATUS RULE PAID FOR ITSELF FOUR TIMES HERE. beachvolleyballworld.com returns 200 with a Plesk default page; Volleyball World returns 200 with 148 KB whose only visible text is 'Loading Matches' and a dummy '+10.2' ranking row; badmintonstatistics.net returns a ModSecurity page in place of robots.txt; and Wikipedia's extracts endpoint returns a clean 200 with ZERO scores while the wikitext behind the same article holds 699 of them. Status codes would have scored all four wrongly, in both directions.",
+    "IN DIRECT-ELIMINATION FENCING THE WINNER'S SCORE IS ALMOST A CONSTANT. Across all completed DE bouts of one senior women's epee championship, 58 of 58 winners finished on exactly 15, with loser scores spread over 1-14. All the information in a DE totals market is in the loser's touch count.",
+    "EPEE DOUBLE TOUCHES BREAK TOTALS PARITY. Epee has no right of way, so one action can add 2 to the total; foil and sabre priority means one action adds at most 1. A single totals model cannot serve all three weapons, and weapon is stated explicitly in every FIE event title so there is no excuse for pooling them.",
+    "BEACH PAIRS ARE NOT TEAMS. FIVB entry ranking is the SUM of two individual rankings, so a newly formed pair of two strong players seeds high with no joint history - the largest systematic mispricing in the sport. History must be keyed on the unordered player pair, never on a team label.",
+    "TWO SOURCES ARE BLOCKED BY POLICY RATHER THAN TECHNOLOGY. tournamentsoftware.com and fencingtimelive.com are both reachable and both carry exactly what this project wants; both were deliberately NOT fetched because robots.txt forbids it. Separately, ophardt.online failed at our own egress proxy (502 to CONNECT) and is a high-value retest from a GitHub Actions runner, exactly as volleyball.json flags for dataproject."
+  ]
+}

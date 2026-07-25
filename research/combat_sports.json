@@ -1,0 +1,710 @@
+{
+  "sport": "combat_sports",
+  "betwinner_sport_ids": [9, 56, 189, 278, 307, 155, 81],
+  "researched": "2026-07-25",
+  "scope_note": "Seven Betwinner sport ids are lumped here but they are NOT one product. Boxing (9), Martial Arts (56), UFC (189) and Bare-knuckle (278) share a modelling skeleton. Sumo (81) is a separate, unusually clean product with its own free API. Pro Wrestling (307) is scripted and Arm Wrestling (155) has no public data - both are excluded, see unmodellable.",
+
+  "statistics": [
+    {
+      "id": "sig_strikes_landed_per_min",
+      "name": "Significant strikes landed per minute (SLpM)",
+      "disciplines": ["mma", "ufc", "bkfc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "Sum SIG.STR. 'landed of attempted' across a fighter's per-round rows, divide by ACTUAL fight time. Verified computable: Islam Makhachev 485 of 830 over 45 logged rounds.",
+      "caveat": "Divide by real elapsed time, not rounds*5 - final rounds are partial and the rounds*5 ceiling biases SLpM downward. Computed against the ceiling Makhachev came out at 2.16; the true figure is higher."
+    },
+    {
+      "id": "sig_strikes_absorbed_per_min",
+      "name": "Significant strikes absorbed per minute (SApM)",
+      "disciplines": ["mma", "ufc", "bkfc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "Pair the two FIGHTER rows sharing a BOUT+ROUND key and read the opponent's landed count. Verified: every bout in the stat file carries both fighters' rows (8647 distinct bouts).",
+      "caveat": "Not published as a column anywhere in the mirror - it only exists once you self-join. Absorbed volume is heavily confounded by whether the fighter chooses to grapple."
+    },
+    {
+      "id": "striking_accuracy",
+      "name": "Significant striking accuracy",
+      "disciplines": ["mma", "ufc", "bkfc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "landed / attempted from the SIG.STR. field; SIG.STR. % is also given per round.",
+      "caveat": "Accuracy is inflated by ground-and-pound volume against a grounded opponent. Split by the DISTANCE / CLINCH / GROUND columns before comparing strikers."
+    },
+    {
+      "id": "striking_defence",
+      "name": "Striking defence (1 - opponent accuracy against you)",
+      "disciplines": ["mma", "ufc", "bkfc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "Self-join on BOUT+ROUND, take opponent landed/attempted against this fighter.",
+      "caveat": "Strongly opponent-quality dependent; needs an opponent adjustment before it is comparable across a career."
+    },
+    {
+      "id": "strike_target_distribution",
+      "name": "Head / body / leg strike split",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "HEAD, BODY, LEG columns, each 'landed of attempted' per round.",
+      "caveat": "Head-strike share is the input that separates a KO threat from a points striker; a leg-kick-heavy volume striker scores well on SLpM but poorly on knockdown probability."
+    },
+    {
+      "id": "strike_position_distribution",
+      "name": "Distance / clinch / ground strike split",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "DISTANCE, CLINCH, GROUND columns per round.",
+      "caveat": "This is the cleanest available proxy for where a fighter wants the fight, and therefore for the method-of-victory market."
+    },
+    {
+      "id": "knockdown_rate",
+      "name": "Knockdowns scored and conceded per 15 minutes",
+      "disciplines": ["mma", "ufc", "bkfc", "boxing"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "KD column per round, normalised to per-15-minutes. Verified: Makhachev 4 career KD.",
+      "caveat": "KD is a statistician judgement call - a flash knockdown and a slip are not always distinguished. Counts are low and Poisson-sparse, so shrink hard. In boxing the count is the referee's, not a stats provider's."
+    },
+    {
+      "id": "takedown_attempts_per15",
+      "name": "Takedown attempts per 15 minutes",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "Attempted side of the TD 'landed of attempted' field."
+    },
+    {
+      "id": "takedown_accuracy",
+      "name": "Takedown accuracy",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "TD landed / TD attempted. Verified: Makhachev 41 of 73 = 56.2%.",
+      "caveat": "TD % column is '---' when there were no attempts; do not read that as zero."
+    },
+    {
+      "id": "takedown_defence",
+      "name": "Takedown defence",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "1 - (opponent TD landed / opponent TD attempted against you), via the BOUT+ROUND self-join.",
+      "caveat": "The single most predictive grappling stat for whether a striker can keep the fight standing, and therefore for method of victory."
+    },
+    {
+      "id": "submission_attempts_per15",
+      "name": "Submission attempts per 15 minutes",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "SUB.ATT column summed, scaled to 15 minutes. Verified: Makhachev 13 attempts = 0.87 per 15 min.",
+      "caveat": "Counts genuine attempts only; a fighter who controls without attacking scores 0 here while dominating."
+    },
+    {
+      "id": "control_time_share",
+      "name": "Control time as a share of fight time",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "CTRL column (mm:ss) summed / elapsed time. Verified: Makhachev 101m28s = 45.1% of the rounds*5 ceiling.",
+      "caveat": "Control time is the strongest single driver of decision outcomes under the current judging criteria, and therefore of the 'goes the distance' market."
+    },
+    {
+      "id": "reversals",
+      "name": "Reversals",
+      "disciplines": ["mma", "ufc"],
+      "source": "ufc_fight_stats_mirror",
+      "compute": "REV. column.",
+      "caveat": "Very sparse - near-useless alone, mild value as a scramble-competence prior."
+    },
+    {
+      "id": "finish_rate",
+      "name": "Career finish rate (share of bouts not reaching the scorecards)",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror / sherdog",
+      "compute": "1 - decisions/bouts. Sherdog publishes the split directly as KO/TKO %, Submissions %, Decisions % for wins and losses separately.",
+      "caveat": "The WIN split and the LOSS split are different quantities - a fighter who wins by KO but loses by decision is a very different totals proposition from the reverse."
+    },
+    {
+      "id": "finish_rate_by_round",
+      "name": "Finish hazard by round",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror",
+      "compute": "ROUND column of non-decision outcomes, conditioned on TIME FORMAT.",
+      "caveat": "MEASURED, not assumed. In 7744 UFC 3-round bouts finishes fall 27.4% (R1), 16.5% (R2), 8.0% (R3). In 782 championship 5-round bouts: 22.5 / 16.6 / 11.0 / 6.5 / 4.5. The hazard is strongly front-loaded, so a constant-hazard model materially underprices UNDER 1.5 rounds and overprices the late rounds."
+    },
+    {
+      "id": "average_fight_time",
+      "name": "Average fight time",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror",
+      "compute": "ROUND and TIME columns give the exact stoppage clock; convert to elapsed seconds using the TIME FORMAT round lengths.",
+      "caveat": "Must be computed within a TIME FORMAT bucket. Mixing 3-round and 5-round bouts produces a mean that describes no real fight."
+    },
+    {
+      "id": "distance_rate",
+      "name": "Probability the bout goes the distance",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror",
+      "compute": "Share of bouts ending in a Decision, by TIME FORMAT.",
+      "caveat": "Measured base rates: 48.2% for 3-round UFC bouts, 38.9% for 5-round championship bouts. Championship bouts go the distance LESS often despite being longer, because the extra two rounds add finish opportunities faster than they add survivors."
+    },
+    {
+      "id": "method_split",
+      "name": "Method-of-victory distribution",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror / sherdog",
+      "compute": "METHOD column, all distinct values enumerated.",
+      "caveat": "Measured over 8784 UFC bouts: Decision-Unanimous 3159, KO/TKO 2775, Submission 1704, Decision-Split 828, Decision-Majority 104, TKO-Doctor's Stoppage 98, Overturned 58, Could Not Continue 33, DQ 23, Other 2. The tail categories are the ones that break naive settlement assumptions."
+    },
+    {
+      "id": "reach_differential",
+      "name": "Reach differential",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fighter_tott_mirror / wikipedia_infobox",
+      "compute": "REACH column (inches) differenced across the two fighters.",
+      "caveat": "Missing as '--' for a meaningful share of older fighters; impute or drop rather than treating as zero."
+    },
+    {
+      "id": "height_differential",
+      "name": "Height differential",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc", "sumo"],
+      "source": "ufc_fighter_tott_mirror / sumo_api / wikipedia_infobox",
+      "compute": "HEIGHT column; sumo-api gives height in cm as an integer.",
+      "caveat": "In sumo, height matters far less than mass and rank; do not port the striking-sport intuition."
+    },
+    {
+      "id": "stance_matchup",
+      "name": "Stance (orthodox / southpaw / switch) matchup",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fighter_tott_mirror",
+      "compute": "STANCE column, crossed between the two fighters.",
+      "caveat": "The signal is in the MISMATCH (open stance) not the stance itself, and southpaws are rare enough that per-fighter southpaw-vs-southpaw samples are tiny. Blank for a share of the roster."
+    },
+    {
+      "id": "age_curve",
+      "name": "Age and age-relative decline",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc", "sumo"],
+      "source": "ufc_fighter_tott_mirror / sumo_api",
+      "compute": "DOB column against event DATE; sumo-api gives birthDate per rikishi.",
+      "caveat": "Decline in combat sports shows up in CHIN before it shows in output - an ageing fighter's SLpM can hold while his knockdown-conceded rate climbs. Model absorbed damage and age together, not age alone."
+    },
+    {
+      "id": "layoff_length",
+      "name": "Layoff since last bout",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc", "sumo"],
+      "source": "ufc_event_details_mirror / sumo_api",
+      "compute": "Difference between this event DATE and the fighter's previous event DATE.",
+      "caveat": "Confounded with injury: a long layoff is usually the SYMPTOM of the thing that should worry you, not the cause. Cumulative damage and short turnarounds cut the other way."
+    },
+    {
+      "id": "weight_miss_history",
+      "name": "Missed weight / weigh-in failure history",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "wikipedia_event_pages",
+      "compute": "UFC event articles document weigh-in results and misses in prose (697 search hits for missed weight).",
+      "caveat": "Not available as a structured column anywhere free - it must be text-extracted per event. A miss changes both the fighter's condition AND the bout's title status."
+    },
+    {
+      "id": "weight_cut_history",
+      "name": "Weight-cut severity and division moves",
+      "disciplines": ["mma", "ufc", "boxing"],
+      "source": "ufc_fight_results_mirror / wikipedia_event_pages",
+      "compute": "Track WEIGHTCLASS across a fighter's bout history to detect moves up or down; 'Catchweight' appears as its own weightclass value.",
+      "caveat": "A first bout at a new weight is a genuine regime change - prior stats are drawn from a different physical athlete."
+    },
+    {
+      "id": "short_notice_replacement",
+      "name": "Short-notice replacement flag",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "wikipedia_event_pages",
+      "compute": "Event articles record replacements and the notice period in prose.",
+      "caveat": "Prose-only, no structured feed. Matters twice: it degrades the replacement's conditioning AND it usually triggers a book's void rule on the original matchup."
+    },
+    {
+      "id": "corner_and_doctor_stoppage_history",
+      "name": "Corner-retirement and doctor-stoppage history",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror",
+      "compute": "METHOD values 'TKO - Doctor's Stoppage' (98) and 'Could Not Continue' (33); Sherdog's fight history carries the same in its Method column.",
+      "caveat": "A corner that throws in the towel early is a real, persistent team-level property and it lands in the KO/TKO settlement bucket, not the decision bucket."
+    },
+    {
+      "id": "referee_identity",
+      "name": "Referee stoppage tendency",
+      "disciplines": ["mma", "ufc", "boxing", "bkfc"],
+      "source": "ufc_fight_results_mirror / sherdog",
+      "compute": "REFEREE column - 243 distinct referees, top: Herb Dean 1249 bouts, John McCarthy 660, Marc Goddard 601, Dan Miragliotta 507, Chris Tognoni 464.",
+      "caveat": "Quick-stoppage vs late-stoppage tendency shifts the KO/TKO-versus-decision boundary. Only the busiest dozen referees have enough bouts to estimate; the rest are noise."
+    },
+    {
+      "id": "judge_identity_tendency",
+      "name": "Individual judge scoring tendency",
+      "disciplines": ["mma", "ufc", "boxing"],
+      "source": "ufc_fight_results_mirror",
+      "compute": "The DETAILS column carries per-judge names and scorecards for 4035 of 4091 decisions (98.6%), e.g. 'Eric Colon 27 - 30.David Sutherland 28 - 29.Mike Bell 28 - 29.'",
+      "caveat": "This is a full free judging-tendency dataset hiding in a free-text column. Judge panels are assigned late, so it is usable for a lean on split-decision likelihood but often not knowable pre-market."
+    },
+    {
+      "id": "home_decision_bias",
+      "name": "Home-crowd decision bias",
+      "disciplines": ["boxing", "mma"],
+      "source": "academic_literature / ufc_event_details_mirror",
+      "compute": "Cross the LOCATION column against fighter nationality.",
+      "caveat": "Quantified by Balmer, Nevill & Lane (2005) on European championship boxing: for EQUALLY MATCHED boxers the expected home win probability was 0.57 by knockout, 0.66 by technical knockout and 0.74 on points. The bias scales with how subjective the outcome is, so it belongs in the decision branch of a method model, not as a flat moneyline bump."
+    },
+    {
+      "id": "boxing_ko_pct",
+      "name": "Boxing KO percentage",
+      "disciplines": ["boxing"],
+      "source": "wikipedia_infobox",
+      "compute": "Infobox 'KO' field over 'wins'. Verified across six current champions: Fury 25/36 (69%), Usyk 16/25 (64%), Inoue 27/33 (82%), Davis 28/30 (93%), Crawford 31/42 (74%), Bivol 12/25 (48%).",
+      "caveat": "KO% is heavily inflated by early-career padding against weak opposition. Weight it by opposition quality and recency or it will tell you a 40-year-old is still a puncher."
+    },
+    {
+      "id": "boxing_record_and_draws",
+      "name": "Boxing record including draws and no-contests",
+      "disciplines": ["boxing"],
+      "source": "wikipedia_infobox / wikidata",
+      "compute": "Infobox fields total, wins, KO, losses, draws, no_contests - all present and consistently named across every boxer tested.",
+      "caveat": "The draws field is populated and non-zero at elite level (Fury 1, Davis 1). This is the free, legal substitute for BoxRec's record table."
+    },
+    {
+      "id": "rounds_boxed",
+      "name": "Rounds boxed (career mileage)",
+      "disciplines": ["boxing"],
+      "source": "wikipedia_infobox / manual",
+      "compute": "Not published as a field - must be accumulated from a bout-by-bout record.",
+      "caveat": "NOT available free in structured form now that BoxRec is off-limits. Wikipedia bout tables are per-fighter, inconsistently formatted, and would need per-page parsing. Treat as a gap."
+    },
+    {
+      "id": "boxing_scheduled_rounds",
+      "name": "Scheduled distance (4/6/8/10/12 rounds)",
+      "disciplines": ["boxing"],
+      "source": "wikipedia_event_pages",
+      "compute": "Stated per bout on event articles.",
+      "caveat": "The single most important context variable in boxing totals and it is NOT inferable from the fighters. 12 rounds is world-title only; most bouts are 8 or 10."
+    },
+    {
+      "id": "compubox_punch_stats",
+      "name": "CompuBox punch counts (thrown/landed, jab vs power)",
+      "disciplines": ["boxing"],
+      "source": "NONE - commercial",
+      "compute": "Not obtainable free.",
+      "caveat": "CompuBox is a proprietary commercial service licensed to broadcasters; counts appear in on-air graphics and press recaps but there is no free bulk feed or API. Boxing therefore has NO free equivalent of the UFC per-round stat file. This is the single largest data asymmetry in this research: MMA is richly instrumented for free, boxing is not."
+    },
+    {
+      "id": "sumo_banzuke_rank",
+      "name": "Banzuke rank and rankValue",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "/api/basho/{bashoId}/banzuke/{division} returns east and west lists with rank string ('Yokozuna 1 East') and a numeric rankValue.",
+      "caveat": "Rank is ORDINAL and highly nonlinear - the strength gap from Yokozuna to Ozeki dwarfs the gap between adjacent Maegashira slots. Never use rankValue as a linear covariate."
+    },
+    {
+      "id": "sumo_kimarite_tendency",
+      "name": "Kimarite (winning technique) tendency",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "Per-bout kimarite is returned inline in the banzuke record array and in /api/rikishi/{id}/matches. /api/kimarite?sortField=count gives global frequencies: yorikiri 176365, oshidashi 129634, hatakikomi 43853, uwatenage 40176, yoritaoshi 39747.",
+      "caveat": "82 official kimarite exist but the distribution is brutally concentrated - the top two account for the majority of bouts. A pusher-thruster (oshi) versus a belt-grappler (yotsu) profile is the real signal; the long tail is noise."
+    },
+    {
+      "id": "sumo_kyujo_history",
+      "name": "Kyujo (withdrawal / absence) history",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "/api/rikishi/{id}/stats returns totalAbsences and absenceByDivision; the banzuke record array marks individual days as 'absent'. Verified: Hoshoryu 33 absences, all in Makuuchi, over 50 basho.",
+      "caveat": "The highest-value sumo variable. An absent rikishi does not merely lose - his scheduled opponents collect fusensho default wins, which corrupts their apparent form."
+    },
+    {
+      "id": "sumo_day_of_basho_form",
+      "name": "Day-of-basho running form",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "The banzuke record array is ordered by day with result values 'win', 'loss', 'fusen loss', 'absent'; /api/basho/{id}/torikumi/{division}/{day} gives the daily card.",
+      "caveat": "Fatigue and injury accumulate visibly within a 15-day basho. Day 1 form and day 13 form are different quantities for the same rikishi."
+    },
+    {
+      "id": "sumo_kachikoshi_pressure",
+      "name": "Kachikoshi / makekoshi promotion pressure",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "Running win count against day number; kachikoshi is 8 wins of 15 for sekitori (4 of 7 in lower divisions).",
+      "caveat": "A rikishi sitting on 7 wins entering the final days has a promotion/demotion cliff in front of him that his season-long rating does not capture. This is a genuine late-basho effort effect."
+    },
+    {
+      "id": "sumo_heya_affiliation",
+      "name": "Heya (stable) affiliation",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "heya field on /api/rikishis.",
+      "caveat": "Rikishi from the same heya do not normally face each other. This is a structural constraint on the fixture list, not a strength variable."
+    },
+    {
+      "id": "sumo_head_to_head",
+      "name": "Sumo head-to-head record",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "/api/rikishi/{id}/matches returns eastId/westId/winnerId/kimarite per bout; filter to the opponent.",
+      "caveat": "Sumo H2H samples are unusually meaningful because the same small Makuuchi field meets repeatedly, six basho a year - but style matchups persist, so H2H partly encodes a real oshi-vs-yotsu effect rather than pure noise."
+    },
+    {
+      "id": "sumo_career_record",
+      "name": "Sumo career record by division",
+      "disciplines": ["sumo"],
+      "source": "sumo_api",
+      "compute": "/api/rikishi/{id}/stats gives totalWins, totalLosses, totalMatches, wins/loss/totalByDivision, yusho, sansho. Verified: Hoshoryu 401-235 over 636 matches, 3 yusho.",
+      "caveat": "Aggregate career records span divisions of wildly different quality - always use the Makuuchi-only split for a Makuuchi bout."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "ufc_fight_stats_mirror",
+      "url": "https://raw.githubusercontent.com/Greco1899/scrape_ufc_stats/main/ufc_fight_stats.csv",
+      "auth": "none",
+      "verified": true,
+      "coverage": "41340 PER-ROUND per-fighter rows across 8647 distinct bouts. Columns: EVENT, BOUT, ROUND, FIGHTER, KD, SIG.STR. (landed of attempted), SIG.STR. %, TOTAL STR., TD, TD %, SUB.ATT, REV., CTRL (mm:ss), HEAD, BODY, LEG, DISTANCE, CLINCH, GROUND.",
+      "note": "BEST SOURCE IN THIS FILE for MMA. Read the actual bytes: 7.5 MB of real CSV, header and rows confirmed. This is an open mirror of ufcstats.com and it is reachable from here even though ufcstats.com itself is NOT (see blocked). Every striking, grappling and control statistic requested is computable from it; SApM and both defence metrics require a self-join on BOUT+ROUND because they are not published as columns. Licence GPL-3.0 on the repo (a code licence - the CSVs are scraped factual records, so redistribution rights are unsettled; treat as internal-use)."
+    },
+    {
+      "id": "ufc_fight_results_mirror",
+      "url": "https://raw.githubusercontent.com/Greco1899/scrape_ufc_stats/main/ufc_fight_results.csv",
+      "auth": "none",
+      "verified": true,
+      "coverage": "8784 bouts. Columns: EVENT, BOUT, OUTCOME (W/L, L/W, D/D, NC/NC), WEIGHTCLASS, METHOD, ROUND, TIME, TIME FORMAT, REFEREE, DETAILS (per-judge scorecards), URL.",
+      "note": "Drives every settlement-shaped market: method of victory, round betting, totals, distance. TIME FORMAT distribution verified: 3 Rnd (5-5-5) 7744, 5 Rnd (5-5-5-5-5) 782, plus legacy formats (1 Rnd + OT (12-3) 88, No Time Limit 31, 1 Rnd (20) 25). DETAILS carries named judges and scores for 98.6% of decisions."
+    },
+    {
+      "id": "ufc_fighter_tott_mirror",
+      "url": "https://raw.githubusercontent.com/Greco1899/scrape_ufc_stats/main/ufc_fighter_tott.csv",
+      "auth": "none",
+      "verified": true,
+      "coverage": "4573 fighters. Columns: FIGHTER, HEIGHT, WEIGHT, REACH, STANCE, DOB, URL.",
+      "note": "The tale-of-the-tape layer: reach/height/stance differentials and the age curve. Missing values appear as '--' (reach especially, for older fighters) - do not coerce to zero."
+    },
+    {
+      "id": "ufc_event_details_mirror",
+      "url": "https://raw.githubusercontent.com/Greco1899/scrape_ufc_stats/main/ufc_event_details.csv",
+      "auth": "none",
+      "verified": true,
+      "coverage": "781 events with EVENT, URL, DATE, LOCATION.",
+      "note": "FRESH: newest row is UFC Fight Night: Du Plessis vs. Usman, July 18 2026 - seven days before this research. Supplies the date spine for layoff length and the LOCATION needed for home-bias work."
+    },
+    {
+      "id": "sherdog",
+      "url": "https://www.sherdog.com/fighter/Jon-Jones-27944",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Per-fighter: HEIGHT, WEIGHT, ASSOCIATION, CLASS, and the win/loss method breakdown as counts AND percentages (KO/TKO, Submissions, Decisions, Others, N/C) split separately for wins and losses. Fight history table: Result | Fighter | Event | Method/Referee | R | Time.",
+      "note": "VERIFIED BY BODY - 107287 bytes of real page, zero Cloudflare/challenge markers, JSON-LD present. robots.txt is 'User-agent: * / Allow: /' with no AI-agent restrictions, so we are permitted. This is the cross-promotion layer the UFC mirror lacks: it covers non-UFC MMA (Betwinner sport id 56, Martial Arts) where the ufcstats mirror is silent."
+    },
+    {
+      "id": "sumo_api",
+      "url": "https://sumo-api.com/api/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Unauthenticated JSON, no key. /api/rikishis (599 active; shikonaEn, currentRank, heya, birthDate, shusshin, height, weight, debut). /api/rikishi/{id}/stats (wins/losses/absences by division, yusho, sansho). /api/rikishi/{id}/matches (H2H log with kimarite and winnerId). /api/basho/{id}/banzuke/{division} (full banzuke, per-day record array with kimarite, 'fusen loss' and 'absent'). /api/basho/{id}/torikumi/{division}/{day} (daily card + yusho). /api/kimarite?sortField=count (global technique frequencies).",
+      "note": "SINGLE BEST SOURCE IN THIS FILE. Every sumo statistic requested - banzuke rank, kimarite tendency, kyujo history, day-of-basho form - is in one free unauthenticated API, and the banzuke endpoint returns all four in a single call. FRESH to 202607-14. robots.txt allows '*' and names only CCBot, GPTBot, ChatGPT-User, Google-Extended, FacebookBot and Omgilibot as disallowed - no Claude/anthropic-ai entry, so we are permitted. /api/kimarite 400s without sortField and the error body helpfully names the valid values."
+    },
+    {
+      "id": "wikipedia_infobox",
+      "url": "https://en.wikipedia.org/w/api.php?action=parse&page={boxer}&prop=wikitext&section=0&format=json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Infobox boxer fields: total, wins, KO, losses, draws, no_contests, height, reach. Verified consistent across Canelo Alvarez, Tyson Fury, Usyk, Inoue, Davis, Crawford, Bivol.",
+      "note": "THE LEGAL REPLACEMENT FOR BOXREC on records. Gives KO% and - critically - the draws field, which is populated and non-zero at elite level. CC BY-SA licensed, documented API, no scraping-prohibition problem. Does NOT give rounds boxed or punch stats."
+    },
+    {
+      "id": "wikipedia_rest_and_search",
+      "url": "https://en.wikipedia.org/api/rest_v1/page/summary/{page}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Page summaries and full-text search over event articles. Verified: 697 hits for UFC missed-weight coverage, and the July 18 2026 event article is indexed.",
+      "note": "The only free route to missed weight, catchweight, short-notice replacements and scheduled boxing distance - all of which live in PROSE on event articles, not in any structured feed. Requires text extraction per event."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Verified live SPARQL returning application/sparql-results+json. Entity counts by occupation: MMA fighter 28548, boxer 19378, sumo wrestler 5660.",
+      "note": "Best used as an IDENTITY//RESOLUTION spine - mapping Betwinner's fighter name strings onto stable QIDs across Sherdog, Wikipedia and the UFC mirror. Weak for performance stats; strong for disambiguation, nationality and date of birth. CC0."
+    },
+    {
+      "id": "sumodb",
+      "url": "https://sumodb.sumogames.de/Rikishi.aspx?r={id}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Rikishi profile pages render (62325 bytes verified, Highest Rank / Hatsu Dohyo / Shikona present).",
+      "note": "COMPLIANCE-LIMITED, and largely redundant. robots.txt Disallows exactly the pages worth having: Rikishi_stat.aspx, Rikishi_kim.aspx (kimarite!), Query.aspx, Query_bout.aspx, Basho.aspx, Results.aspx, Rikishi_basho.aspx, Rikishi_opp.aspx, /hoshi/*, /gtb/*. Only the profile page is permitted. sumo-api.com covers all of it legitimately, so use that instead; sumodb's sumodbId is exposed by sumo-api for cross-referencing."
+    },
+    {
+      "id": "betwinner_guidebook",
+      "url": "https://guidebook.betwinner.com/bet/boxing/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "113298 bytes of real page. Enumerates the boxing market menu: 1X2 (explicitly '1, X (draw), 2'), Win (2Way) ('excluding the possibility of a draw'), Total Rounds (O/U), Win in Round, Method Of Victory ('knockout, technical knockout, decision, or disqualification'), Fight To Go The Distance.",
+      "note": "This is a Betwinner-operated guide, not the binding rules document. It CONFIRMS that Betwinner offers a genuine three-way 1X2 on boxing alongside a separate two-way market, which settles the draw question. It does NOT state settlement conventions - see open_questions."
+    },
+    {
+      "id": "the_odds_api",
+      "url": "https://api.the-odds-api.com/v4/sports/",
+      "auth": "api key",
+      "verified": true,
+      "coverage": "Route alive; returned a well-formed JSON error {'message':'API key is missing','error_code':'MISSING_KEY'} rather than a block page.",
+      "note": "Verified reachable but NOT verified for combat-sports content - no key was used, so coverage of mma_mixed_martial_arts / boxing_boxing and whether Betwinner appears in its bookmaker list are both UNCONFIRMED. The project's tennis research already recorded that its bookmaker list excludes Betwinner; assume the same until checked."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "boxrec",
+      "detail": "DOUBLY BLOCKED - the definitive answer on the source this research was asked to check first. (1) TECHNICAL: robots.txt ITSELF is unreadable - https://boxrec.com/robots.txt returns HTTP 403 with a 5452-byte Cloudflare 'Just a moment...' managed-challenge page. We cannot read the robots policy, which alone forbids proceeding. (2) LEGAL: BoxRec's Terms and Conditions expressly prohibit it - 'the use of automated systems or software to extract data from boxrec.com (screen scraping) is prohibited unless the third party has directly concluded a written licence agreement with BoxRec'. Added around mid-2018. This is a contractual prohibition that survives any technical workaround, so BoxRec is OUT regardless of access method. Use wikipedia_infobox for boxing records instead."
+    },
+    {
+      "id": "tapology",
+      "detail": "ROBOTS-DISALLOWED BY NAME - NOT FETCHED. robots.txt names us four times: 'User-agent: ClaudeBot Disallow: /', 'User-agent: anthropic-ai Disallow: /', 'User-agent: Claude-Web Disallow: /', 'User-agent: Claudebot Disallow: /'. It also sets a Cloudflare content signal 'ai-train=no, use=reference' and asserts an Article 4 EU DSM reservation of rights. No request was made to any Tapology page. This removes the best free source of scheduled-bout metadata, short-notice replacements and regional-promotion coverage."
+    },
+    {
+      "id": "espn_mma",
+      "detail": "ROBOTS-DISALLOWED BY NAME - NOT FETCHED. espn.com/robots.txt contains 'User-agent: anthropic-ai Disallow: /' (alongside GPTBot and CCBot). No request was made. Note this is a stricter outcome than the project's tennis research, which used ESPN's site.api endpoints."
+    },
+    {
+      "id": "ufcstats_direct",
+      "detail": "FALSE 200 - the exact trap this project's verification rule exists for. http://ufcstats.com/statistics/events/completed returns HTTP 200 with content-type text/html, but the body is 2998 bytes of JavaScript interstitial titled 'Loading...' reading 'Checking your browser...' - a SHA-256 proof-of-work challenge that computes a nonce, POSTs it to /__c and reloads. Zero event links in the payload. Anything checking only the status code records this source as working. The site has NO robots.txt (404), so there is no robots restriction - the barrier is purely the JS challenge, and solving it was not attempted. Fully mitigated: use ufc_fight_stats_mirror, which carries the same data."
+    },
+    {
+      "id": "github_api",
+      "detail": "403 from the session proxy: 'GitHub access to this repository is not enabled for this session. Use add_repo to request access.' This blocks api.github.com metadata (file listings, licence field, pushed_at). raw.githubusercontent.com is UNAFFECTED and served every CSV and the LICENSE/README files fine - so dataset access is unimpaired, only repo metadata is. Freshness must be established from the data (newest event DATE), not from pushed_at."
+    },
+    {
+      "id": "cagematch",
+      "detail": "Pro-wrestling database. robots.txt Disallows /database/ and /db/ - i.e. the entire result database - and sets Crawl-delay: 527 seconds for '*'. Effectively unusable, and moot: pro wrestling is excluded as unmodellable."
+    },
+    {
+      "id": "bkfc_official",
+      "detail": "NOT BLOCKED BY NAME but effectively non-crawlable: bkfc.com/robots.txt allows '*' while setting 'Crawl-delay: 86400' - one request per DAY - and disallows /news. Honouring that crawl-delay makes any systematic bare-knuckle scrape impossible. There is no free structured bare-knuckle results database; BKFC coverage must come from Wikipedia event articles and Sherdog."
+    },
+    {
+      "id": "compubox",
+      "detail": "NO FREE ACCESS. CompuBox is a proprietary commercial service licensed to broadcasters; punch counts appear only in on-air graphics and press recaps. There is no free bulk feed, API or open mirror. Consequence: boxing has no free equivalent of the UFC per-round stat file, so boxing models must run on record-level data (KO%, method split, scheduled distance) while MMA models get per-round granularity."
+    },
+    {
+      "id": "octagon_api",
+      "detail": "DEAD. Both https://octagon-api.com/api/rankings and the raw GitHub JSON return 404 ('The page could not be found', NOT_FOUND). Do not cite it as a UFC rankings source."
+    },
+    {
+      "id": "mdabbert_ultimate_ufc_dataset",
+      "detail": "404 on raw.githubusercontent.com for the ufc-master.csv path. Could be a moved/renamed repo or a per-repo egress block of the kind this project's tennis research documented for Sackmann. Not retested from GitHub Actions - worth a retest there if a second UFC mirror is ever needed for redundancy."
+    },
+    {
+      "id": "armpower_net",
+      "detail": "Arm-wrestling federation site: proxy CONNECT tunnel failed with 502 - not reachable from this environment. Moot: see unmodellable, arm wrestling has no usable statistical base regardless."
+    },
+    {
+      "id": "betwinner_rules_pages",
+      "detail": "Betwinner's own binding rules could NOT be retrieved. https://betwinner.com/en/rules, /en/betting-rules, /en/betting_rules, /en/info/rules and /en/user-agreement all redirect to betwinner2.com and return HTTP 404. Only the marketing guidebook subdomain resolves. This is why the totals-settlement convention below is an open question rather than a documented fact."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_safety_ladder_note": "These are nominally two-outcome markets, so the project's safety ladder would normally treat the moneyline as the safe base. That reading is only valid where a draw is genuinely impossible. Measured draw/no-contest mass: SUMO effectively 0% (no hikiwake since 1974; inconclusive bouts are re-fought, not split) - moneyline IS a safe two-way base. MMA 1.76% (65 draws + 90 no contests in 8784 UFC bouts) - small but real, and no-contests can appear MONTHS later via overturned results. BOXING materially higher and, decisively, Betwinner prices it explicitly as 1X2 with an X. Never fold a boxing 1X2 into two-way implied probabilities.",
+    "fight_winner_moneyline": [
+      "sig_strikes_landed_per_min",
+      "sig_strikes_absorbed_per_min",
+      "striking_accuracy",
+      "striking_defence",
+      "takedown_accuracy",
+      "takedown_defence",
+      "control_time_share",
+      "reach_differential",
+      "stance_matchup",
+      "age_curve",
+      "layoff_length",
+      "weight_miss_history",
+      "short_notice_replacement",
+      "home_decision_bias",
+      "sumo_banzuke_rank",
+      "sumo_kyujo_history",
+      "sumo_day_of_basho_form",
+      "sumo_head_to_head",
+      "boxing_record_and_draws"
+    ],
+    "method_ko_tko": [
+      "knockdown_rate",
+      "strike_target_distribution",
+      "sig_strikes_absorbed_per_min",
+      "striking_defence",
+      "takedown_defence",
+      "boxing_ko_pct",
+      "corner_and_doctor_stoppage_history",
+      "referee_identity",
+      "age_curve",
+      "method_split",
+      "finish_rate_by_round"
+    ],
+    "method_submission": [
+      "submission_attempts_per15",
+      "takedown_accuracy",
+      "control_time_share",
+      "strike_position_distribution",
+      "reversals",
+      "method_split"
+    ],
+    "method_decision": [
+      "control_time_share",
+      "striking_accuracy",
+      "distance_rate",
+      "takedown_defence",
+      "judge_identity_tendency",
+      "home_decision_bias",
+      "boxing_scheduled_rounds",
+      "method_split"
+    ],
+    "method_dq_or_nc": [
+      "referee_identity",
+      "method_split",
+      "corner_and_doctor_stoppage_history"
+    ],
+    "round_betting": [
+      "finish_rate_by_round",
+      "knockdown_rate",
+      "average_fight_time",
+      "strike_target_distribution",
+      "submission_attempts_per15",
+      "boxing_scheduled_rounds",
+      "referee_identity",
+      "layoff_length"
+    ],
+    "over_under_total_rounds": [
+      "finish_rate_by_round",
+      "average_fight_time",
+      "distance_rate",
+      "finish_rate",
+      "boxing_scheduled_rounds",
+      "sig_strikes_absorbed_per_min",
+      "control_time_share",
+      "knockdown_rate",
+      "corner_and_doctor_stoppage_history"
+    ],
+    "fight_goes_the_distance": [
+      "distance_rate",
+      "finish_rate",
+      "control_time_share",
+      "takedown_defence",
+      "knockdown_rate",
+      "striking_defence",
+      "boxing_scheduled_rounds",
+      "age_curve",
+      "corner_and_doctor_stoppage_history"
+    ],
+    "will_there_be_a_knockdown": [
+      "knockdown_rate",
+      "strike_target_distribution",
+      "sig_strikes_absorbed_per_min",
+      "striking_defence",
+      "boxing_ko_pct",
+      "age_curve",
+      "reach_differential"
+    ],
+    "sumo_bout_winner": [
+      "sumo_banzuke_rank",
+      "sumo_day_of_basho_form",
+      "sumo_kyujo_history",
+      "sumo_head_to_head",
+      "sumo_kimarite_tendency",
+      "sumo_kachikoshi_pressure",
+      "sumo_career_record",
+      "sumo_heya_affiliation"
+    ],
+    "sumo_yusho_outright": [
+      "sumo_banzuke_rank",
+      "sumo_career_record",
+      "sumo_day_of_basho_form",
+      "sumo_kyujo_history"
+    ],
+    "_mapping_notes": [
+      "The strongest structural insight: control_time_share and takedown_defence are the two variables that most move the DISTANCE markets, because they determine whether the fight stays in the phase where finishes happen. They belong in the totals model at least as much as in the winner model.",
+      "distance_rate and finish_rate_by_round must both be conditioned on scheduled rounds BEFORE anything else. The measured 3-round distance rate (48.2%) and 5-round rate (38.9%) are different products.",
+      "home_decision_bias enters the DECISION branch only. Balmer et al. measured 0.74 home win probability on points versus 0.57 by knockout for equally matched boxers - applying a flat moneyline bump would mis-shape the method market."
+    ]
+  },
+
+  "rules_critical": [
+    "HEADLINE: A BOXING DRAW IS A REAL THIRD OUTCOME, NOT A ROUNDING ERROR. Betwinner's own boxing guide lists 1X2 with an explicit 'X (draw)' ALONGSIDE a separate 'Win (2Way)' market described as 'excluding the possibility of a draw'. Unanimous, majority and split draws are all live results, and elite records carry them (Fury 1, Davis 1). Folding a boxing 1X2 into two-way implied probabilities silently redistributes the draw's probability mass into the two fighters and overstates both. The two-way and three-way markets are DIFFERENT BETS with different settlement on the same event.",
+    "HEADLINE: 'OVER 2.5 ROUNDS' HAS NO UNIVERSAL MEANING AND BETWINNER'S CONVENTION MUST BE READ BEFORE ANY TOTALS MODEL IS TRUSTED. The industry norm settles a half-round at the HALFWAY POINT: 2:30 of a 5-minute MMA round, so 'over 2.5' needs the fight still live at 2:30 of round 3 and pushes if it ends at exactly 2:30. But some books instead settle at the END of the round. The two conventions disagree on every fight stopped in the first half of the deciding round - which, given the measured front-loaded finish hazard, is a large slice of outcomes. Worse, the halfway mark is DISCIPLINE-DEPENDENT: a boxing round is 3 minutes so half is 1:30, and a bare-knuckle round is 2 minutes so half is 1:00. One hardcoded 2:30 across all four combat ids is a settlement bug. Betwinner's binding rules pages 404 from this environment (see blocked), so this must be read off the live account.",
+    "HEADLINE: PRO WRESTLING (id 307) OUTCOMES ARE SCRIPTED. Winners are decided by writers before the event; nothing physical is being contested. No statistical model can apply, because there is no data-generating process to model - only a creative decision. Odds move on leaked booking sheets, not form, and books deliberately cap limits low precisely because they expect leak-driven action. That makes the counterparty adversely selected against anyone without insider information: a statistical model here has NEGATIVE expected value, not merely zero. Some regulators (e.g. Colorado) prohibit wagering on predetermined events outright. RECOMMENDATION: exclude sport id 307 from the product entirely rather than scoring it.",
+    "MMA ACCIDENTAL-FOUL THRESHOLD FLIPS THE SETTLEMENT: under the ABC Unified Rules, if an accidental foul (usually an eye poke or head clash) forces a stoppage BEFORE 2 completed rounds of a scheduled 3, or 3 completed rounds of a scheduled 5, the bout is a NO CONTEST; AFTER that threshold it becomes a TECHNICAL DECISION on the scorecards. The identical injury voids the moneyline on one side of that line and settles it on the other.",
+    "BOXING'S EQUIVALENT THRESHOLD IS DIFFERENT AND JURISDICTION-DEPENDENT: most commissions require FOUR completed rounds before an accidental-foul stoppage can go to the cards as a technical decision, while many championship rules require passing the halfway point instead (5 of 10, 6 of 12). Stop it earlier and it is a TECHNICAL DRAW or no contest - not a win for whoever was ahead. Never assume the MMA threshold applies to boxing.",
+    "AN INTENTIONAL FOUL CANNOT PRODUCE A WIN FOR THE FOULER, AND OFTEN CANNOT PRODUCE ONE FOR THE VICTIM EITHER: if an intentional foul injures a fighter who is BEHIND on points and he cannot continue, the result is a TECHNICAL DRAW - the fouler is ineligible to win but the victim cannot win from behind. A model that assumes 'fouled fighter wins' will misprice this.",
+    "SCHEDULED ROUNDS MUST BE THE FIRST BRANCH IN ANY TOTALS OR ROUND MODEL. Verified on 8784 UFC bouts: 7744 are 3 Rnd (5-5-5) and 782 are 5 Rnd (5-5-5-5-5) - non-title bouts are 3x5, title and designated main events 5x5. Boxing is scheduled at 4/6/8/10/12 rounds with 12 reserved for world titles. An 'over 8.5 rounds' in a 10-rounder and in a 12-rounder are different bets on different distributions.",
+    "THE FINISH HAZARD IS STRONGLY FRONT-LOADED, NOT UNIFORM. Measured over 7744 three-round UFC bouts: finishes land in R1 27.4%, R2 16.5%, R3 8.0% of all bouts. Championship bouts: 22.5 / 16.6 / 11.0 / 6.5 / 4.5. A constant-hazard survival model materially underprices UNDER 1.5 rounds and overprices the late rounds.",
+    "LONGER FIGHTS GO THE DISTANCE LESS OFTEN: 5-round championship bouts reach the cards only 38.9% of the time versus 48.2% for 3-round bouts. Adding rounds adds finish opportunities faster than it adds survivors, so a naive 'more rounds means more likely to hear the final bell' intuition is backwards.",
+    "DOCTOR'S STOPPAGE SETTLES AS A TKO, NOT A DECISION - 98 occurrences in the verified data, a distinct METHOD value. Any 'KO/TKO' method bet must include it, and any distance/totals model must treat a cut stoppage as a finish.",
+    "'OVERTURNED' RESULTS ARE RETROACTIVE NO CONTESTS: 58 bouts in the verified data carry METHOD 'Overturned', typically after a failed drug test, and the change can land MONTHS after the event. Historical training data must be read as-of the settlement date, and a book's resettlement policy on already-paid bets is a real exposure.",
+    "'COULD NOT CONTINUE' (33 bouts) AND 'DQ' (23) ARE SEPARATE SETTLEMENT BUCKETS from KO/TKO and from decisions. Betwinner's Method Of Victory market explicitly enumerates knockout, technical knockout, decision AND disqualification - so a model that lumps KO with TKO, or ignores DQ entirely, is pricing a market that Betwinner does not offer.",
+    "A SINGLE REFEREE POINT DEDUCTION CAN CONVERT A DECISION INTO A DRAW. Under the 10-point must system judges score 10-9 (or 10-8), and the referee's foul deductions are applied to the judges' totals afterwards. One deducted point turns a would-be 29-28 win into a 28-28 draw - which is the mechanism by which the boxing X gets hit.",
+    "MMA DRAWS AND NO CONTESTS ARE RARE BUT NOT NEGLIGIBLE: 65 draws (0.74%) and 90 no contests (1.02%) across 8784 UFC bouts = 1.76% of the book. Small, but it is the difference between a two-way market that pushes and one that pays, and it must be explicit in the model rather than assumed away.",
+    "SUMO HAS EFFECTIVELY NO DRAWS - UNIQUELY AMONG THESE SPORTS, THE TWO-WAY MONEYLINE IS A GENUINELY SAFE BASE. A hikiwake (draw by exhaustion) has not occurred since 1974. When a bout is too close to call even after a mono-ii conference, the judges order a TORINAOSHI - the bout is re-fought from the tachi-ai - rather than being split. Every bout resolves to a winner.",
+    "SUMO FUSENSHO: A RIKISHI CAN 'WIN' WITHOUT A BOUT TAKING PLACE. If his opponent withdraws, the win is awarded by default and the API records it literally - kimarite 'fusen', result 'fusen loss' for the absentee, 'absent' for subsequent days. Verified live on Hoshoryu's 202605 banzuke. A bout-winner market settles normally, but any kimarite/method market is UNDEFINED, and the beneficiary's form is inflated by a win he did not earn.",
+    "A SUMO BASHO IS 15 DAYS, ONE BOUT PER RIKISHI PER DAY, SIX TIMES A YEAR, AND THE TORIKUMI (DAILY CARD) IS ANNOUNCED ONLY A DAY OR TWO AHEAD. Opponents are not knowable far in advance, so there is no long-dated per-bout market to model - only the current and next day, plus the yusho outright.",
+    "RIKISHI FROM THE SAME HEYA (STABLE) DO NOT NORMALLY FACE EACH OTHER. This is a structural constraint on which pairings can ever appear, not a strength effect - a model that generates expected matchups without it will produce fixtures that cannot happen.",
+    "SUMO RANK IS ORDINAL AND SHARPLY NONLINEAR: the Yokozuna / Ozeki / Sekiwake / Komusubi / Maegashira ladder compresses enormously at the top. The API's numeric rankValue is a sort key, not a strength scale - using it as a linear covariate will badly underrate the top ranks.",
+    "KACHIKOSHI IS A CLIFF, NOT A GRADIENT: 8 wins from 15 (4 from 7 in lower divisions) determines promotion, and make-koshi determines demotion. A rikishi sitting on 7 wins entering the final days faces a discontinuity in stakes that no season-long rating captures, and late-basho effort shifts accordingly.",
+    "BARE-KNUCKLE IS 5 ROUNDS OF TWO MINUTES - A MAXIMUM OF 10 MINUTES OF FIGHTING. Neither boxing's 12x3 nor MMA's 3x5 or 5x5 totals structure ports to it, the half-round settlement mark is 1:00, and rounds restart from a 'toe the line' position 3 feet apart rather than from open space.",
+    "BARE-KNUCKLE KO/TKO AND CUT-STOPPAGE PRIORS ARE STRUCTURALLY HIGHER THAN GLOVED BOXING: no glove padding to absorb impact and far less surface to block with means knockdowns and doctor stoppages occur at materially higher rates. Importing a boxing finish prior into BKFC will systematically overprice the distance.",
+    "MISSED WEIGHT USUALLY DOES NOT CANCEL THE BOUT - IT CHANGES WHAT IS AT STAKE. The fight proceeds at catchweight with a purse fine, but a champion who misses weight forfeits the belt on the scale while the fight still happens. 'To win the fight' and 'to win the title' therefore diverge, and any title market needs its own settlement reading.",
+    "A REPLACED OPPONENT IS NOT THE SAME EVENT. Short-notice replacements and bouts moved to a different card commonly trigger void rules, but the specific policy differs by book and by whether the change was announced before the bet. Betwinner's rule on opponent substitution and on rescheduled bouts must be read - it is a void-versus-stand question, not a pricing question.",
+    "IF THE SCHEDULED NUMBER OF ROUNDS CHANGES, TOTALS BETS TYPICALLY STAND UNLESS THE CHANGE ITSELF DETERMINES THE RESULT, IN WHICH CASE THEY VOID. This is a standard clause across books and it is the one place where a rules change retroactively converts a live bet into a void - confirm Betwinner's wording.",
+    "CATCHWEIGHT BOUTS APPEAR AS THEIR OWN WEIGHTCLASS VALUE IN THE DATA AND SHOULD NOT BE POOLED WITH THE NEAREST DIVISION. A fighter's first bout at a new weight is a regime change: the prior statistics describe a physically different athlete."
+  ],
+
+  "unmodellable": [
+    {
+      "id": "pro_wrestling",
+      "betwinner_sport_id": 307,
+      "verdict": "EXCLUDE FROM THE PRODUCT",
+      "reason": "Outcomes are PREDETERMINED by writers before the event. There is no competitive data-generating process, so no statistic - none of the 40+ in this file - has any predictive relationship to the result. The only information that moves the price is a leaked booking decision. Because the market is driven by insiders, a purely statistical entrant is adversely selected: expected value is negative, not zero. Books cap limits low here specifically to contain leak risk, which in this project's own scoring terms means limit_score would be structurally depressed - the book itself is signalling it does not trust the market. Some jurisdictions prohibit wagering on predetermined events. Do not scan it, do not score it, do not include it in a parlay."
+    },
+    {
+      "id": "arm_wrestling",
+      "betwinner_sport_id": 155,
+      "verdict": "EXCLUDE - NO DATA BASE EXISTS",
+      "reason": "There is no free structured results or statistics database for professional arm wrestling. The federation site armpower.net was unreachable from this environment (proxy 502) and no open dataset, API or permissively-licensed mirror was found. Beyond availability, the sport is structurally hostile to modelling: matches are decided in seconds by a single pull, per-athlete sample sizes are tiny, there is no per-bout statistical record analogous to strikes or takedowns, and results turn on hand size, grip style and table position that are not recorded anywhere. Even with perfect data the variance per contest would swamp any estimable edge."
+    },
+    {
+      "id": "boxing_deep_stats",
+      "betwinner_sport_id": 9,
+      "verdict": "PARTIALLY MODELLABLE - RECORD LEVEL ONLY",
+      "reason": "Boxing is modellable at the RECORD level (KO%, method split, draws, scheduled distance, age, reach) via Wikipedia and Wikidata, but NOT at the punch level. BoxRec is contractually closed and CompuBox is a commercial broadcast product with no free feed. So boxing gets no equivalent of the UFC per-round file, and 'rounds boxed' - a genuine mileage variable - has no free structured source at all. Expect materially wider model uncertainty on boxing than on MMA, and do not let a boxing model inherit an MMA model's confidence calibration."
+    },
+    {
+      "id": "exhibition_and_celebrity_bouts",
+      "betwinner_sport_ids": [9, 278],
+      "verdict": "EXCLUDE ON DETECTION",
+      "reason": "Exhibition, celebrity and influencer bouts run under bespoke rules (headgear, heavier gloves, no official scoring, no official record entry, sometimes 'no winner declared'). They carry no comparable prior data and their settlement terms are ad hoc. They should be filtered out by name/promotion rather than fed into a boxing model."
+    }
+  ],
+
+  "open_questions": [
+    "BETWINNER TOTALS CONVENTION - THE HIGHEST-PRIORITY UNKNOWN. Does Betwinner settle 'over 2.5 rounds' at the HALFWAY point of round 3 (2:30 in MMA, 1:30 in boxing, 1:00 in bare-knuckle) or at the END of round 3? Betwinner's binding rules pages all 404 from this environment (betwinner.com/en/rules and four variants redirect to betwinner2.com and 404), and the guidebook subdomain does not state settlement. This must be read off the live account before any totals model is deployed. It changes the bet, not just the price.",
+    "Does Betwinner void or settle a 2Way boxing moneyline on a DRAW - push/void, or dead heat reduction? The guidebook says the 2Way market 'excludes the possibility of a draw' but does not say what happens when one occurs.",
+    "Does Betwinner actually offer a 'will there be a knockdown' market on boxing/MMA? It was NOT among the six markets enumerated in Betwinner's own boxing guide (1X2, Win 2Way, Total Rounds, Win in Round, Method Of Victory, Fight To Go The Distance). The stat mapping for it is included here, but its existence should be confirmed against a live pull before building for it.",
+    "How does Betwinner settle a TECHNICAL DECISION on Total Rounds and Round Betting - at the point of stoppage, or void? Several books settle 'by the point the fight was stopped'; Betwinner's wording is unread.",
+    "What is Betwinner's opponent-substitution and rescheduling rule? Short-notice replacement is common enough in MMA to matter materially for any pre-match pipeline.",
+    "Does Betwinner offer sumo markets beyond the bout winner - yusho outright, kachikoshi, kimarite? If kimarite markets exist, the fusensho case (a win with no bout and kimarite literally 'fusen') needs an explicit settlement answer.",
+    "Does The Odds API cover mma_mixed_martial_arts and boxing_boxing, and does its bookmaker list include Betwinner? Not verified here - no key was used. The project's tennis research found Betwinner absent from API-Tennis's bookmaker list; assume the same until checked.",
+    "Is the mdabbert UFC mirror a genuine 404 or a per-repo egress block like the one this project documented for Sackmann's tennis repos? Worth a retest from GitHub Actions if a redundant UFC mirror is wanted.",
+    "Redistribution rights on the UFC mirror: the repo carries GPL-3.0, which is a CODE licence, while the CSVs are scraped factual records from ufcstats.com. Rights are unsettled - treat as internal use only and revisit before anything is published or monetised.",
+    "Sherdog is permitted by robots and verified live, but no rate limit is documented. A polite crawl delay should be agreed with the operator before any bulk pull.",
+    "Betwinner sport id 56 (Martial Arts) presumably aggregates non-UFC promotions (ONE, PFL, Bellator successors, regional shows). The UFC mirror is silent on all of them and Sherdog is the only verified fallback - its coverage depth for smaller regional promotions was not measured and should be spot-checked before relying on it."
+  ],
+
+  "key_findings": [
+    "The MMA data situation is far better than the boxing one, and this asymmetry should drive product scope. One free, fresh, unauthenticated mirror (Greco1899/scrape_ufc_stats) delivers 41340 PER-ROUND rows over 8647 bouts with knockdowns, significant strikes landed/attempted split by target and position, takedowns, submission attempts and control time - every MMA statistic requested. Boxing has no free equivalent at all: BoxRec is contractually closed and CompuBox is commercial.",
+    "VERIFICATION LESSON, EXACTLY AS THE PROJECT'S RULE PREDICTS: ufcstats.com returns HTTP 200 with content-type text/html and a 2998-byte body that is a SHA-256 proof-of-work JS interstitial ('Checking your browser...'), containing zero data. Any qualifier checking status codes would have recorded the primary MMA source as working. The open GitHub mirror of that same site is fully reachable - so the fix was a different host, not a workaround.",
+    "sumo-api.com is the single best source in this research: free, unauthenticated, no key, fresh to 2026-07-14, and one call to /api/basho/{id}/banzuke/{division} returns banzuke rank, per-day results, kimarite, fusen defaults AND kyujo absences together. Sumo is the best-instrumented and cleanest of the seven ids despite being the most obscure.",
+    "Sumo is also the only one of these sports where the two-way moneyline is a genuinely safe base: no hikiwake since 1974, and inconclusive bouts are RE-FOUGHT (torinaoshi) rather than split. Boxing sits at the opposite extreme - Betwinner prices an explicit 1X2 with an X - and MMA is in between at a measured 1.76% draw-plus-no-contest rate.",
+    "THREE COMPLIANCE BLOCKS BY NAME, NONE OF WHICH WERE FETCHED: Tapology disallows ClaudeBot / anthropic-ai / Claude-Web / Claudebot explicitly (four separate entries plus an EU DSM Article 4 reservation), and ESPN disallows anthropic-ai. Losing Tapology costs the best free scheduled-bout and short-notice-replacement metadata, which is why that statistic now depends on Wikipedia prose extraction.",
+    "BoxRec is closed on BOTH axes and the finding is unambiguous: its robots.txt is itself unreadable behind a Cloudflare 403 challenge, and its Terms prohibit 'the use of automated systems or software to extract data' absent a written licence agreement. The contractual bar survives any technical workaround. Wikipedia's Infobox boxer is the legal substitute and carries total/wins/KO/losses/draws/no_contests consistently across every boxer tested.",
+    "The finish hazard is measurably front-loaded and this is the most exploitable structural fact in the file: R1 27.4%, R2 16.5%, R3 8.0% of all 3-round bouts. A uniform-hazard model will systematically misprice both ends of the totals ladder.",
+    "Counter-intuitively, longer fights reach the cards LESS often: 38.9% of 5-round championship bouts go the distance versus 48.2% of 3-round bouts. Extra rounds add finish opportunities faster than they add survivors.",
+    "A complete free judging-tendency dataset is hiding in a free-text column: ufc_fight_results.csv's DETAILS field carries named judges and their individual scorecards for 4035 of 4091 decisions (98.6%), alongside 243 distinct named referees. Judging and stoppage tendencies - normally treated as unmeasurable - are directly estimable for the busiest officials.",
+    "Home-crowd bias is real, quantified and METHOD-DEPENDENT: Balmer, Nevill & Lane (2005) found equally matched boxers had a 0.74 home win probability on points versus 0.57 by knockout. It belongs in the decision branch of a method model, not as a flat moneyline adjustment.",
+    "Half-round settlement marks differ by discipline (2:30 MMA, 1:30 boxing, 1:00 bare-knuckle) AND the halfway-versus-end-of-round convention differs by book. Betwinner's own rules pages 404 from here, so this is an unresolved settlement risk sitting under every totals market across four of the seven sport ids.",
+    "Two of the seven sport ids should be dropped outright: Pro Wrestling (307) because outcomes are scripted and the market is an insider-information game where a statistical model has negative EV, and Arm Wrestling (155) because no public statistical base exists and single-pull variance would swamp any edge even if it did."
+  ]
+}

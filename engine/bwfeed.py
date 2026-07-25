@@ -30,7 +30,9 @@ from datetime import datetime, timezone
 # own market labels for the same fixture. Anything unlisted stays "other" rather than
 # being guessed at.
 GROUP_TYPES = {
-    1: "moneyline",      # 1X2, T = 1 / 2 / 3
+    1: "moneyline",      # 1X2, T = 1 / 2 / 3 — three-way, so only where a draw exists
+    101: "moneyline2way",  # two-way result, T = 401 / 402
+    8: "doubleChance",   # T = 4 (1X) / 5 (12) / 6 (X2)
     2: "spreads",        # handicap, T = 7 / 8
     2854: "spreads",     # asian handicap, T = 3829 / 3830
     17: "totals",        # match total, T = 9 / 10
@@ -39,19 +41,61 @@ GROUP_TYPES = {
     8429: "totals",
     15: "teamTotal",     # team 1 total, T = 11 / 12
     62: "teamTotal",     # team 2 total, T = 13 / 14
+    109: "setHandicap",  # tennis, T = 732 / 733
+    7099: "setHandicap",  # table tennis, T = 5749 / 5750
+    182: "totalSets",    # tennis, T = 971 / 972
+    2604: "totalSets",   # table tennis, T = 3150 / 3151
+    136: "correctScore",  # P encodes the scoreline itself, see OUTCOME_ENUM_GROUPS
 }
+
+# A two-way result market and a three-way 1X2 are deliberately different types. Ice
+# hockey publishes BOTH on the same game — G=1 settles on regulation and can draw, G=101
+# includes overtime and the shootout and cannot — and they are not the same product, so
+# their holds must not be normalized against one another. Measured on one NHL game: the
+# 1X2 and the two-way carried the same 3.1% hold, but the two-way's is spread over two
+# outcomes rather than three, which is exactly the kind of difference per-type
+# normalization exists to respect.
 
 # Outcome labels only where the meaning is established. Everything else gets a
 # structural label so the table never implies a reading that was not verified.
 OUTCOME_LABELS = {
     1: "1", 2: "X", 3: "2",                    # 1X2
+    4: "1X", 5: "12", 6: "X2",                 # double chance
+    401: "ML1", 402: "ML2",                    # two-way result (hockey: incl. OT)
     7: "H1", 8: "H2",                          # handicap sides
     9: "over", 10: "under",                    # match total
     11: "T1 over", 12: "T1 under",             # team 1 total
     13: "T2 over", 14: "T2 under",             # team 2 total
     3827: "over", 3828: "under",
     3829: "H1", 3830: "H2",
+    732: "SH1", 733: "SH2",                    # tennis set handicap
+    5749: "SH1", 5750: "SH2",                  # table tennis set handicap
+    971: "sets over", 972: "sets under",       # tennis total sets
+    3150: "sets over", 3151: "sets under",     # table tennis total sets
 }
+
+# Handicap groups publish the two sides of ONE market at OPPOSITE signed lines: home -1.5
+# is quoted against away +1.5. Keying a market on the raw P therefore split every
+# handicap into two single-sided "markets" and the hold became meaningless — on the
+# football sample the per-market implied sums ran 0.230 to 1.961 instead of clustering
+# just above 1. Basketball was worse: every handicap was a lone selection, so all of them
+# were dropped for want of a second side. Re-keying on the line as the HOME side sees it
+# pairs them correctly: 218 football markets, every one with exactly two selections and a
+# hold between 5.2% and 10.6%.
+HANDICAP_HOME_SIDE = {2: 7, 2854: 3829}
+
+# Groups where P enumerates an OUTCOME rather than naming a line. Correct score prices
+# one selection per scoreline (P = 2.001 means 2:1), so the whole group is a single
+# market; keying per P made each scoreline its own one-sided market.
+OUTCOME_ENUM_GROUPS = {136}
+
+# How many times a group's selections cover the outcome space. Double chance covers it
+# TWICE — 1X, 12 and X2 each contain two of the three results — so its implied
+# probabilities sum to about 2, not about 1. Read as a hold that is 100%+, which is how
+# every double-chance market in the sample was being scored, and then dropped by
+# MAX_OVERROUND. That silently removed the safest rung of the football ladder from the
+# scan: measured median sum was 2.154, i.e. a perfectly ordinary 7.7% hold.
+MARKET_COVERAGE = {8: 2}
 
 
 # The feed carries template entries whose participants are the literal strings "Home"
@@ -136,12 +180,23 @@ def normalize(data, book="betwinner"):
             # Does this group use a line parameter at all? If not (1X2, double chance)
             # every selection is a main line by definition.
             lined = any(e.get("P") is not None for e in sels)
+            home_t = HANDICAP_HOME_SIDE.get(g)
+            coverage = MARKET_COVERAGE.get(g, 1)
             for e in sels:
                 price = e.get("C")
                 if not price or price <= 1.0:
                     continue
                 p = e.get("P")
+                t = e.get("T")
                 main = True if not lined else (e.get("CE") == 1)
+                # The line that identifies the market this selection belongs to.
+                if g in OUTCOME_ENUM_GROUPS:
+                    line_key = "*"
+                elif home_t is not None and p is not None:
+                    hl = float(p if t == home_t else -p)
+                    line_key = 0.0 if hl == 0 else hl   # keep -0.0 from forking the key
+                else:
+                    line_key = p
                 rows.append({
                     "fixture_id": ci,
                     "p1": gm.get("O1"),
@@ -159,12 +214,19 @@ def normalize(data, book="betwinner"):
                     # per-fixture cap — has to group on THIS, not on fixture_id.
                     "match_id": parent if is_sub else ci,
                     # group + line, so each line is scored as its own market
-                    "market_key": (ci, f"{g}|{p}"),
+                    "market_key": (ci, f"{g}|{line_key}"),
                     "market_type": mtype,
+                    # How many times this market's selections cover the outcome space.
+                    # score.py divides the implied sum by it before calling it a hold.
+                    "market_coverage": coverage,
+                    # The raw outcome type id. The ladder matches on this rather than on
+                    # the display label, so relabelling a market cannot silently detach
+                    # a ladder rung from the market it is supposed to select.
+                    "outcome_id": t,
                     "is_alt": lined and not main,
                     "main_line": main,
                     "selection": (
-                        f"[{tag}] {_label(e.get('T'), p)}" if tag else _label(e.get("T"), p)
+                        f"[{tag}] {_label(t, p)}" if tag else _label(t, p)
                     ),
                     "odds": float(price),
                     "implied": 1.0 / float(price),

@@ -1,0 +1,525 @@
+{
+  "sport": "cricket",
+  "betwinner_sport_ids": [66],
+  "researched": "2026-07-25",
+  "id_check": "sport id 66 = 'Cricket' confirmed against research/sports_catalogue.json (betwinner LineFeed GetSportsShortZip, partner=159, pulled 2026-07-25). Not assumed from the brief.",
+  "formats_in_scope": [
+    "T20 / T20I (20 overs a side, max 4 overs per bowler, 6-over powerplay)",
+    "ODI / List A (50 overs a side, max 10 overs per bowler, 3 powerplay blocks)",
+    "Test / first-class (2 innings a side, up to 5 days, min 90 overs a day, CAN DRAW)",
+    "The Hundred (100 balls a side, ends change every 10 balls, max 20 balls per bowler, 25-ball powerplay)"
+  ],
+
+  "statistics": [
+    {
+      "id": "batting_strike_rate",
+      "group": "batting",
+      "definition": "Runs scored per 100 balls faced, by player, split by format and by phase.",
+      "why": "The single strongest driver of limited-overs totals. Team total is close to (balls faced) x (aggregate SR) / 100, so SR feeds every runs market.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Compute from deliveries: batter runs / legal balls faced. A WIDE is not a ball faced; a NO-BALL is. Do not use runs.total as the batter's runs - runs.batter is the batter's own contribution."
+    },
+    {
+      "id": "batting_average",
+      "group": "batting",
+      "definition": "Runs per dismissal. Format-specific; in T20 it is far less informative than SR.",
+      "why": "Drives Test/ODI run expectations and top-batsman markets; in Tests average is the dominant term because balls faced is unconstrained.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Not-outs must be excluded from the dismissal count. Cricsheet marks dismissals explicitly via the wickets array, so not-outs are the residual - never infer them."
+    },
+    {
+      "id": "phase_batting_powerplay",
+      "group": "phase",
+      "definition": "Runs, SR, boundary% and wickets lost in the fielding-restriction phase: T20 overs 1-6, ODI overs 1-10, The Hundred balls 1-25.",
+      "why": "Powerplay scoring is a distinct regime (2 fielders outside the circle) and directly prices 'runs in first N overs' and opening-partnership markets.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Phase boundaries are RULE-defined, not convention. Never port a T20 6-over powerplay window onto an ODI or a Hundred innings."
+    },
+    {
+      "id": "phase_batting_middle",
+      "group": "phase",
+      "definition": "Runs, SR, dot% and wickets in the middle overs: T20 7-15, ODI 11-40.",
+      "why": "The consolidation phase sets the platform; middle-overs wicket loss is the best single predictor of a below-par total.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true
+    },
+    {
+      "id": "phase_batting_death",
+      "group": "phase",
+      "definition": "Runs, SR and boundary% at the death: T20 overs 16-20, ODI overs 41-50.",
+      "why": "Death scoring has the fattest right tail and is the largest source of variance in totals markets; it also drives most-sixes and race-to-N.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Death overs are only reached with wickets in hand - death SR must be conditioned on wickets remaining, or it is survivorship-biased upward."
+    },
+    {
+      "id": "bowling_economy",
+      "group": "bowling",
+      "definition": "Runs conceded per over, by bowler, by phase.",
+      "why": "Mirror image of batting SR; the totals model needs both sides. Death economy is the scarcest skill and the most predictive.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Economy charges the bowler for wides and no-balls but NOT for byes and leg-byes. Cricsheet types extras (wides, noballs, byes, legbyes, penalty) so this split is computable exactly - a naive runs.total attribution is wrong."
+    },
+    {
+      "id": "bowling_strike_rate",
+      "group": "bowling",
+      "definition": "Balls per wicket taken.",
+      "why": "Drives top-bowler and 'bowler to take N wickets' markets, and feeds the wicket-loss term of the totals model.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "RUN OUTS are not credited to any bowler. Cricsheet's wickets[].kind distinguishes them, so bowler wicket counts must filter kind out of {run out, retired out, obstructing the field}."
+    },
+    {
+      "id": "boundary_percentage",
+      "group": "batting",
+      "definition": "Share of balls faced going for four or six; and boundary runs as a share of total runs.",
+      "why": "Boundary% is the most persistent batting skill across formats and the primary input to most-sixes and total-fours/sixes markets.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Count from runs.batter == 4 / == 6 on a delivery. Do not count all-run fours; and a boundary off a no-ball still counts to the batter."
+    },
+    {
+      "id": "dot_ball_percentage",
+      "group": "batting_and_bowling",
+      "definition": "Share of legal deliveries yielding zero runs off the bat.",
+      "why": "Dot% is the cleanest pressure metric and the best early-innings predictor of a collapse; a bowler's dot% predicts economy better than economy itself in small samples.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true
+    },
+    {
+      "id": "wickets_by_dismissal_kind",
+      "group": "bowling",
+      "definition": "Distribution over caught, bowled, lbw, run out, stumped, hit wicket, retired out, obstructing the field, handled the ball.",
+      "why": "This IS the method-of-dismissal market. Also separates keeper-catch and slip-catch propensity for prop markets.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "VERIFIED directly in the payload: wickets[] carries {player_out, kind, fielders[]}. Fielder names are present but there is NO keeper flag - 'caught behind' must be inferred by joining the fielder to the named wicketkeeper, which Cricsheet does not label either."
+    },
+    {
+      "id": "spin_vs_pace_split",
+      "group": "matchup",
+      "definition": "Batter SR/average and bowler economy split by bowling type (pace vs spin, and finer: off-spin, leg-spin, left-arm orthodox, left-arm wrist, right-arm fast, left-arm fast).",
+      "why": "The largest single matchup edge in cricket. Venue and phase interact strongly: spin dominates the middle overs on subcontinent surfaces.",
+      "source": "EXTERNAL - not in cricsheet",
+      "cricsheet_derivable": false,
+      "note": "GAP CONFIRMED BY INSPECTION: no bowling-style field exists anywhere in the Cricsheet match JSON (info or deliveries). Bowling type must be joined in from an external player-attribute table keyed on the Cricsheet register id. This is the single biggest modelling gap in the free stack."
+    },
+    {
+      "id": "handedness_matchup",
+      "group": "matchup",
+      "definition": "Left/right hand batter vs bowler-arm/around-the-wicket splits.",
+      "why": "Drives bowler-batter assignment, powerplay matchups, and left-arm-spin-to-right-hander edges.",
+      "source": "EXTERNAL - not in cricsheet",
+      "cricsheet_derivable": false,
+      "note": "Same gap as bowling type. Cricsheet gives names and register ids only, never player attributes."
+    },
+    {
+      "id": "venue_par_score",
+      "group": "venue",
+      "definition": "Mean and median first-innings total at a ground, by format and by season, with a recency window.",
+      "why": "The anchor of every total-runs and team-total line. Betwinner will set the total from a venue baseline; the model must reproduce that baseline.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Cricsheet gives info.venue as a free-text string and info.city separately; the SAME ground appears under multiple spellings across seasons. Venue normalisation is required before any par score is trustworthy."
+    },
+    {
+      "id": "venue_chase_vs_set_record",
+      "group": "venue",
+      "definition": "Win rate for the side batting second at a ground, by format, and the mean margin.",
+      "why": "Directly prices match winner once the toss is known, and is the strongest venue-level prior available.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Derive from info.toss (winner + decision) joined to info.outcome. Beware small samples: a new franchise ground may have under 20 matches, which is not enough to beat the league prior."
+    },
+    {
+      "id": "toss_to_win_rate_by_venue",
+      "group": "venue",
+      "definition": "P(toss winner wins the match) and the toss-decision split (bat/field) at each ground.",
+      "why": "Prices the toss market itself, and more importantly tells you how much the match-winner price should move at the toss.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "info.toss = {winner, decision} is present on every match. The toss is a coin flip; the EDGE is in the decision and the conditional win rate, never in predicting the toss."
+    },
+    {
+      "id": "venue_boundary_dimensions_and_altitude",
+      "group": "venue",
+      "definition": "Square and straight boundary lengths, ground elevation, outfield speed.",
+      "why": "Short square boundaries inflate six counts; altitude (e.g. Johannesburg) raises carry and totals.",
+      "source": "wikidata_sparql (coordinates/elevation) + manual",
+      "cricsheet_derivable": false,
+      "note": "No free structured source for boundary lengths was found. Elevation and coordinates are available from Wikidata; boundary dimensions would have to be hand-curated per ground."
+    },
+    {
+      "id": "dew_factor",
+      "group": "conditions",
+      "definition": "Expected dew formation during the second innings of a day-night match, proxied by dew-point depression (air temperature minus dew point) and relative humidity in the evening hours at the ground.",
+      "why": "Dew makes the ball wet, kills grip and spin, and materially favours the chasing side. It is the main reason teams bowl first in evening subcontinent games, and it shifts both the match-winner and the second-innings total.",
+      "source": "open_meteo",
+      "cricsheet_derivable": false,
+      "note": "Open-Meteo returns hourly dew_point_2m and relative_humidity_2m free with no key - VERIFIED in body. Chain: Cricsheet venue string -> normalised ground -> Wikidata coordinates -> Open-Meteo hourly forecast for the match window. Dew risk rises sharply as (temp - dew point) approaches zero after sunset."
+    },
+    {
+      "id": "rain_and_interruption_risk",
+      "group": "conditions",
+      "definition": "Hourly precipitation probability and expected precipitation over the scheduled match window at the ground.",
+      "why": "Rain is the mechanism behind BOTH headline settlement traps: a DLS result that contradicts raw runs, and a no-result void below the minimum-overs threshold. A totals model without weather is mispriced in both directions.",
+      "source": "open_meteo",
+      "cricsheet_derivable": false,
+      "note": "Rain has an ASYMMETRIC effect on totals: it truncates overs and therefore caps the over, while the DLS revision raises the required run rate and can inflate scoring rate per over. Never treat rain as a symmetric variance term."
+    },
+    {
+      "id": "pitch_report",
+      "group": "conditions",
+      "definition": "Surface character: grass cover, cracking, expected turn, pace and bounce, and whether the pitch is fresh or reused.",
+      "why": "The largest single determinant of a Test result vs draw, and of spin effectiveness in limited overs.",
+      "source": "NONE FREE AND STRUCTURED",
+      "cricsheet_derivable": false,
+      "note": "No free machine-readable pitch report source was found. It exists only as broadcast/journalistic text. The honest proxy is a REVEALED pitch signature computed from Cricsheet: rolling venue-level runs per wicket, spin share of overs, and boundary% over recent matches at that ground. Use the proxy; do not scrape prose and call it a feature."
+    },
+    {
+      "id": "dls_par_and_resource_tables",
+      "group": "situational",
+      "definition": "The DLS resource percentage remaining as a function of overs left and wickets lost, and the resulting par score at any point of a chase.",
+      "why": "Determines the settled result of any rain-shortened limited-overs match. A chase abandoned mid-innings settles on par, not on raw runs.",
+      "source": "PROPRIETARY - see open_questions",
+      "cricsheet_derivable": false,
+      "note": "The Standard Edition resource table is published in ICC playing-condition annexes; the Professional Edition used in international cricket is a closed algorithm with the G50 constant. No free API returns DLS par. It can be approximated with the Standard table but the approximation will diverge from the official figure in high-scoring games - exactly the games where it matters."
+    },
+    {
+      "id": "run_rate_curve",
+      "group": "situational",
+      "definition": "Expected cumulative runs and wickets by ball number, conditioned on format, venue and innings, i.e. the whole scoring trajectory rather than the final total.",
+      "why": "Required for race-to-N runs, over/under on partial innings, and any in-play-shaped pre-match market. Also the correct object for converting a rain-shortened innings into an expected total.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Cricsheet's ball-by-ball structure makes this directly computable - this is the capability that separates it from every scorecard-level source."
+    },
+    {
+      "id": "wickets_in_hand_state",
+      "group": "situational",
+      "definition": "Joint distribution of (balls remaining, wickets lost) and the expected runs from each state.",
+      "why": "Runs are a function of the state, not of the team. This is the correct conditioning variable for totals and it is what DLS itself encodes.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true
+    },
+    {
+      "id": "opening_partnership_distribution",
+      "group": "partnership",
+      "definition": "Distribution (not just mean) of runs added for the first wicket, by team, format and venue.",
+      "why": "Prices highest-opening-partnership and first-wicket-runs markets. The distribution is heavily right-skewed with a large mass near zero.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Reconstruct partnerships by tracking batter/non_striker across deliveries until a wicket falls. Byes and leg-byes accrue to the PARTNERSHIP total but to neither batter - so the partnership figure is not the sum of the two batters' runs."
+    },
+    {
+      "id": "player_form_windows",
+      "group": "form",
+      "definition": "Rolling player metrics over multiple windows: last 5, 10 and 20 innings, plus last-12-months, with format and competition weighting.",
+      "why": "Short-window form is noisy but the market prices it; a model needs the same windows to explain the price it is ranking against.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Weight by competition strength - a T20 Blast SR and an IPL SR are not the same quantity. Cricsheet's info.event.name plus the per-competition downloads give the competition label needed to do this."
+    },
+    {
+      "id": "batting_position_and_entry_point",
+      "group": "batting",
+      "definition": "Actual batting position and the typical over/ball at which a player enters.",
+      "why": "Top-batsman markets are dominated by opportunity, not skill: an opener faces roughly twice the balls of a number 5. Entry point is the single most important covariate.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "info.players gives the SQUAD in listed order, which is NOT the batting order. True position must be derived from the order batters actually appear in the deliveries. Using the squad list as the order is a silent, systematic error."
+    },
+    {
+      "id": "bowler_workload_and_role",
+      "group": "bowling",
+      "definition": "Overs bowled per match, which phases a bowler is used in, and whether they open the bowling or bowl at the death.",
+      "why": "Top-bowler markets are also opportunity-driven: a bowler who bowls 4 of 20 overs at the death has a different wicket distribution from a powerplay-only bowler.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Format caps the maximum: 4 overs in T20, 10 in ODI, 20 BALLS in The Hundred. The cap truncates the wicket distribution and must be enforced in any simulation."
+    },
+    {
+      "id": "extras_rate",
+      "group": "bowling",
+      "definition": "Wides, no-balls, byes and leg-byes conceded per innings, by team and bowler.",
+      "why": "Extras are a non-trivial share of a limited-overs total (often 5-8%) and are pure additive runs no batter is credited with.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "VERIFIED in payload: extras are typed as {wides, noballs, byes, legbyes, penalty}. This is why team total strictly exceeds the sum of batter runs - see rules_critical."
+    },
+    {
+      "id": "team_head_to_head_and_squad_continuity",
+      "group": "form",
+      "definition": "Head-to-head record, and how much of the current XI actually played the historical fixtures.",
+      "why": "Franchise T20 squads turn over almost completely between seasons, so raw head-to-head is close to meaningless without continuity weighting.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "Cricsheet lists the XI per match in info.players, so continuity is directly measurable rather than assumed."
+    },
+    {
+      "id": "match_result_margin_and_method",
+      "group": "outcome",
+      "definition": "Result type and margin: runs, wickets, tie, draw, no result, and whether the result was decided by DLS or a super over.",
+      "why": "Needed to build the outcome label correctly, and to identify which historical matches must be EXCLUDED from totals training data.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "VERIFIED in payload: info.outcome carried {\"result\": \"draw\"} on the sampled Test. The outcome object also expresses winner/by-runs/by-wickets, method (e.g. D/L) and result values of tie and no result. Any match with a method or a no-result MUST be excluded or specially handled when fitting a totals model."
+    },
+    {
+      "id": "innings_count_and_follow_on",
+      "group": "outcome",
+      "definition": "Number of innings actually played in a multi-day match, and whether a follow-on was enforced.",
+      "why": "Test total-runs markets span 3 or 4 innings; the follow-on changes the innings sequence and the fourth innings is frequently never bowled.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "VERIFIED: the sampled Test had 3 innings in the innings array, not 4. Any 'total match runs' model must treat innings count as a random variable, not a constant."
+    },
+    {
+      "id": "balls_per_over_and_format_metadata",
+      "group": "meta",
+      "definition": "Balls per over, scheduled overs, match type, gender, team type, season, event name.",
+      "why": "Prevents cross-format contamination, which is the most common silent bug in cricket modelling.",
+      "source": "cricsheet_matchdata",
+      "cricsheet_derivable": true,
+      "note": "VERIFIED: info carries balls_per_over, match_type, gender, team_type, season, event and match_type_number. The Hundred does not fit a 6-ball-over model - filter on match_type/event before aggregating anything."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "cricsheet_matchdata",
+      "url": "https://cricsheet.org/downloads/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "22,326 matches ball-by-ball: 910 Tests, 3,152 ODIs, 5,550 T20Is, 320 other IT20s, 2,179 multi-day, 1,904 other one-day, plus club competitions incl. IPL 1,243, T20 Blast 1,557, County Championship 1,429, BBL 662, PSL 357, CPL 407, BPL 469, The Hundred 322, MLC 105, LPL 119, ILT20 134. Women's and men's separately (4,502 / 17,824). 2,456 zip files sliced by year, gender, match type, team and competition.",
+      "note": "VERIFIED BY BODY, NOT STATUS. Downloaded https://cricsheet.org/downloads/2001_json.zip (HTTP 200, content-type application/zip, 13,959 bytes), opened it, and parsed the contents. Archive held README.txt + 63963.json (453,728 bytes). Parsed JSON: top level {meta, info, innings}; meta.data_version 1.2.0; info carried balls_per_over=6, city, dates[5], event, gender, match_type='Test', officials, outcome={'result':'draw'}, player_of_match, players (XI per team), registry.people (name -> Cricsheet id), season, team_type, teams, toss={'decision':'bat','winner':'England'}, venue. innings was a 3-element array (NOT 4 - follow-on/declaration), each {team, overs[]}, each over {over, deliveries[]}. Delivery keys observed across 1,357 balls: actual_delivery, batter, bowler, non_striker, runs{batter,extras,total}, plus wickets on 20 balls and extras on 23. wickets[] = {player_out, kind, fielders[{name}]} with kinds observed {caught:12, run out:2, lbw:2, bowled:2, stumped:1, handled the ball:1}. extras typed {noballs, legbyes, byes}. robots.txt allows / and disallows only /data/; the zips are served from /downloads/ so they are NOT robots-disallowed (confirmed by HEAD: 200, application/zip, served by LiteSpeed, no redirect into /data/)."
+    },
+    {
+      "id": "cricsheet_register",
+      "url": "https://cricsheet.org/register/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Identity mapping CSVs: 18,298 people, 28,145 identifiers across 12 sources, 8,809 name variants. Sources include ESPNcricinfo (18,433 ids), CricketArchive (4,509), BCCI (1,329), Pulse (2,023), NV Play (1,121), Cricbuzz, CricHeroes, CricHQ, Cricingif, Cricketworld, Big Bash, Opta.",
+      "note": "LICENCE VERIFIED VERBATIM ON THIS PAGE: 'This dataset is made available under the Open Data Commons Attribution License: http://opendatacommons.org/licenses/by/1.0/' (ODC-BY 1.0) with the summary terms - free to share, create and adapt, as long as you Attribute: 'You must attribute any public use of the dataset, or works produced from the dataset, in the manner specified in the license. For any use or redistribution of the dataset, or works produced from it, you must make clear to others the license of the dataset and keep intact any notices on the original dataset.' CRITICAL SCOPE CAVEAT: this licence statement sits under the heading 'The License' on the REGISTER page and says 'This dataset'. See open_questions - the ball-by-ball MATCH data does not carry an equivalent statement anywhere I could find."
+    },
+    {
+      "id": "open_meteo",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "auth": "none - no API key required",
+      "verified": true,
+      "coverage": "Hourly temperature_2m, relative_humidity_2m, dew_point_2m and precipitation_probability for any lat/lon worldwide, forecast plus historical reanalysis archive.",
+      "note": "VERIFIED BY BODY. Requested Mumbai (19.076, 72.8777) with hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation_probability. HTTP 200, content-type application/json, 2,119 bytes, real payload: {\"latitude\":19.086115,\"longitude\":72.85291,...,\"hourly_units\":{\"temperature_2m\":\"C\",\"dew_point_2m\":\"C\",\"precipitation_probability\":\"%\"},\"hourly\":{\"time\":[\"2026-07-25T00:00\",...]}}. This is the dew-factor and rain-risk source, and it is the only free way to make the DLS/no-result exposure quantitative rather than hand-waved."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Cricket ground entities with P625 coordinates (and elevation where populated); usable to resolve a Cricsheet venue string to lat/lon.",
+      "note": "VERIFIED BY BODY. Ran a SPARQL query for cricket grounds with coordinates, format=json. HTTP 200, content-type application/sparql-results+json, 2,217 bytes, real bindings returned e.g. {\"ground\":\"http://www.wikidata.org/entity/Q1562558\",\"coord\":\"Point(-73.676111111 42.733333333)\"}. This is the join that turns a venue name into a weather lookup. Ground-name matching from Cricsheet's free-text venue field still needs a manual alias table."
+    },
+    {
+      "id": "mcc_laws_of_cricket",
+      "url": "https://www.lords.org/mcc/the-laws",
+      "auth": "none",
+      "verified": true,
+      "coverage": "All 42 Laws plus Preamble and Appendices as individual HTML pages - the authoritative rules text (2017 Code).",
+      "note": "VERIFIED BY BODY. Index page HTTP 200 listing every Law with number and title (Law 13 Innings, Law 14 The follow-on, Law 15 Declaration and forfeiture, Law 16 The result...). Fetched two Laws and read the actual text: Law 14.1.1 'In a two-innings match of 5 days or more, the side which bats first and leads by at least 200 runs shall have the option of requiring the other side to follow their innings' with 14.1.2 minimum leads of 150 runs (3 or 4 days), 100 (2-day), 75 (1-day); and Law 16 (A Win - two-innings match / one-innings match / umpires awarding a match). COMPLIANCE: robots.txt is 'User-agent: * / Allow: / / Disallow: /*.pdf$ / Disallow: /*.PDF$' - HTML Law pages are permitted, the PDF versions are NOT. Do not fetch the PDFs."
+    },
+    {
+      "id": "icc_news_playing_conditions",
+      "url": "https://www.icc-cricket.com/news/several-changes-made-to-icc-playing-conditions",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official ICC announcements of playing-condition changes - the primary source for current international rules.",
+      "note": "VERIFIED BY BODY. HTTP 200, 420,220 bytes, article text present server-side and read directly: dated 27 June 2025, confirming 'Two new balls will be used for the first 34 overs of an ODI innings, after which the fielding team will choose one of the balls for the remaining overs'; stop clock extended to Test matches with a five-run penalty on the third offence and 'Two warning sanctions will be reset to zero after 80 overs have passed'; new boundary-catch condition requiring a fielder who makes airborne contact beyond the boundary to land and remain inside it; plus concussion-replacement, DRS wicket-zone and deliberate-short-run changes. robots.txt allows / and names NO AI user-agents (checked explicitly for anthropic-ai, GPTBot, CCBot, Google-Extended, Bytespider - none present)."
+    },
+    {
+      "id": "thehundred_competition_rules",
+      "url": "https://www.thehundred.com/info/competition-rules",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official format rules for The Hundred.",
+      "note": "VERIFIED BY BODY. HTTP 200, rules text read directly: 100 balls per side; 'The fielding side change ends after 10 balls'; 'Bowlers deliver either five or 10 consecutive balls. The captain decides'; 'Each bowler can deliver a maximum of 20 balls per match'; 'A 25-ball powerplay for each team' with two fielders outside the circle; strategic timeout of up to 90 seconds; match length two and a half hours; and on results: 'Sometimes both teams will score the same number of runs. This is a tie. Teams get two points each for a tie. Teams also get two points each if weather or other circumstances prevent the match from finishing.' Note robots.txt itself 404s on this host."
+    },
+    {
+      "id": "thesportsdb",
+      "url": "https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?s=Cricket",
+      "auth": "free public test key '3'",
+      "verified": true,
+      "coverage": "Cricket league/competition metadata and fixtures only. Returned real cricket league objects (idLeague, strLeague, strCountry, strCurrentSeason, intFormedYear, strGender).",
+      "note": "VERIFIED BY BODY: HTTP 200, application/json, 12,709 bytes, genuine cricket rows (e.g. idLeague 5534 'Shpageeza Cricket League', Afghanistan). BUT SHALLOW - metadata and results only, no ball-by-ball, no player match stats. Same failure mode recorded for volleyball in research/volleyball.json: it cannot serve the markets that matter. Note the free key's all_leagues.php endpoint returned only 5 soccer leagues (392 bytes), so free-tier responses are truncated in places - always read the body."
+    }
+  ],
+
+  "unverified_or_partial": [
+    {
+      "id": "cricketdata_org_cricapi",
+      "url": "https://api.cricapi.com/v1/ (docs and pricing at https://cricketdata.org/)",
+      "auth": "API key, free tier after signup",
+      "verified": false,
+      "coverage": "Claimed: series, matches, squads, scorecards, ball-by-ball and over-by-over, players, fantasy points.",
+      "note": "ENDPOINT AND PRICING VERIFIED BY BODY; DATA PAYLOAD NOT VERIFIED - I hold no API key, so verified:false per the rule. THIS IS THE BEST LIVE ILLUSTRATION OF THE BODY-NOT-STATUS RULE: https://api.cricapi.com/v1/currentMatches?apikey=&offset=0 returns HTTP **200** with content-type application/json and body {\"status\":\"failure\",\"reason\":\"Invalid API Key\"}. A status-code check would mark this source healthy while it is returning nothing. Any client MUST branch on the JSON status field, not the HTTP code. Pricing page read verbatim: 'A very generous free package is offered with 100 hits per day', '1 HIT = 1 Use of the API', 'API is the same - FREE vs PAID changes usage volume, not data type' (so ball-by-ball is nominally reachable free, just rate-capped), and 'data is always a few minutes behind real-time' - acceptable for pre-match, fatal for in-play. 100 hits/day is a hard architectural constraint: it will not support per-match polling across a full fixture list. robots.txt on both cricketdata.org and cricapi.com permits crawling."
+    },
+    {
+      "id": "icc_rankings",
+      "url": "https://www.icc-cricket.com/rankings/team-rankings/mens/odi",
+      "auth": "none",
+      "verified": false,
+      "coverage": "Official team and player rankings - would be a clean strength prior.",
+      "note": "HTTP 200 and 440,769 bytes, BUT THE BODY CONTAINS NO RANKING DATA. Next.js page; the table is client-rendered. Grepped the payload: only a handful of incidental country-name mentions and zero rating/points/rank JSON keys. Classic 200-with-no-payload - would pass a status check and fail in production. Needs a headless browser or an undocumented JSON endpoint. ICC NEWS articles by contrast DO render server-side and are verified above."
+    },
+    {
+      "id": "official_boards_bcci_cricket_australia",
+      "url": "https://www.bcci.tv/ , https://www.cricket.com.au/",
+      "auth": "scraping",
+      "verified": false,
+      "coverage": "Domestic fixtures, squads, some scorecards.",
+      "note": "ROBOTS CHECKED AND PERMISSIVE ONLY. bcci.tv: 'User-agent: * / Allow: / ' with only /cgi-bin/, /lib/, /utils/, /zlib/ disallowed. cricket.com.au: 'User-agent: * / Disallow:' (i.e. allow all). I did NOT fetch or read any data page from either, so no coverage claim is made. Low priority: Cricsheet already covers their competitions ball-by-ball."
+    },
+    {
+      "id": "ecb",
+      "url": "https://www.ecb.co.uk/",
+      "auth": "scraping",
+      "verified": false,
+      "coverage": "England domestic - County Championship, T20 Blast, One-Day Cup.",
+      "note": "robots.txt returns HTTP 404 serving a 239,754-byte HTML SPA shell rather than a robots policy - another status-code trap (a 404 that is not a 404 page for a machine). No policy file means no explicit permission signal; treat with care. Cricsheet already carries 1,429 County Championship and 1,557 T20 Blast matches ball-by-ball, so there is no reason to scrape here."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "espncricinfo",
+      "detail": "BLOCKED ON TWO INDEPENDENT GROUNDS - DO NOT FETCH. (1) COMPLIANCE: https://www.espn.com/robots.txt returned HTTP 200 and its body explicitly contains 'User-agent: anthropic-ai' followed by 'Disallow: /' (alongside GPTBot, CCBot, Google-Extended, ChatGPT-User, Bytespider). ESPNcricinfo is an ESPN property and is covered by that policy. (2) TECHNICAL: https://www.espncricinfo.com/robots.txt itself returns HTTP 403, 388 bytes, Akamai 'Access Denied' edge block - identical result under both the anthropic-ai UA and a browser UA, so it is not UA-based and cannot be read at all. This is the richest cricket stats site in existence (Statsguru) and it is off-limits. Its loss is largely mitigated by Cricsheet, which covers the same ball-by-ball ground with a licence."
+    },
+    {
+      "id": "cricbuzz",
+      "detail": "BLOCKED BY ROBOTS. https://www.cricbuzz.com/robots.txt returned HTTP 200, 10,115 bytes, and opens with 'User-agent: * / Allow: /ads.txt / Disallow: /' - a blanket disallow for every agent not individually named. Named exceptions (Googlebot etc.) do not include us, and /api/ and /match/ are additionally disallowed even for Googlebot. Do not fetch."
+    },
+    {
+      "id": "howstat",
+      "detail": "BLOCKED BY THE SITE. http://www.howstat.com/cricket/Statistics/Grounds/GroundList.asp returned HTTP 403 with a 25-byte plain-text body: 'Your request was blocked.' Verified on the body, not inferred. Would have been a useful free venue/ground statistics source."
+    },
+    {
+      "id": "cricsheet_xml_mirror",
+      "detail": "https://git.sr.ht/~srushe/cricsheet-xml returned HTTP 502 (150 bytes). This is only the XML mirror of data already obtainable as JSON/YAML zips from cricsheet.org/downloads/, so nothing is actually lost - use the JSON zips."
+    },
+    {
+      "id": "dls_professional_edition",
+      "detail": "NOT A SITE BLOCK - A LICENSING ONE. The Duckworth-Lewis-Stern Professional Edition used in all international cricket is proprietary and is not published as a table or an API. No free source returns official DLS par scores or revised targets. Any DLS handling in this project is an approximation and must be labelled as such."
+    }
+  ],
+
+  "stat_to_bet": {
+    "match_winner": {
+      "primary": ["venue_chase_vs_set_record", "toss_to_win_rate_by_venue", "player_form_windows", "team_head_to_head_and_squad_continuity", "dew_factor"],
+      "secondary": ["spin_vs_pace_split", "phase_batting_powerplay", "bowling_strike_rate", "rain_and_interruption_risk"],
+      "note": "TWO-WAY in limited overs but THREE-WAY in Tests, where the draw is a genuine and common outcome - never fold a Test 1X2 into two-way implied probabilities. In limited overs the tie/no-result branch still exists and is not zero. Toss is worth a real probability shift at day-night venues with dew."
+    },
+    "total_runs_match": {
+      "primary": ["venue_par_score", "run_rate_curve", "phase_batting_death", "bowling_economy", "extras_rate"],
+      "secondary": ["pitch_report", "dew_factor", "rain_and_interruption_risk", "spin_vs_pace_split"],
+      "note": "RIGHT-CENSORED, NOT SYMMETRIC. The chasing side stops batting the instant it passes the target, so match total runs is truncated above by (first-innings total + 1 + up to 6 for the winning stroke). Fitting a symmetric distribution to match totals systematically overprices the over. Model the two innings separately and censor the second."
+    },
+    "team_totals": {
+      "primary": ["venue_par_score", "run_rate_curve", "phase_batting_powerplay", "phase_batting_middle", "phase_batting_death", "wickets_in_hand_state"],
+      "secondary": ["extras_rate", "bowling_economy", "spin_vs_pace_split", "dew_factor"],
+      "note": "The FIRST-innings team total is the clean, uncensored quantity and is the right thing to model first; the second-innings total is censored by the chase. Team total includes byes, leg-byes, wides, no-balls and penalty runs - it is strictly greater than the sum of the batters' runs."
+    },
+    "over_under_innings_runs": {
+      "primary": ["venue_par_score", "run_rate_curve", "wickets_in_hand_state", "phase_batting_death"],
+      "secondary": ["dot_ball_percentage", "boundary_percentage", "rain_and_interruption_risk"],
+      "note": "Most exposed market to the weather traps. A reduced-overs innings changes the reference total entirely, and an abandonment below the minimum-overs threshold voids rather than settling. Betwinner's reduced-overs terms decide whether the line is adjusted or the bet is void - read them before quoting this market."
+    },
+    "top_batsman": {
+      "primary": ["batting_position_and_entry_point", "batting_strike_rate", "player_form_windows", "boundary_percentage"],
+      "secondary": ["spin_vs_pace_split", "handedness_matchup", "venue_par_score", "phase_batting_powerplay"],
+      "note": "OPPORTUNITY DOMINATES SKILL - openers face roughly double the balls of a number 5, so entry point outweighs strike rate. Derive real batting order from the delivery sequence; info.players is the squad list, NOT the order. Watch dead-heat rules and the treatment of a player who does not bat (top-order-only markets vs whole-XI markets settle differently)."
+    },
+    "top_bowler": {
+      "primary": ["bowler_workload_and_role", "bowling_strike_rate", "wickets_by_dismissal_kind", "player_form_windows"],
+      "secondary": ["spin_vs_pace_split", "pitch_report", "phase_batting_death"],
+      "note": "RUN OUTS ARE NOT CREDITED TO A BOWLER - filter wickets[].kind out of {run out, retired out, obstructing the field} or every bowler's count is inflated. Overs cap truncates the distribution (4 in T20, 10 in ODI, 20 balls in The Hundred), and a bowler who does not bowl at all is a live possibility."
+    },
+    "method_of_dismissal": {
+      "primary": ["wickets_by_dismissal_kind"],
+      "secondary": ["spin_vs_pace_split", "pitch_report", "phase_batting_powerplay", "handedness_matchup"],
+      "note": "Directly readable from Cricsheet's wickets[].kind, which is the cleanest stat-to-market mapping in the sport. Kind mix is strongly conditional: stumped requires spin, lbw rises on low-bounce surfaces, caught-behind rises with pace and lateral movement. 'Caught behind' is NOT a distinct kind - it is kind='caught' with the keeper as fielder, and Cricsheet does not flag who the keeper is, so that sub-market needs an external keeper mapping."
+    },
+    "highest_opening_partnership": {
+      "primary": ["opening_partnership_distribution", "phase_batting_powerplay", "batting_position_and_entry_point"],
+      "secondary": ["boundary_percentage", "dot_ball_percentage", "bowling_strike_rate", "venue_par_score"],
+      "note": "A comparison of two right-skewed distributions with a large mass near zero - use the full distribution, never the two means. Leg-byes and byes accrue to the partnership but to neither batter, so the partnership total exceeds the sum of the openers' runs. An unbroken opening stand and a retired-hurt opener both need explicit rules. If only one team bats (abandonment), the market cannot settle normally."
+    },
+    "most_sixes": {
+      "primary": ["boundary_percentage", "phase_batting_death", "venue_boundary_dimensions_and_altitude"],
+      "secondary": ["spin_vs_pace_split", "batting_position_and_entry_point", "pitch_report", "dew_factor"],
+      "note": "Six rate is a ground-geometry market as much as a batting market - short square boundaries and altitude move it more than form does. Sixes hit in a SUPER OVER are excluded from official statistics (Cricsheet states this explicitly), so a super-over six may or may not count for settlement depending on Betwinner's terms."
+    },
+    "race_to_n_runs": {
+      "primary": ["run_rate_curve", "phase_batting_powerplay", "batting_position_and_entry_point"],
+      "secondary": ["bowling_economy", "dot_ball_percentage", "wickets_in_hand_state"],
+      "note": "Needs the scoring TRAJECTORY, not the final total - this is why ball-by-ball data is non-negotiable here and why scorecard-level sources cannot serve it. The market is undefined if neither side reaches N (low total, rain-shortened innings, or a chase that ends below N because the target was smaller than N): that is a void, not a loss, and it is a real probability that must be priced."
+    },
+    "toss_winner": {
+      "primary": ["toss_to_win_rate_by_venue"],
+      "secondary": [],
+      "note": "A genuine coin flip - the only question is the book's hold. Any model claiming to predict the toss itself is fitting noise. The USEFUL statistic is the toss DECISION and its conditional effect on the match-winner price, not the toss result."
+    }
+  },
+
+  "rules_critical": [
+    "RAIN PLUS DLS CAN HAND THE MATCH TO THE SIDE THAT IS BEHIND ON RAW RUNS. Duckworth-Lewis-Stern settles on RESOURCES (overs left x wickets in hand), not on runs scored, so a chasing team ahead of the DLS par score when play is abandoned WINS while trailing on the scoreboard. Any match-winner or totals model that treats the raw run difference as the outcome is simply wrong on rain-affected games, and rain-affected games are a large share of the calendar in England, the Caribbean and the subcontinent monsoon.",
+    "BELOW THE MINIMUM-OVERS THRESHOLD A MATCH VOIDS RATHER THAN SETTLES. A limited-overs game needs a minimum completed per-side allocation for any result: 20 overs per side in an ODI and 5 overs per side in a T20. Below that it is a NO RESULT, not a win for whoever was ahead. This is a discrete cliff in the payoff function, not a gradual effect - and it means a totals model that ignores weather is mispriced on both the DLS count and the void count.",
+    "THE MINIMUM-OVERS THRESHOLD IS NOT CONSTANT WITHIN A FORMAT. ICC World Cup knockouts (semi-finals and final) raise the T20 minimum from 5 overs a side to 10, precisely doubling the rain exposure needed to void. A model that hard-codes 5 for all T20 will misprice the highest-liquidity fixtures of the year. Read the competition's own playing conditions, not the format default.",
+    "A TEST MATCH CAN GENUINELY DRAW, MAKING IT A THREE-OUTCOME MARKET. Unlike limited-overs cricket, a Test that runs out of time with the fourth innings incomplete is a draw - a distinct outcome, not a tie and not a void, and it is frequently the most likely single outcome on a flat pitch or a rain-hit game. Never convert Test 1X2 prices into two-way implied probabilities, and never route a Test into a limited-overs win model. A Test can ALSO tie (both innings totals exactly level), which is astronomically rare but is a different outcome again from a draw.",
+    "THE SECOND INNINGS IS RIGHT-CENSORED: THE CHASE STOPS AT THE TARGET. The team batting second ceases to bat the moment it passes the target, so its total cannot exceed the first-innings total by more than the winning stroke. Match-total-runs is therefore a truncated distribution with a hard ceiling, and fitting a symmetric or unbounded model to it systematically overprices the over.",
+    "TEAM TOTAL IS STRICTLY GREATER THAN THE SUM OF THE BATTERS' RUNS. Byes, leg-byes, wides, no-balls and penalty runs all count to the team but to no batter, and typically add 5-8% to a limited-overs innings. A team-total line and a sum-of-top-batsmen line are different quantities; reconciling them without the extras term is a guaranteed bias.",
+    "RUN OUTS ARE CREDITED TO NO BOWLER. Bowler wicket counts, top-bowler markets and 'bowler to take N wickets' must exclude kind in {run out, retired out, obstructing the field}. Cricsheet exposes wickets[].kind so the filter is exact - there is no excuse for using raw wickets-fallen.",
+    "SUPER OVER RUNS AND WICKETS DO NOT COUNT TOWARDS OFFICIAL STATISTICS. Cricsheet states this explicitly as the standard explanation for player-total discrepancies against other sources. So a six or a wicket in a super over is invisible in the stats but may still be inside a bookmaker's most-sixes or total-runs settlement - the two conventions disagree and Betwinner's must be read.",
+    "A TIE DOES NOT ALWAYS TRIGGER A SUPER OVER. Knockouts and most franchise T20 leagues resolve a tie with a super over (repeated until a winner, since boundary countback was abolished after 2019), but league-stage matches in several competitions simply stand as ties - The Hundred's own rules state 'This is a tie. Teams get two points each.' A two-way match-winner market therefore needs an explicit tie branch: dead heat, void, or super-over-decides, depending on the competition AND the book.",
+    "IN-MATCH SLOW-OVER-RATE PENALTIES CHANGE THE SCORING RATE, NOT JUST THE FINE. In T20Is the fielding side must be in position to bowl the first ball of the final over by the scheduled cut-off; if not, only FOUR fielders (instead of five) may be outside the circle for the remaining overs. That is a live, mid-innings inflation of the death-overs run rate, extended to ODIs as well - a totals model that treats fielding restrictions as fixed by over number is missing it.",
+    "THE STOP CLOCK ADDS FIVE-RUN PENALTIES DIRECTLY TO THE TOTAL. The bowling side must be ready to bowl the next over within 60 seconds; the third offence in an innings, after two warnings, is a five-run penalty against the fielding side, and per the ICC's 27 June 2025 update the warnings reset after each 80 overs and the mechanism now applies in Tests too. These are real runs credited as extras with no ball bowled - small in expectation, but they are pure additive tail risk on a tight total line.",
+    "THE ODI BALL CHANGED IN 2025 AND IT MOVES DEATH-OVERS SCORING. Per the ICC (27 June 2025), two new balls are now used only for the first 34 overs of an ODI innings, after which the fielding side CHOOSES one ball for overs 35-50. The intent was to restore reverse swing at the death. Any ODI death-overs model fitted on pre-2025 data is fitted on a different game - the training window must be cut at this rule change.",
+    "THE FOLLOW-ON THRESHOLD SCALES WITH MATCH LENGTH, AND THE FOURTH INNINGS OFTEN NEVER HAPPENS. Law 14: a 200-run first-innings lead in a match of 5 days or more, 150 in a 3-or-4-day match, 100 in a 2-day match, 75 in a 1-day match. Enforcing it reorders the innings; and a Test frequently finishes in THREE innings (verified directly in the Cricsheet sample - the innings array had 3 entries, not 4). Test total-runs markets must treat innings count as a random variable.",
+    "DECLARATION MAKES A TEST INNINGS TOTAL A DECISION, NOT A DISTRIBUTION. Under Law 15 a captain may close an innings at any time, so first- and third-innings Test totals are censored by strategy rather than by dismissal - the captain declares when the lead is sufficient. Modelling a declared innings as a completed batting distribution overstates the tail, and 'total runs in innings X' in a Test is partly a captaincy forecast.",
+    "THE HUNDRED IS NOT T20 WITH DIFFERENT ARITHMETIC. 100 balls a side, ends change every 10 balls, bowlers deliver five or ten CONSECUTIVE balls at the captain's choice, a maximum of 20 balls per bowler, and a 25-ball powerplay. There is no over as a unit, so economy-per-over, overs-remaining and any 6-ball phase window are undefined. Cricsheet carries 322 Hundred matches - filter them out of any over-based aggregation or they will silently corrupt it.",
+    "FORMAT DETERMINES THE BOWLING CAP AND THEREFORE THE WICKET DISTRIBUTION. Maximum 4 overs per bowler in T20, 10 in an ODI, 20 balls in The Hundred, and no limit at all in Tests. The cap truncates every top-bowler and wickets-taken market, and it is the reason Test bowler props cannot be ported from white-ball priors.",
+    "POWERPLAY STRUCTURE DIFFERS BY FORMAT AND IS A RULE, NOT A CONVENTION. T20: 6 overs with 2 fielders outside the circle. ODI: overs 1-10 with 2 outside, 11-40 with 4, 41-50 with 5. The Hundred: 25 balls with 2 outside. Phase-split statistics computed with the wrong window are not merely noisy, they are measuring a different game state.",
+    "TEST MATCHES HAVE A MINIMUM OVERS-PER-DAY OBLIGATION AND LOST TIME DRIVES THE DRAW PRICE. A minimum of 90 overs a day is scheduled, and time lost to rain or bad light is the single largest input to the probability of a draw. A Test draw price is substantially a WEATHER forecast, which makes the same Open-Meteo feed that serves the DLS exposure a first-class input to Test match-winner markets.",
+    "RESERVE DAYS EXIST FOR KNOCKOUTS AND CHANGE THE VOID PROBABILITY. ICC event semi-finals and finals typically carry a reserve day while group matches do not, so an identical weather forecast implies a very different no-result probability depending on the stage of the tournament. Never apply one abandonment prior across a whole competition.",
+    "CONCUSSION SUBSTITUTES CAN REPLACE A NAMED PLAYER MID-MATCH. A like-for-like concussion replacement may bat and bowl, so a player named in a top-batsman or top-bowler market can be removed from the game after the toss through no fault of the bettor. Whether the market voids, stands, or transfers to the substitute is a book-specific term - the ICC updated concussion-replacement processes again in the 27 June 2025 playing conditions.",
+    "DLS APPLIES ONLY TO LIMITED-OVERS CRICKET. There is no DLS in a Test or any multi-day match - lost time there produces a draw, not a revised target. Applying a rain adjustment to a Test total is a category error, and so is applying a draw model to a limited-overs game.",
+    "BETWINNER'S OWN ABANDONMENT AND REDUCED-OVERS TERMS OVERRIDE EVERY LINE ABOVE FOR SETTLEMENT PURPOSES. The playing conditions determine the sporting result; the book's rules determine the payout. Whether a reduced-overs match voids totals or re-lines them, whether DLS decides the match-winner market, how a no-result, a tie, a super over and a non-batting player are treated, and whether super-over runs count - all of these are book terms, not ICC terms, and they were NOT verified in this research. State no settlement rule as fact until the Betwinner cricket rules page has been read and quoted. Note that betwinner.com currently redirects to betwinner2.com and /en/rules returns HTTP 404, so the correct rules path must be found first."
+  ],
+
+  "open_questions": [
+    "LICENCE SCOPE ON THE MATCH DATA - THE MOST IMPORTANT UNRESOLVED ITEM. The ODC-BY 1.0 statement is published on cricsheet.org/register/ under the heading 'The License' and reads 'This dataset is made available under...', which on its face scopes to the REGISTER (identifier) dataset. I searched cricsheet.org/, /about/, /downloads/, /matches/, /format/, /format/json/, /coverage/ and the README.txt inside a downloaded zip: none contains the string 'licen' at all, and the site footer reads 'Site (c) 2009-2026 Cricsheet. All rights reserved.' The ball-by-ball match data is therefore NOT covered by an explicit licence statement I could verify. A web search asserts ODC-BY for Cricsheet generally, but it cited only generic Open Data Commons pages, so I am not recording that as verified. ACTION: email the maintainer (contact page) to confirm the match data licence in writing before any redistribution; attribute ODC-BY-style regardless.",
+    "Does Betwinner offer cricket markets deep enough to justify this stack? The scanner ranks within Betwinner's own prices, so if sport 66 only ever returns match winner and total runs, the top-batsman / method-of-dismissal / opening-partnership research is unused. Confirm the actual market catalogue for sport 66 from a live LineFeed pull before building any cricket-specific scoring.",
+    "What are Betwinner's exact settlement terms for no-result, DLS-decided matches, reduced overs, ties, super overs and non-batting players in top-batsman markets? Not verified - the /en/rules path 404s and the domain redirects to betwinner2.com.",
+    "Where does bowling type (pace/spin, arm, hand) and batter handedness come from for free? This is the single biggest data gap: it is absent from Cricsheet by inspection, and the richest source (ESPNcricinfo) is robots-blocked. Candidates not yet tested: Wikidata player entities, the CricAPI players endpoint (needs a key), or hand-curating the ~500 players who matter across the main T20 leagues.",
+    "Can the DLS Standard Edition resource table be sourced legitimately and is it close enough to the Professional Edition to be useful? Needed for any quantitative rain adjustment; the Professional Edition is proprietary.",
+    "Is a CricAPI free key (100 hits/day) worth wiring in at all given Cricsheet already provides history? Its unique value is FIXTURES and squads for upcoming matches - which Cricsheet, being a historical archive, does not provide. The pre-match app needs a fixture feed from somewhere, and this is currently the only free candidate identified.",
+    "Cricsheet withholds 370 matches involving Afghanistan or the Afghanistan Premier League (13 Tests, 155 ODIs, 158 T20Is). Any Afghanistan fixture will therefore have a materially thinner history than the model assumes - does the scanner need to flag or suppress those?",
+    "Cricsheet update latency is explicitly best-effort ('I'm probably busy with other things, like real life'), so recent-form windows may be stale by days during a busy calendar. How stale is acceptable before a form feature is suppressed?",
+    "Venue-name normalisation: info.venue is free text and the same ground appears under multiple spellings (the sample carried city 'Bengaluru' with venue 'M Chinnaswamy Stadium, Bangalore'). An alias table is required before venue par scores or the Wikidata coordinate join can be trusted."
+  ],
+
+  "key_findings": [
+    "CRICSHEET IS THE BEST FREE SOURCE FOUND IN ANY SPORT IN THIS PROJECT SO FAR, AND IT IS NOT CLOSE. 22,326 matches of genuine ball-by-ball data - 910 Tests, 3,152 ODIs, 5,550 T20Is, plus IPL, BBL, PSL, CPL, T20 Blast, County Championship, The Hundred and 20+ other competitions, men's and women's - free, no key, no rate limit, sliced into 2,456 zips. Verified by downloading an archive and parsing the JSON, not by trusting a status code. Every batting, bowling, phase, partnership, venue and run-rate-curve statistic in this document is computable from it alone.",
+    "THE LICENCE IS THE ONE THING THAT DID NOT CHECK OUT CLEANLY. ODC-BY 1.0 is stated verbatim and unambiguously - but on the REGISTER page, about 'this dataset'. No licence statement exists anywhere on the match-data pages or in the zip README, and the site footer says 'All rights reserved'. The permissive licence the brief assumed is verified for the identifier data and UNVERIFIED for the ball-by-ball data. Attribute and confirm before redistributing.",
+    "CRICAPI IS THE PROJECT'S CLEANEST LIVE EXAMPLE OF THE BODY-NOT-STATUS RULE: api.cricapi.com returns HTTP 200 with {\"status\":\"failure\",\"reason\":\"Invalid API Key\"}. A status-code health check marks it green while it returns nothing. ICC's rankings page is the second example - HTTP 200, 440KB, and zero ranking data because the table is client-rendered. Both would have been recorded as working sources by anything that did not read the bytes.",
+    "ESPNCRICINFO IS DOUBLE-BLOCKED AND MUST NOT BE FETCHED: espn.com/robots.txt names 'anthropic-ai' with 'Disallow: /' (read directly in the body), and espncricinfo.com/robots.txt is itself an Akamai 403 under any user-agent. Cricbuzz is blanket-disallowed ('User-agent: * / Disallow: /') and HowSTAT returns a 403 'Your request was blocked.' The three richest scrapeable cricket stats sites are all closed - which is precisely why Cricsheet carries the project.",
+    "WEATHER IS A FIRST-CLASS MODELLING INPUT IN CRICKET, NOT A GARNISH, AND IT IS FREE. Open-Meteo returns hourly dew point, humidity and precipitation probability with no API key (verified in body). It is the only way to make three separate exposures quantitative: dew advantage to the chasing side in day-night matches, DLS-reversal risk, and no-result void risk - plus the Test draw price, which is substantially a weather forecast. Chain it via Cricsheet venue -> Wikidata coordinates (SPARQL verified) -> Open-Meteo.",
+    "THE TWO HEADLINE TRAPS COMPOUND EACH OTHER. Rain does not just add variance to a totals line, it splits the outcome space three ways: play through (settle normally), reduced/DLS (settle on resources, where the side behind on runs can win), or abandon below 20 overs an ODI / 5 overs a T20 (void, no settlement at all). These are three different payoff regimes, and the threshold itself moves - World Cup knockouts require 10 overs a side, not 5.",
+    "MATCH TOTAL RUNS IS RIGHT-CENSORED BECAUSE THE CHASE STOPS AT THE TARGET, AND TEAM TOTAL EXCEEDS THE SUM OF BATTER RUNS BECAUSE OF EXTRAS. Two structural biases, both trivially avoidable, both fatal if missed: the first overprices the over on match totals, the second breaks any attempt to reconcile team-total and batsman markets. Model the first innings uncensored and the second innings truncated.",
+    "METHOD OF DISMISSAL IS THE CLEANEST STAT-TO-MARKET MAPPING IN THE SPORT - Cricsheet's wickets[].kind gives caught, bowled, lbw, run out, stumped and the rest directly (all six observed in a single sampled Test). The same field is what stops top-bowler markets being wrong: run outs are credited to no bowler and must be filtered out.",
+    "THE BIG DATA GAP IS PLAYER ATTRIBUTES, NOT MATCH EVENTS. Bowling type and batter handedness appear NOWHERE in the Cricsheet JSON (confirmed by inspecting info and every delivery). Spin-vs-pace matchups - among the largest real edges in cricket - therefore require an external player-attribute table joined on the Cricsheet register id, and the obvious source for it is the one that is robots-blocked.",
+    "FOUR FORMATS, FOUR DIFFERENT GAMES - AND ONE OF THEM HAS NO OVERS. Test cricket is a three-outcome market with declarations and follow-ons; The Hundred has 100 balls, 10-ball end changes and a 20-BALL bowler cap, so every over-based metric is undefined for it. Cricsheet's info.balls_per_over, match_type and event fields make the filter exact - use them before aggregating anything, or 322 Hundred matches will silently poison the T20 priors.",
+    "TWO 2025 RULE CHANGES INVALIDATE OLDER TRAINING DATA AT THE DEATH: the ODI ball change (two new balls only to over 34, then one chosen ball for 35-50, ICC 27 June 2025) and the stop clock with its five-run penalty, now extended to Tests. Cut the ODI death-overs training window at the ball change or the model is fitted on a different sport."
+  ]
+}

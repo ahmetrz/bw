@@ -4,17 +4,26 @@ import config
 
 
 def _overrounds(rows):
-    """Per-market hold: sum(implied) - 1, only for markets with >=2 outcomes and sum>1."""
-    agg = {}
+    """Per-market hold, only for markets with >=2 outcomes.
+
+    The hold is sum(implied)/coverage - 1, not sum(implied) - 1. Coverage is how many
+    times a market's selections cover the outcome space, and it is 1 for almost every
+    market — but not for double chance, whose 1X, 12 and X2 each contain two of the three
+    results and therefore sum to about 2 under fair pricing. Treating that sum as a hold
+    reported every double-chance market at 100%+, which MAX_OVERROUND then discarded, and
+    since double chance is the top rung of the football safety ladder the ladder had
+    nothing to select. The measured sum on the sample was 2.154 — a 7.7% hold.
+    """
+    agg, counts, cover = {}, {}, {}
     for r in rows:
-        agg.setdefault(r["market_key"], 0.0)
-        agg[r["market_key"]] += r["implied"]
-    counts = {}
-    for r in rows:
-        counts[r["market_key"]] = counts.get(r["market_key"], 0) + 1
+        k = r["market_key"]
+        agg[k] = agg.get(k, 0.0) + r["implied"]
+        counts[k] = counts.get(k, 0) + 1
+        cover[k] = r.get("market_coverage") or 1
     out = {}
     for k, s in agg.items():
-        out[k] = (s - 1.0) if (counts[k] >= 2 and s > 1.0) else None
+        fair = s / cover[k]
+        out[k] = (fair - 1.0) if (counts[k] >= 2 and fair > 1.0) else None
     return out
 
 
