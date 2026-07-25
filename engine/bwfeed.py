@@ -140,6 +140,12 @@ def normalize(data, book="betwinner"):
                     "p1": gm.get("O1"),
                     "p2": gm.get("O2"),
                     "start": start,
+                    # Needed to build the deep link back into Betwinner. The numeric
+                    # form /en/line/<sport>/<champ>/<game> resolves; the slug form
+                    # would mean guessing a competition slug we do not have.
+                    "sport_id": gm.get("SI"),
+                    "champ_id": gm.get("LI"),
+                    "league": gm.get("LE") or gm.get("L"),
                     # group + line, so each line is scored as its own market
                     "market_key": (ci, f"{g}|{p}"),
                     "market_type": mtype,
