@@ -226,6 +226,70 @@ jobs:
           echo "=================================================="
           ls -la data/
 
+      # Anahtar odds-api.io'da auth gecmedi. 32 karakterlik format the-odds-api.com'un
+      # (AYRI bir sirket) ev stili — operator "emin degilim, test et" dedigi icin
+      # anahtarin gercekte hangi saglayiciya ait oldugunu burada belirliyoruz.
+      # Not: the-odds-api.com'un yayinlanan kitap listesinde Betwinner YOK; bu adim
+      # anahtarin kimligini saptar, Betwinner sorununu cozmez.
+      - name: Anahtar the-odds-api.com'a mi ait?
+        if: always()
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          set -o pipefail
+          TOA="https://api.the-odds-api.com/v4"
+          if [ -z "${ODDS_API_KEY}" ]; then
+            echo "ODDS_API_KEY bos — atlaniyor."; exit 0
+          fi
+
+          # /v4/sports gercekten dogruluyor: sahte anahtara 401 INVALID_KEY veriyor.
+          echo "=================================================="
+          echo "the-odds-api.com kimlik testi (GET /v4/sports)"
+          CODE=$(curl -sS -m 30 -o /tmp/toa.json -D /tmp/toa.hdr -w "%{http_code}" \
+                 "${TOA}/sports?apiKey=${ODDS_API_KEY}" || echo "000")
+          echo "   HTTP ${CODE}"
+          if [ "${CODE}" != "200" ]; then
+            head -c 300 /tmp/toa.json | sed 's/^/     /'; echo ""
+            echo "SONUÇ: Anahtar the-odds-api.com'a da ait DEGIL."
+            exit 0
+          fi
+
+          echo "   ✓ Anahtar the-odds-api.com'da GECERLI."
+          grep -i '^x-requests' /tmp/toa.hdr | sed 's/^/     kota: /' || true
+
+          SPORTKEY=$(python3 -c "
+          import json
+          d=json.load(open('/tmp/toa.json'))
+          s=[x['key'] for x in d if x.get('key','').startswith('soccer_') and x.get('active')]
+          print(s[0] if s else '')
+          " 2>/dev/null || echo "")
+          echo "   secilen futbol ligi: ${SPORTKEY:-<yok>}"
+
+          if [ -n "${SPORTKEY}" ]; then
+            CODE=$(curl -sS -m 30 -o /tmp/toaodds.json -w "%{http_code}" \
+                   "${TOA}/sports/${SPORTKEY}/odds?apiKey=${ODDS_API_KEY}&regions=eu&markets=h2h" || echo "000")
+            echo "   GET /v4/sports/${SPORTKEY}/odds?apiKey=***&regions=eu -> HTTP ${CODE}"
+            if [ "${CODE}" = "200" ]; then
+              mkdir -p data
+              cp /tmp/toaodds.json data/theoddsapi_${SPORTKEY}_eu.json
+              echo "   --- bu anahtarin GERCEKTEN dondurdugu kitaplar ---"
+              python3 -c "
+          import json, collections
+          d=json.load(open('/tmp/toaodds.json'))
+          c=collections.Counter()
+          for ev in (d if isinstance(d,list) else []):
+              for b in ev.get('bookmakers') or []:
+                  c[b.get('key')] += 1
+          print('   etkinlik:', len(d) if isinstance(d,list) else 0)
+          for k,v in c.most_common():
+              print(f'     {k}: {v} etkinlikte')
+          print('   betwinner var mi:', any('betwinner' in (k or '') for k in c))
+          "
+            else
+              head -c 300 /tmp/toaodds.json | sed 's/^/     /'; echo ""
+            fi
+          fi
+
       - name: Commit data
         if: always()
         run: |
