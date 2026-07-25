@@ -59,7 +59,8 @@ jobs:
             --partner "${P}" \
             --sports "${S}" \
             --max-fixtures "${MF}" \
-            --workers 8 \
+            --workers 6 \
+            --budget-min 150 \
             --out "data/betwinner_${H}h.json.gz"
           ls -la data/
 

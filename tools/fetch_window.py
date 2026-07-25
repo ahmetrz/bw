@@ -36,7 +36,7 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 COUNTEVENTS = 1000
 
 
-def get(path, tries=3, timeout=25):
+def get(path, tries=2, timeout=12):
     """GET a LineFeed endpoint, returning the decoded Value or None."""
     url = f"{BASE}/{path}"
     for attempt in range(tries):
@@ -52,7 +52,7 @@ def get(path, tries=3, timeout=25):
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
             if attempt == tries - 1:
                 return None
-            time.sleep(1.5 * (attempt + 1))
+            time.sleep(1.0)
     return None
 
 
@@ -102,11 +102,30 @@ def main():
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--sports", default="", help="csv of sport ids; blank = every sport")
     ap.add_argument("--max-fixtures", type=int, default=0, help="0 = no cap")
+    ap.add_argument("--budget-min", type=float, default=150.0,
+                    help="wall-clock budget in minutes; stops gracefully and writes what it has")
     args = ap.parse_args()
 
     now = time.time()
     until = now + args.hours * 3600
+    deadline = now + args.budget_min * 60
     pool = ThreadPoolExecutor(max_workers=args.workers)
+
+    collected = []
+
+    def flush(note=""):
+        """Write everything collected so far. Called periodically, so a timeout kill
+        costs at most one checkpoint interval, not the whole run."""
+        payload = json.dumps(collected).encode()
+        if args.out.endswith(".gz"):
+            with gzip.open(args.out, "wb") as f:
+                f.write(payload)
+        else:
+            with open(args.out, "wb") as f:
+                f.write(payload)
+        print(f"checkpoint: {len(collected)} records "
+              f"({len(payload) / 1024 / 1024:.1f} MB){' - ' + note if note else ''}",
+              flush=True)
 
     if args.sports.strip():
         sport_list = [(int(x), f"sport{x}") for x in args.sports.split(",") if x.strip()]
@@ -137,19 +156,40 @@ def main():
         ids = ids[: args.max_fixtures]
         print(f"capped to {len(ids)} fixtures", flush=True)
 
-    games = [g for g in pool.map(lambda c: game(c, args.partner), ids)
-             if isinstance(g, dict) and g.get("GE")]
-    print(f"fixtures fetched: {len(games)}", flush=True)
+    CHUNK = 200
+    timed_out = False
+    for i in range(0, len(ids), CHUNK):
+        if time.time() > deadline:
+            print(f"budget exhausted after {len(collected)} fixtures - stopping early",
+                  flush=True)
+            timed_out = True
+            break
+        chunk = ids[i:i + CHUNK]
+        got = [g for g in pool.map(lambda c: game(c, args.partner), chunk)
+               if isinstance(g, dict) and g.get("GE")]
+        collected.extend(got)
+        flush(f"fixtures {i + len(chunk)}/{len(ids)}")
+    print(f"fixtures fetched: {len(collected)}", flush=True)
 
-    sub_ids = {sg["CI"] for g in games for sg in (g.get("SG") or []) if sg.get("CI")}
+    # Sub-games only with leftover budget - the main card outranks them.
+    sub_ids = {sg["CI"] for g in collected for sg in (g.get("SG") or []) if sg.get("CI")}
     sub_ids -= set(ids)
-    subs = []
-    if sub_ids:
-        subs = [g for g in pool.map(lambda c: game(c, args.partner), sorted(sub_ids))
-                if isinstance(g, dict) and g.get("GE")]
-    print(f"sub-games fetched: {len(subs)} of {len(sub_ids)} referenced", flush=True)
+    subs_done = 0
+    if sub_ids and not timed_out:
+        sub_list = sorted(sub_ids)
+        for i in range(0, len(sub_list), CHUNK):
+            if time.time() > deadline:
+                print("budget exhausted during sub-games - stopping early", flush=True)
+                break
+            chunk = sub_list[i:i + CHUNK]
+            got = [g for g in pool.map(lambda c: game(c, args.partner), chunk)
+                   if isinstance(g, dict) and g.get("GE")]
+            collected.extend(got)
+            subs_done += len(got)
+            flush(f"sub-games {i + len(chunk)}/{len(sub_list)}")
+    print(f"sub-games fetched: {subs_done} of {len(sub_ids)} referenced", flush=True)
 
-    out = games + subs
+    out = collected
     sel = sum(
         1
         for g in out
@@ -161,14 +201,7 @@ def main():
     print(f"records: {len(out)} | market groups: {sum(len(g.get('GE') or []) for g in out)}"
           f" | priced selections: {sel}", flush=True)
 
-    payload = json.dumps(out).encode()
-    if args.out.endswith(".gz"):
-        with gzip.open(args.out, "wb") as f:
-            f.write(payload)
-    else:
-        with open(args.out, "wb") as f:
-            f.write(payload)
-    print(f"wrote {args.out} ({len(payload) / 1024 / 1024:.1f} MB uncompressed)")
+    flush("final")
     return 0 if out else 1
 
 
