@@ -1,0 +1,127 @@
+{
+  "sport": "esports",
+  "researched": "2026-07-25",
+  "verified_free_sources": [
+    {
+      "id": "bo3gg",
+      "url": "https://bo3.gg/api/v1/matches",
+      "auth": "none",
+      "verified": true,
+      "coverage": "cs2, valorant, lol, dota2, r6 + deadlock/mlbb. 77928 matches, 140401 games with map_name and per-map round scores, 8286 teams. From 2020-12.",
+      "rate_limit": "none observed (20 rapid requests, 0 blocks)",
+      "WARNING": "robots.txt says Disallow: /api/ and there are no published terms. Legal grey zone - highest-value source found but use conservatively."
+    },
+    {
+      "id": "liquipedia",
+      "url": "https://liquipedia.net/counterstrike/api.php",
+      "auth": "none",
+      "verified": true,
+      "coverage": "all 5 titles: rosters, transfers, tournaments, map pools, patches",
+      "rate_limit": "1 req/2s; action=parse 1 req/30s; LPDB 60/hr",
+      "license": "CC-BY-SA 3.0, attribution + caching mandatory",
+      "note": "returns 406 unless the client sends gzip and a descriptive User-Agent"
+    },
+    {
+      "id": "opendota",
+      "url": "https://api.opendota.com/api/proMatches",
+      "auth": "none",
+      "verified": true,
+      "coverage": "dota2 only; pro matches, leagues, team ratings, deep history",
+      "rate_limit": "60/min, ~2000/day"
+    },
+    {
+      "id": "vlrgg",
+      "url": "https://www.vlr.gg/matches",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "valorant global, server-rendered",
+      "license": "robots.txt permissive"
+    },
+    {
+      "id": "siegegg",
+      "url": "https://siege.gg/matches",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "r6 siege - the main free R6 source",
+      "license": "robots.txt Allow: /"
+    },
+    {
+      "id": "riot_ddragon",
+      "url": "https://ddragon.leagueoflegends.com/api/versions.json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "lol patch versions only, no results"
+    }
+  ],
+  "blocked": [
+    {
+      "id": "hltv",
+      "detail": "403 + Cloudflare 'Just a moment' body. CS2 ratings must be REBUILT in-house from bo3.gg map results."
+    },
+    {
+      "id": "stratz",
+      "detail": "403 Cloudflare"
+    },
+    {
+      "id": "faceit",
+      "detail": "403 Cloudflare"
+    },
+    {
+      "id": "dotabuff",
+      "detail": "403 Cloudflare"
+    },
+    {
+      "id": "pandascore",
+      "detail": "free 'Fixtures Only' tier EXCLUDES post-game statistics - useless for modelling"
+    },
+    {
+      "id": "riot_main_api",
+      "detail": "free developer key grants NO esports endpoints; only soloq"
+    }
+  ],
+  "stat_to_bet": {
+    "match_winner": [
+      "team_elo",
+      "recent_form_decayed",
+      "lan_vs_online",
+      "roster_stability"
+    ],
+    "map_handicap": [
+      "map_winrate",
+      "team_elo",
+      "recent_form_decayed"
+    ],
+    "total_maps": [
+      "map_winrate",
+      "team_elo",
+      "game_duration"
+    ],
+    "correct_map_score": [
+      "map_winrate",
+      "veto_model"
+    ],
+    "map_winner": [
+      "map_winrate",
+      "side_winrate_ct_t",
+      "atk_def_split"
+    ],
+    "total_rounds_kills": [
+      "side_winrate_ct_t",
+      "eco_conversion",
+      "game_duration",
+      "gd10_15"
+    ],
+    "first_blood_objective": [
+      "pistol_winrate",
+      "objective_control",
+      "gd10_15"
+    ]
+  },
+  "key_findings": [
+    "Model at MAP level, not match level. Map win rate x veto is the dominant feature for CS2/Valorant/R6.",
+    "THE BINDING CONSTRAINT: required sample (20-30 maps per map) exceeds roster stability for all but tier-1 teams, and patch cadence (LoL/Valorant ~2 weeks) invalidates history faster still. Hierarchical partial pooling with time decay and roster-overlap weighting is mandatory, not optional.",
+    "LAN and online must be separate rating pools - online rating overstates LAN for many rosters.",
+    "Pistol-round and first-blood are the noisiest inputs (~2 pistols per map). Tiebreakers only, smallest stakes.",
+    "Recent form should use exponential decay (45-60d half-life), not 'last 5'."
+  ]
+}

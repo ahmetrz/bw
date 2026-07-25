@@ -55,6 +55,13 @@ RANGE_DECAY = 1.00              # decimal-odds distance over which range_score f
 # Set to 0 to disable and rank purely on score.
 MAX_PER_FIXTURE = 4
 
+# --- Safety laddering ------------------------------------------------------
+# The only place odds are allowed to influence selection. Direction comes from the
+# model; the ladder then walks to the safest form of that same view and stops at the
+# last rung still priced at or above this. A short price is NOT a probability estimate,
+# so it must never be used to pick a side.
+MIN_ODDS = 1.10
+
 # --- Output -----------------------------------------------------------------
 TOP_N = 50
 REPORT_PATH = "report.json"
