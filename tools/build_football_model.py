@@ -36,6 +36,7 @@ import sys
 import urllib.error
 import urllib.request
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -74,7 +75,7 @@ EXTRA_COUNTRIES = [
     "MEX", "NOR", "POL", "ROU", "RUS", "SWE", "SWZ", "USA",
 ]
 EXTRA_BASE = "https://www.football-data.co.uk/new"
-EXTRA_FROM_SEASON = 2021
+EXTRA_FROM_SEASON = 2012   # these files start here
 
 K_FACTOR = 20.0
 HOME_ADV_ELO = 60.0     # starting value; refitted below
@@ -82,12 +83,16 @@ START_RATING = 1500.0
 
 
 def season_codes(n):
-    """The n most recent season codes, newest first: 2526, 2425, ..."""
+    """The n most recent season codes, newest first: 2526, 2425, ...
+
+    Wraps correctly through the century boundary, so a deep history reaches 9495 rather
+    than producing negative years.
+    """
     # The 2026-27 season has not started, so the current file is 2526.
     out, y = [], 25
     for _ in range(n):
         out.append(f"{y:02d}{(y + 1) % 100:02d}")
-        y -= 1
+        y = (y - 1) % 100
     return out
 
 
@@ -230,7 +235,12 @@ def fit_draw_boost(history, slope, intercept, mean_total):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seasons", type=int, default=5)
+    # Elo runs over the FULL history so ratings are settled; the parameters are fitted on
+    # recent seasons only, because 1990s football is not the game being priced today.
+    ap.add_argument("--seasons", type=int, default=32,
+                    help="seasons of history for the Elo run")
+    ap.add_argument("--fit-seasons", type=int, default=6,
+                    help="most recent seasons used to fit supremacy / totals / draw rate")
     ap.add_argument("--out", default="data/model_football.json")
     ap.add_argument("--divisions", default="")
     ap.add_argument("--no-extra", action="store_true",
@@ -239,15 +249,19 @@ def main():
 
     divs = [d.strip() for d in args.divisions.split(",") if d.strip()] or DIVISIONS
     seasons = season_codes(args.seasons)
+    fit_window = set(season_codes(args.fit_seasons))
+    fit_window |= {str(y) for y in range(2026 - args.fit_seasons + 1, 2027)}  # extra files
+    print(f"Elo history: {len(seasons)} seasons | parameters fitted on the most recent "
+          f"{args.fit_seasons}")
     print(f"downloading {len(divs)} divisions x {len(seasons)} seasons ...")
 
     by_div = defaultdict(list)
     total = 0
-    for season in reversed(seasons):          # oldest first, so Elo runs forward in time
-        for d in divs:
-            rows = fetch(d, season)
-            by_div[d].extend(rows)
-            total += len(rows)
+    pool = ThreadPoolExecutor(max_workers=14)
+    jobs = [(d, s_) for s_ in reversed(seasons) for d in divs]  # oldest first: Elo runs forward
+    for (d, _s), rows in zip(jobs, pool.map(lambda j: fetch(j[0], j[1]), jobs)):
+        by_div[d].extend(rows)
+        total += len(rows)
     print(f"  main divisions: {total} matches")
 
     if not args.no_extra:
@@ -274,9 +288,13 @@ def main():
             print(f"  {d}: {len(matches)} matches — too few, skipped")
             continue
         ratings, history = run_elo(matches)
-        slope, intercept = fit_supremacy(history)
-        mean_total = sum(m["total"] for m in history) / len(history)
-        boost, obs_draw, base_draw = fit_draw_boost(history, slope, intercept, mean_total)
+        # Ratings come from everything; the fitted parameters come from the recent game
+        # only. Scoring rates and draw frequencies have drifted over three decades, and
+        # fitting them across that span would price today's match with the 1990s' football.
+        recent = [h for h in history if h["season"] in fit_window] or history
+        slope, intercept = fit_supremacy(recent, burn_in=0.0)
+        mean_total = sum(m["total"] for m in recent) / len(recent)
+        boost, obs_draw, base_draw = fit_draw_boost(recent, slope, intercept, mean_total)
         model["divisions"][d] = {
             "matches": len(matches),
             "teams": len(ratings),
