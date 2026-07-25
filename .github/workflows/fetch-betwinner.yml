@@ -28,12 +28,8 @@ on:
         description: "En fazla kac mac cekilsin"
         required: false
         default: "40"
-  # Bu dosya main'de kayitli olana kadar workflow_dispatch 404 verir; bu dalda kendi
-  # yoluna yapilan push ile tetiklenir. paths dar tutuldu ki isin data/ commit'i
-  # workflow'u yeniden tetiklemesin.
-  push:
-    branches: [claude/betwinner-scanner-data-flow-60bitm]
-    paths: ['.github/workflows/fetch-betwinner.yml']
+  # Zamanlama YOK. Kota yakan bir cron'u operator onayi olmadan kurmuyoruz
+  # (CLAUDE.md, human-in-the-loop madde 5).
 
 permissions:
   contents: write
@@ -83,12 +79,45 @@ jobs:
             exit 1
           fi
 
-          echo "2) her mac icin tum marketler"
+          # countevents KIRPAR. 250 ile bu turnuvada mac basina 21 grup / 307 secim
+          # geliyordu; 1000 ile 119 grup / 847 secim — yani marketlerin ancak %36'si
+          # aliniyordu. 5000 de 1000 ile ayni sonucu veriyor, yani 1000 doyuyor.
+          CE=1000
+
+          echo "2) her mac icin tum marketler (countevents=${CE})"
           for ci in ${IDS}; do
             curl -sS -m 25 -H "Accept: application/json" -H "User-Agent: ${UA}" \
-              "${BASE}/GetGameZip?id=${ci}&lng=en&cfview=0&isSubGames=true&GroupEvents=true&countevents=250&partner=${PARTNER}&grMode=4&country=1&marketType=1" \
+              "${BASE}/GetGameZip?id=${ci}&lng=en&cfview=0&isSubGames=true&GroupEvents=true&countevents=${CE}&partner=${PARTNER}&grMode=4&country=1&marketType=1" \
               -o "games/${ci}.json" || true
             sleep 0.6   # ardisik istekler rate limit yiyor
+          done
+
+          # Alt-oyunlar (SG) AYRI game id'lerdir: "First To Happen", yarilar, kornerler…
+          # Ana macin payload'inda yalnizca referanslari bulunur, marketleri gelmez.
+          echo "3) alt-oyunlar"
+          SGIDS=$(python3 - <<PY
+          import json, glob, os
+          ids = []
+          for f in glob.glob("games/*.json"):
+              if os.path.basename(f) == "_list.json":
+                  continue
+              try:
+                  v = json.load(open(f)).get("Value") or {}
+              except Exception:
+                  continue
+              for sg in v.get("SG") or []:
+                  if sg.get("CI"):
+                      ids.append(str(sg["CI"]))
+          print(" ".join(sorted(set(ids))))
+          PY
+          )
+          echo "   alt-oyun sayisi: $(echo "${SGIDS}" | wc -w)"
+          for ci in ${SGIDS}; do
+            [ -f "games/${ci}.json" ] && continue
+            curl -sS -m 25 -H "Accept: application/json" -H "User-Agent: ${UA}" \
+              "${BASE}/GetGameZip?id=${ci}&lng=en&cfview=0&isSubGames=true&GroupEvents=true&countevents=${CE}&partner=${PARTNER}&grMode=4&country=1&marketType=1" \
+              -o "games/${ci}.json" || true
+            sleep 0.6
           done
 
           OUT="data/betwinner_${CHAMP}.json"

@@ -113,6 +113,10 @@ def normalize(data, book="betwinner"):
             continue
         ci = gm.get("CI")
         start = _start_iso(gm.get("S"))
+        # Sub-games ("First To Happen", halves, corners…) arrive as their own game ids
+        # carrying the parent's team names. Tag the selection so the table does not show
+        # two identical-looking rows for what are different propositions.
+        tag = (gm.get("TG") or "").strip()
         for grp in gm.get("GE") or []:
             g = grp.get("G")
             mtype = GROUP_TYPES.get(g, "other")
@@ -141,7 +145,9 @@ def normalize(data, book="betwinner"):
                     "market_type": mtype,
                     "is_alt": lined and not main,
                     "main_line": main,
-                    "selection": _label(e.get("T"), p),
+                    "selection": (
+                        f"[{tag}] {_label(e.get('T'), p)}" if tag else _label(e.get("T"), p)
+                    ),
                     "odds": float(price),
                     "implied": 1.0 / float(price),
                     # The feed only publishes selections that are open, so anything
