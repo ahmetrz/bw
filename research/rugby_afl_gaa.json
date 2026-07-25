@@ -1,0 +1,364 @@
+{
+  "sport": "rugby_afl_gaa",
+  "betwinner_sport_ids": [7, 28, 80, 126],
+  "researched": "2026-07-25",
+  "scope_note": "FOUR SEPARATE SPORTS bundled by one research pass, NOT one model. Betwinner id 7 covers BOTH rugby union and rugby league, which are different games with different scoring values, different draw behaviour and different data sources. id 28 = Australian Rules, id 80 = Gaelic football, id 126 = hurling. Nothing in this file may be shared across codes without an explicit per-code recalibration.",
+
+  "scoring_values": {
+    "rugby_union": {"try": 5, "conversion": 2, "penalty_goal": 3, "drop_goal": 3, "penalty_try": 7, "note": "Penalty try is 7 and NO conversion kick is attempted - verified in World Rugby timeline as type PT5, points 7."},
+    "rugby_league": {"try": 4, "conversion": 2, "penalty_goal": 2, "field_goal": 1, "field_goal_40m_plus": 2, "note": "NRL two-point field goal from beyond the 40m line, introduced 2021. Confirmed live in the NRL data model: player stat fields onePointFieldGoals AND twoPointFieldGoals are separate."},
+    "afl": {"goal": 6, "behind": 1, "note": "Notation 13.4 (82) = 13 goals, 4 behinds, 82 points. A rushed behind still scores 1 for the attacking team."},
+    "gaelic_football": {"goal": 3, "point": 1, "two_point_score": 2, "note": "Two-pointer for a point scored directly from outside the 40m arc, NEW for 2025. Notation 1-15 = 1 goal + 15 points = 18. A '45' remains 1 point."},
+    "hurling": {"goal": 3, "point": 1, "note": "NO two-point rule. Verified against the official GAA 'Hurling - New Rules Congress 2026' PDF, which contains zero scoring changes (dissent and team-management sanctions only)."}
+  },
+
+  "measured_baselines": {
+    "method": "Computed by this research pass directly from the verified free sources listed below, not quoted from secondary reporting.",
+    "afl_2025": {"n": 216, "mean_total": 168.8, "median_total": 168, "min": 83, "max": 261, "mean_margin": 33.2, "draws": 1, "draw_pct": 0.46, "mean_scoring_shots": 46.2, "accuracy_goals_over_shots": 0.531, "source": "squiggle"},
+    "six_nations_2026": {"n": 15, "mean_total": 54.8, "median_total": 50, "min": 33, "max": 94, "mean_margin": 15.9, "draws": 0, "source": "world_rugby_api"},
+    "english_premiership_2026": {"n": 93, "mean_total": 59.5, "median_total": 58, "min": 11, "max": 127, "mean_margin": 19.3, "draws": 1, "draw_pct": 1.1, "source": "world_rugby_api"},
+    "super_rugby_pacific_2026": {"n": 83, "mean_total": 58.4, "median_total": 57, "min": 22, "max": 95, "mean_margin": 17.7, "draws": 0, "source": "world_rugby_api"},
+    "urc_2026": {"n": 151, "mean_total": 47.5, "median_total": 47, "min": 15, "max": 93, "mean_margin": 14.6, "draws": 7, "draw_pct": 4.6, "source": "world_rugby_api", "note": "Draws verified as genuine scorelines, not nulls: 17-17, 19-19, 24-24, 20-20, 15-15, 38-38, 35-35. URC draw rate is an order of magnitude above AFL/NRL and is the single strongest argument for a double-chance safety ladder in union."},
+    "nrl_2025": {"n": 204, "mean_total": 46.4, "median_total": 44, "min": 14, "max": 88, "mean_margin": 15.2, "draws": 1, "draw_pct": 0.49, "p_total_over_40": 60.3, "p_margin_within_6": 34.3, "source": "nrl_draw_data", "note": "One drawn match DESPITE golden point - empirical proof that NRL regular-season draws survive the 10-minute period."}
+  },
+
+  "statistics": [
+    {"id": "u_tries", "code": "rugby_union", "name": "Tries", "field": "Tries", "definition": "Tries scored, 5 points each.", "sources": ["world_rugby_api"], "drives": ["total_points", "team_totals", "handicap", "first_scoring_play"]},
+    {"id": "u_conversions", "code": "rugby_union", "name": "Conversions / MissedConversions", "field": "Conversions, MissedConversions", "definition": "Conversion kicks made and missed, 2 points each.", "sources": ["world_rugby_api"], "drives": ["total_points", "winning_margin_bands"], "note": "Conversion rate is the main driver of margin-band granularity: a 5 vs 7 point try swings which band settles."},
+    {"id": "u_penalties", "code": "rugby_union", "name": "Penalty goals / MissedPenalties", "field": "Penalties, MissedPenalties", "definition": "Penalty goals kicked and missed, 3 points each.", "sources": ["world_rugby_api"], "drives": ["total_points", "handicap", "race_to_x"], "note": "Betwinner returns null, not 0, when a team kicks no penalty goals - a parser that sums raw fields will produce NaN totals."},
+    {"id": "u_dropgoals", "code": "rugby_union", "name": "Drop goals / MissedDropGoals", "field": "MissedDropGoals (made DG not observed as its own team key)", "definition": "Drop goals, 3 points each.", "sources": ["world_rugby_api"], "drives": ["total_points", "winning_margin_bands"], "note": "GAP: MissedDropGoals appears but no made-DG team key was observed, and no drop-goal timeline code appeared across 12 sampled Six Nations 2026 matches. Derive DG from Points minus (5*Tries + 2*Conversions + 3*Penalties + 7*PenaltyTries)."},
+    {"id": "u_penalty_try", "code": "rugby_union", "name": "Penalty try", "field": "timeline type PT5", "definition": "Awarded try worth 7 points with no conversion attempted.", "sources": ["world_rugby_api"], "drives": ["total_points", "winning_margin_bands"], "note": "Breaks any model that reconstructs points as tries*5 + conversions*2."},
+    {"id": "u_scrum", "code": "rugby_union", "name": "Scrum win %", "field": "ScrumsTotal, ScrumsWon, ScrumsSuccess, ScrumsWonOutright, ScrumsWonPenalty, ScrumsWonFreeKick, ScrumsReset", "definition": "Own-feed scrum retention plus the penalty/free-kick yield of the set piece.", "sources": ["world_rugby_api"], "drives": ["total_points", "handicap", "team_totals"], "note": "ScrumsWonPenalty is the betting-relevant sub-field: a dominant scrum manufactures 3-point shots, not just possession."},
+    {"id": "u_lineout", "code": "rugby_union", "name": "Lineout win %", "field": "TotalLineouts, LineoutsWon, LineoutSuccess, LineoutWonOwnThrow, LineoutWonSteal, LineoutThrowWonClean, Lineout4Man, Lineout5Man, LineoutFull, LineoutsToOwnPlayer, SetPieceWon", "definition": "Lineout retention on own throw and steal rate on opposition throw.", "sources": ["world_rugby_api"], "drives": ["total_points", "team_totals", "handicap"], "note": "Lineout + maul is the primary red-zone try-scoring mechanism in northern-hemisphere rugby; pair with MaulingMetres."},
+    {"id": "u_metres", "code": "rugby_union", "name": "Metres carried", "field": "Metres, CarriesMetres, Carries, CarriesCrossedGainLine, CarriesNotMadeGainLine, CarryDominant, CarryNeutral, CarryIneffective, CarriesPickAndGo(+Metres), CarriesOneOutDrive(+Metres), CarriesSupport(+Metres), CarriesKickReturn(+Metres)", "definition": "Total and decomposed carrying metres with gain-line outcome.", "sources": ["world_rugby_api"], "drives": ["total_points", "handicap", "team_totals"]},
+    {"id": "u_tackle", "code": "rugby_union", "name": "Tackle completion", "field": "Tackles, MissedTackles, TackleSuccess, DominantTackles, TackleTurnover, TackleOffloadAllowed", "definition": "Tackle success rate and its quality decomposition.", "sources": ["world_rugby_api"], "drives": ["total_points", "team_totals", "handicap"], "note": "TackleSuccess in the verified Six Nations sample ranged 0.69 to 0.83 - a 14pt spread that maps almost linearly onto conceded points."},
+    {"id": "u_turnovers", "code": "rugby_union", "name": "Turnovers", "field": "TurnoverWon, TurnoversWon, TurnoverKnockOn, TurnoverBadPass, TurnoverForwardPass, TurnoverCarriedInTouch, TurnoverKickError, TurnoverLostInRuckOrMaul, TurnoverOwnHalf, TurnoverOppHalf", "definition": "Turnovers won and conceded, split by cause and by field half.", "sources": ["world_rugby_api"], "drives": ["total_points", "first_scoring_play", "race_to_x"], "note": "TurnoverOwnHalf is the high-leverage one: turnovers conceded in your own half convert to points far more often than opposition-half turnovers."},
+    {"id": "u_ruckspeed", "code": "rugby_union", "name": "Ruck speed", "field": "RuckSpeed03, RuckSpeed36, RuckSpeed6Plus, RucksTotal, RucksWon, RucksLost, RuckSuccess, RuckOnGainline, RuckBehindGainline, RuckOverGainline, RuckOverGainlinePercent", "definition": "Rucks bucketed by recycle time (0-3s, 3-6s, 6s+) plus gain-line position of the ruck.", "sources": ["world_rugby_api"], "drives": ["total_points", "team_totals"], "note": "Directly available as three buckets - this is the best free tempo proxy in union and the closest analogue to NRL play-the-ball speed."},
+    {"id": "u_possession_territory", "code": "rugby_union", "name": "Possession and territory", "field": "Possession, Territory, PcPossessionFirst, PcPossessionSecond, PcTerritoryFirst, PcTerritorySecond, BallPossessionLast10Mins, TerritoryLast10Mins, AttackingEventsZoneA-D, BallWonZoneA-D, Opposition22EntryOutcomeTurnover", "definition": "Share of ball and field position, split by HALF and by the last 10 minutes, plus zonal breakdown.", "sources": ["world_rugby_api"], "drives": ["half_markets", "total_points", "handicap", "race_to_x"], "note": "PcPossessionFirst/Second and PcTerritoryFirst/Second are the only free half-split inputs found across all four codes - they are what make union half markets modellable at all."},
+    {"id": "u_kicking", "code": "rugby_union", "name": "Kicking game", "field": "KicksFromHand, KickFromHandMetres, KickInTouch, KickPenaltyGood, KickPercentSuccess, KickSuccess, TotalKicks, TotalKicksSucceeded, RetainedKicks, TrueRetainedKicks, KickPossessionRetained, KickPossessionLost, KickChargedDown, KickOutOfPlay, KickOppnCollection, KickTryScored, PcKickPercent, PenaltyKickForTouchMetres", "definition": "Kicking volume, retention and goal-kicking accuracy.", "sources": ["world_rugby_api"], "drives": ["total_points", "handicap"], "note": "Goal-kicking accuracy is the highest-variance single input to union totals: the same try count settles very different totals lines at 60% vs 85% place-kicking."},
+    {"id": "u_penalties_conceded", "code": "rugby_union", "name": "Penalties conceded", "field": "PenaltiesConceded, PenaltyConcededOffside, PenaltyConcededKillingRuck, PenaltyConcededScrumOffence, PenaltyConcededDelibKnockOn, PenaltyConcededOwnHalf, PenaltyConcededOppHalf", "definition": "Discipline, split by offence type and field half.", "sources": ["world_rugby_api"], "drives": ["total_points", "team_totals"], "note": "PenaltyConcededOwnHalf feeds opposition 3-point shots directly."},
+    {"id": "u_cards", "code": "rugby_union", "name": "Cards", "field": "timeline types Yellow, Red", "definition": "Yellow and red cards with a timestamp.", "sources": ["world_rugby_api"], "drives": ["total_points", "handicap", "half_markets"], "note": "NOT in the team-stats block - there is no card counter among the 129-139 stat keys. Cards must be derived from the /timeline endpoint. Verified: 22 Yellow and 1 Red across 12 Six Nations 2026 matches."},
+    {"id": "u_restarts", "code": "rugby_union", "name": "Restarts and collections", "field": "RestartHalfway, RestartOppPlayer, RestartsLost, CollectionSuccess, CollectionFailed, CollectionFromKick, CollectionInterception, CollectionLooseBall", "definition": "Kick-off/restart retention and loose-ball collection.", "sources": ["world_rugby_api"], "drives": ["race_to_x", "first_scoring_play"]},
+
+    {"id": "l_scoring", "code": "rugby_league", "name": "Scoring breakdown", "field": "points, tries, conversions, conversionAttempts, penaltyGoals, goalConversionRate, onePointFieldGoals, twoPointFieldGoals", "definition": "Player-level scoring split including the one- and two-point field goals as separate fields.", "sources": ["nrl_match_centre"], "drives": ["total_points", "winning_margin_bands", "team_totals", "first_scoring_play"], "note": "The separate twoPointFieldGoals field is the proof the 40m+ rule is live - a totals or margin model that assumes field goal = 1 is wrong."},
+    {"id": "l_possession", "code": "rugby_league", "name": "Possession and completion", "field": "Possession %, Time In Possession, Completion Rate (with numerator/denominator)", "definition": "Share of ball, seconds held, and completed sets over total sets.", "sources": ["nrl_match_centre"], "drives": ["total_points", "handicap", "team_totals"], "note": "Completion Rate ships as a real fraction (e.g. 30/43) - use the raw counts, not the rounded percentage."},
+    {"id": "l_running", "code": "rugby_league", "name": "Run metres and set position", "field": "All Runs, All Run Metres, Post Contact Metres, Average Set Distance, Kick Return Metres, hitUps, dummyHalfRuns, dummyHalfRunMetres, lineEngagedRuns", "definition": "Yardage and where sets start/end.", "sources": ["nrl_match_centre"], "drives": ["total_points", "handicap", "team_totals"], "note": "Average Set Distance is the single cleanest field-position metric in league - it is the league analogue of union territory."},
+    {"id": "l_breaks", "code": "rugby_league", "name": "Line breaks and tackle breaks", "field": "Line Breaks, Tackle Breaks, lineBreakAssists, tryAssists, oneOnOneSteal", "definition": "Defensive line penetration.", "sources": ["nrl_match_centre"], "drives": ["total_points", "team_totals", "race_to_x"]},
+    {"id": "l_ptb", "code": "rugby_league", "name": "Play-the-ball speed", "field": "Average Play The Ball Speed, playTheBallTotal, playTheBallAverageSpeed", "definition": "Average seconds to play the ball - the league equivalent of ruck speed.", "sources": ["nrl_match_centre"], "drives": ["total_points", "team_totals"], "note": "Verified sample values 3.57s and 3.72s. Faster PTB compounds with the six-again rule to inflate totals."},
+    {"id": "l_passing", "code": "rugby_league", "name": "Passing", "field": "Offloads, Receipts, Total Passes, Dummy Passes, passes, passesToRunRatio", "definition": "Ball movement volume and style.", "sources": ["nrl_match_centre"], "drives": ["total_points", "team_totals"]},
+    {"id": "l_kicking", "code": "rugby_league", "name": "Kicking game", "field": "Kicks, Kicking Metres, Forced Drop Outs, Kick Defusal %, Bombs, Grubbers, fortyTwentyKicks, twentyFortyKicks, crossFieldKicks, kicksDead, forcedDropOutKicks", "definition": "Kick volume, type and the defusal contest.", "sources": ["nrl_match_centre"], "drives": ["total_points", "team_totals", "race_to_x"], "note": "Forced Drop Outs are a leading indicator of repeat-set pressure and therefore of tries."},
+    {"id": "l_defence", "code": "rugby_league", "name": "Defence", "field": "Effective Tackle %, Tackles Made, Missed Tackles, Ineffective Tackles, Intercepts, tackleEfficiency, kicksDefused", "definition": "Tackle efficiency and its failure modes.", "sources": ["nrl_match_centre"], "drives": ["total_points", "handicap", "team_totals"], "note": "Ineffective Tackles is tracked separately from Missed Tackles - do not conflate; ineffective tackles concede metres, missed tackles concede breaks."},
+    {"id": "l_negative", "code": "rugby_league", "name": "Errors, penalties and cards", "field": "Errors, handlingErrors, Penalties Conceded, Ruck Infringements, Inside 10 Metres, On Reports, Sin Bins, sendOffs, offsideWithinTenMetres", "definition": "Error and discipline counts including sin bins and send-offs.", "sources": ["nrl_match_centre"], "drives": ["total_points", "handicap", "half_markets"], "note": "Unlike union, cards ARE in the league team-stats block (Sin Bins) - no timeline join needed."},
+    {"id": "l_interchange", "code": "rugby_league", "name": "Interchanges", "field": "Interchanges Used, stintOne, stintTwo, minutesPlayed", "definition": "Bench usage and player stint lengths.", "sources": ["nrl_match_centre"], "drives": ["half_markets", "total_points"], "note": "Interchange exhaustion is a second-half fatigue signal and therefore a second-half totals signal."},
+
+    {"id": "a_disposals", "code": "afl", "name": "Disposals", "field": "DI (= KI kicks + HB handballs), DA disposal average", "definition": "Total effective ball possessions disposed of.", "sources": ["afltables"], "drives": ["handicap", "total_points", "team_totals"], "note": "Disposals correlate with, but do not cause, score - always convert to inside-50s before feeding a totals model."},
+    {"id": "a_marks", "code": "afl", "name": "Marks", "field": "MK, CM contested marks, MI marks inside 50", "definition": "Clean catches from a kick of 15m+.", "sources": ["afltables"], "drives": ["total_points", "team_totals"], "note": "MI (marks inside 50) is the scoring-relevant one; raw MK includes uncontested defensive chip-marks that carry no scoring information."},
+    {"id": "a_inside50", "code": "afl", "name": "Inside 50s", "field": "IF", "definition": "Entries into the attacking 50m arc.", "sources": ["afltables"], "drives": ["total_points", "team_totals", "handicap", "race_to_x"], "note": "The primary volume driver of AFL scoring. Pair with RB (rebound 50s) to get net territory."},
+    {"id": "a_clearances", "code": "afl", "name": "Clearances", "field": "CL, HO hitouts", "definition": "First possessions won out of a stoppage; hitouts are ruck taps.", "sources": ["afltables"], "drives": ["total_points", "team_totals", "race_to_x"], "note": "Hitouts without clearances are noise - a ruckman winning taps to no advantage does not move the score."},
+    {"id": "a_tackles", "code": "afl", "name": "Tackles", "field": "TK", "definition": "Tackles laid.", "sources": ["afltables"], "drives": ["total_points", "handicap"], "note": "High tackle counts are a low-scoring signal: they indicate congestion, which suppresses totals."},
+    {"id": "a_scoring_shots", "code": "afl", "name": "Scoring shots and accuracy", "field": "derived: GL + BH; accuracy = GL / (GL + BH)", "definition": "Total shots at goal and the fraction converted to goals.", "sources": ["afltables", "squiggle"], "drives": ["total_points", "team_totals", "winning_margin_bands", "handicap"], "note": "MEASURED 2025: 46.2 scoring shots per match at 53.1% accuracy. Accuracy is largely non-predictive noise round to round - model scoring shots, then apply a regressed accuracy prior. Never extrapolate a team's hot accuracy streak into a totals line."},
+    {"id": "a_behinds", "code": "afl", "name": "Behinds", "field": "BH; Squiggle hbehinds/abehinds", "definition": "1-point scores, including rushed behinds.", "sources": ["afltables", "squiggle"], "drives": ["total_points", "winning_margin_bands"], "note": "Behinds are why AFL margins are near-continuous rather than lumpy - unlike union/league/GAA, almost every margin value is reachable, so margin bands are genuinely fine-grained."},
+    {"id": "a_possession_quality", "code": "afl", "name": "Contested / uncontested possession", "field": "CP, UP, CG clangers, 1% one percenters, BO bounces", "definition": "Possession quality split and error count.", "sources": ["afltables"], "drives": ["handicap", "total_points"]},
+    {"id": "a_frees", "code": "afl", "name": "Frees for and against", "field": "FF, FA", "definition": "Free kicks awarded for and against.", "sources": ["afltables"], "drives": ["total_points", "team_totals"]},
+    {"id": "a_goal_assists", "code": "afl", "name": "Goal assists and time on ground", "field": "GA, %P percentage of game played, SU sub", "definition": "Assists and player availability/rotation.", "sources": ["afltables"], "drives": ["team_totals"]},
+    {"id": "a_match_result", "code": "afl", "name": "Match scoreline with goal/behind split", "field": "hgoals, hbehinds, hscore, agoals, abehinds, ascore, winner, venue, complete, is_final, is_grand_final", "definition": "Full match result already decomposed into goals and behinds.", "sources": ["squiggle"], "drives": ["1x2_or_two_way", "handicap", "total_points", "winning_margin_bands"]},
+    {"id": "a_model_probs", "code": "afl", "name": "Public model win probabilities and expected margins", "field": "tips: confidence, hconfidence, margin, hmargin, bits, err, source, sourceid", "definition": "Per-match win probability and expected margin from ~8 independent public AFL models, with historical accuracy scoring (bits, err).", "sources": ["squiggle"], "drives": ["1x2_or_two_way", "handicap", "winning_margin_bands"], "note": "This is the highest-value single field in the whole file: a free, independent probability and margin estimate that can be compared directly against Betwinner's implied numbers. No equivalent exists for union, league or GAA."},
+
+    {"id": "g_goals_points", "code": "gaa", "name": "Goals vs points", "field": "scoreline in G-PP notation", "definition": "Goal = 3, point = 1. 1-15 means 1 goal and 15 points = 18.", "sources": ["gaa_ie", "hoganstand", "rte_sport"], "drives": ["total_points", "1x2_or_two_way", "handicap", "winning_margin_bands"], "note": "A goal is a 3-point discontinuity. GAA margins are lumpy around multiples of 3 - margin bands and handicap lines straddling 3 are far more sensitive than in AFL."},
+    {"id": "g_two_pointers", "code": "gaelic_football", "name": "Two-point scores", "field": "not separately published in any verified free feed", "definition": "A point kicked directly from outside the 40m arc, worth 2. New for 2025.", "sources": [], "drives": ["total_points", "winning_margin_bands", "handicap"], "note": "CRITICAL GAP: the raw G-PP scoreline does NOT reveal how many of the points were two-pointers, so the published notation is now ambiguous - 0-15 could be 15 or fewer actual scores. Any pre-2025 Gaelic football totals history is a different sport and must be discarded or level-shifted."},
+    {"id": "g_wides", "code": "gaa", "name": "Wides", "field": "not in any verified free feed", "definition": "Shots that miss the posts - the GAA analogue of AFL behinds/accuracy.", "sources": [], "drives": ["total_points", "team_totals"], "note": "Shot volume vs conversion is the same decomposition that works in AFL, but no free structured source was found. Manual-entry apps only."},
+    {"id": "g_puckouts", "code": "hurling", "name": "Puckouts won", "field": "not in any verified free feed", "definition": "Restart retention in hurling - the primary possession-chain metric.", "sources": [], "drives": ["total_points", "team_totals", "handicap"], "note": "No free structured source found."},
+    {"id": "g_kickouts", "code": "gaelic_football", "name": "Kickouts won", "field": "not in any verified free feed", "definition": "Restart retention in Gaelic football.", "sources": [], "drives": ["total_points", "team_totals"], "note": "The 2025 rule forcing kickouts beyond the 40m arc and the 20m line structurally destroyed the short-kickout retention game - pre-2025 kickout-retention priors are void."},
+    {"id": "g_frees", "code": "gaa", "name": "Frees", "field": "not in any verified free feed", "definition": "Frees won and conceded; free-taking accuracy is a large share of GAA scoring.", "sources": [], "drives": ["total_points", "team_totals"], "note": "No free structured source found."}
+  ],
+
+  "verified": [
+    {
+      "id": "world_rugby_api",
+      "url": "https://api.wr-rims-prod.pulselive.com/rugby/v3/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "THE BEST SOURCE IN THIS FILE. 2336 events. Verified live: Six Nations, English Premiership, Super Rugby Pacific, Super Rugby Americas, URC, Rugby Championship, RWC, women's and U20 equivalents. Endpoints confirmed by reading the body: /v3/event (list), /v3/event/{id}/schedule, /v3/match?events={id}&pageSize=100&page=N (match list with scores[], status, outcome), /v3/match/{id}/stats (team stats), /v3/match/{id}/timeline (per-event scoring). Six Nations 2026 match returned 129 team stat keys, English Premiership 137, Super Rugby Pacific 139 - including ScrumsWon, LineoutsWon, Metres, TackleSuccess, RuckSpeed03/36/6Plus, Possession, Territory and half-split PcPossessionFirst/Second and PcTerritoryFirst/Second.",
+      "note": "TWO REAL LIMITS, both confirmed by body. (1) URC matches return only SEVEN keys - Points, Tries, Conversions, Penalties, MissedConversions, MissedPenalties, MissedDropGoals - the deep stats are absent, not null-filled. So URC is scores-only despite being in the same API. (2) There is NO card counter in the team-stats block; cards come from /timeline as types Yellow and Red. Timeline vocabulary verified across 12 Six Nations 2026 matches: T5 Try 5pts, C2 Conversion 2pts, P3 Penalty 3pts, PT5 Penalty Try 7pts, Yellow, Red, MS Change Match Status (fires at 40:00, giving an exact half boundary), Sub On, Sub Off. playerStats came back empty on the sampled match. /v3/fixture 404s - use /v3/match."
+    },
+    {
+      "id": "nrl_match_centre",
+      "url": "https://www.nrl.com/draw/nrl-premiership/{season}/round-{n}/{home}-v-{away}/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Full NRL team and player match stats embedded as HTML-entity-encoded JSON in the q-data attribute of <div id=\"vue-match-centre\">. Verified on Raiders v Warriors R1 2025 (134,856-char payload). Team stats in 7 groups: Possession & Completions, Attack, Passing, Kicking, Defence, Negative Play, Interchanges. Player stat vocabulary confirmed including onePointFieldGoals and twoPointFieldGoals as separate fields.",
+      "note": "robots.txt is User-agent: * with no Disallow - crawling permitted. Percentages ship with numerator/denominator (e.g. Completion Rate 69% = 30/43) so use the raw counts. Values are nested one level deep as {'value': x, 'isLeader': bool}."
+    },
+    {
+      "id": "nrl_draw_data",
+      "url": "https://www.nrl.com/draw/data?competition=111&round={n}&season={yyyy}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Clean JSON fixtures/results. Verified 2025 R1: Raiders 30 - Warriors 8 at Allegiant Stadium. Competition IDs exposed via https://www.nrl.com/ladder/data: 111 NRL Telstra Premiership, 161 NRLW, 119 Pre-Season Challenge, 113 NSW Cup, plus Hostplus Cup. Fields include matchState (FullTime), homeTeam.score, awayTeam.score, clock.gameTime, venue, kickOffTimeLong.",
+      "note": "Used to compute the NRL 2025 baselines in this file (204 matches). Loop rounds 1-27 to build a season."
+    },
+    {
+      "id": "squiggle",
+      "url": "https://api.squiggle.com.au/?q={games|teams|standings|ladder|tips|sources}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "AFL. q=games returns hgoals/hbehinds/hscore + agoals/abehinds/ascore, winner, venue, complete, is_final, is_grand_final, unixtime. q=standings returns goals_for/behinds_for/goals_against/behinds_against/percentage/pts/draws. q=tips returns per-match win probability (confidence), expected margin, and post-hoc accuracy (bits, err) for ~8 independent public models. q=ladder returns simulated finishing-position distributions (swarms).",
+      "note": "Verified by body on 2025 data. The site publishes a Cloudflare content-signals robots.txt with NO User-agent/Disallow directives at all - so no crawl restriction, but read the signals block before any bulk or training use. Squiggle asks API users to send a descriptive User-Agent identifying themselves; do that. This is the only free per-match probability+margin feed found for any of the four codes."
+    },
+    {
+      "id": "afltables",
+      "url": "https://afltables.com/afl/seas/{yyyy}.html and https://afltables.com/afl/stats/{yyyy}.html",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Full historical AFL. Season pages carry every round, ladder, finals and attendances. Per-team player stats tables verified with 27 columns: GM, KI kicks, MK marks, HB handballs, DI disposals, DA disposal avg, GL goals, BH behinds, HO hitouts, TK tackles, RB rebound 50s, IF inside 50s, CL clearances, CG clangers, FF frees for, FA frees against, BR Brownlow, CP contested poss, UP uncontested poss, CM contested marks, MI marks inside 50, 1% one percenters, BO bounces, GA goal assists, %P pct played, SU sub. 2025 stats page is ~520KB.",
+      "note": "NO robots.txt - /robots.txt returns a custom 404 'Broked!' page, so there is no crawl policy to violate. IMPORTANT CORRECTION: an initial probe returned HTTP 418 with a zero-byte body for the ClaudeBot UA, which looked like a name-based block; on retest, content pages returned HTTP 200 with full bodies for ClaudeBot, Claude-User and a generic UA alike. The 418 was transient, NOT a bot ban. Site is hand-maintained - be polite, rate-limit, and cache aggressively."
+    },
+    {
+      "id": "gaa_ie",
+      "url": "https://www.gaa.ie/fixtures-results",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Official GAA fixtures and results for football and hurling, inter-county and club, plus tables at /fixtures-results/tables. Verified by body: 1.29MB Next.js page whose embedded flight payload (self.__next_f.push) carries competition objects with cupIds, county and club team names, and scores in G-PP notation.",
+      "note": "robots.txt disallows only /_libraries/ and /_test/ - fixtures and results are permitted. There is NO clean JSON API: /api/ on this host serves images only, and no Next.js buildId was exposed, so the _next/data JSON route could not be constructed. You must parse the embedded flight payload. SCORES ONLY - no puckouts, wides, frees or possession anywhere on this feed."
+    },
+    {
+      "id": "gaa_official_rules_pdf",
+      "url": "https://www.gaa.ie/api/images/image/upload/prd/ttlaascukdwxoa3i1cq3.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official GAA 'Hurling - New Rules Congress 2026, Effective from 28th March 2026'. 10 pages, extracted and read in full.",
+      "note": "Used as the NEGATIVE confirmation that hurling has no two-point rule: across the whole document the strings 'two point', '2 point', '40m arc', 'goal' and 'point' occur zero times; the content is entirely dissent and team-management sanctions. 'extra time' occurs 4 times, confirming hurling does use extra time."
+    },
+    {
+      "id": "dublin_gaa_ccc2_rules_pdf",
+      "url": "https://uploads.dublingaa.ie/files/21/summary_of_new_ccc2_gaa_football_rules_for_2025_as_of_170225.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "9-page official county-board summary of the 2025 Gaelic football rule changes, extracted and read in full. Covers the 1v1 throw-in, kickout rules, solo-and-go, goalkeeper pass restrictions, the 3v3 structure rule, scoring (two-pointer), advanced mark, kickout mark, tactical foul, cynical behaviour, dissent, melee and head-contact sanctions.",
+      "note": "This is Dublin's CCC2 (juvenile club) guidance, so club-level adaptations are mixed in - notably it states the stop clock 'Will not be in use', which is a CLUB position and does NOT apply to inter-county football, where the clock/hooter IS used. Treat the rule CONTENT as authoritative and the competition-level application as club-specific. No robots.txt on the S3 host."
+    },
+    {
+      "id": "afl_com_au",
+      "url": "https://www.afl.com.au/news/344176/no-more-golden-score-league-changes-finals-tie-break-rule",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official AFL article establishing the CURRENT finals tie-break rule. robots.txt is User-agent: * / Disallow: (blank) - fully permitted.",
+      "note": "Confirmed by body: after a six-minute break, 'Three minutes of Additional Time shall be played, plus time-on', teams then 'immediately change ends without a break' and play another three-minute period plus time-on, repeating 'until there is a winner'. The League 'removed the possibility of finals, including the Grand Final, being decided by a golden score'. Also in force for AFLW (with a 6m30s break)."
+    },
+    {
+      "id": "rugbyleagueproject",
+      "url": "https://www.rugbyleagueproject.org/seasons/nrl-{yyyy}/results.html",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Deep historical rugby league archive across NRL, Super League, State of Origin and internationals. Verified by body: '2025 Telstra NRL Premiership' summary page and a 158KB results page with per-match scorers.",
+      "note": "robots.txt disallows /matches/Custom and any URL with a query string (Disallow: /*?) - use plain paths only. Best free source for pre-2013 league history, which the NRL site does not serve well."
+    },
+    {
+      "id": "superleague_co_uk",
+      "url": "https://www.superleague.co.uk/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Official Betfred Super League site - title tag confirmed by body. robots.txt disallows only /cgi-bin/ and /ignite/.",
+      "note": "Site reachable and permitted, but the per-match stats payload was NOT located in this pass. Do not assume NRL-equivalent depth until a match page is parsed and read."
+    },
+    {
+      "id": "premiership_rugby",
+      "url": "https://www.premiershiprugby.com/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Official English Premiership site, 920KB body, title 'PREM Rugby'. robots.txt is Allow: / with an empty Disallow.",
+      "note": "LOWER PRIORITY - the World Rugby API already returns 137 team stat keys for English Premiership 2026, which is richer and far cheaper to parse than scraping this site."
+    },
+    {
+      "id": "sixnations_official",
+      "url": "https://www.sixnationsrugby.com/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "robots.txt is User-Agent: * / Allow: / - fully permitted.",
+      "note": "CAUTION, AND THE BEST ILLUSTRATION OF THE BODY-NOT-STATUS RULE IN THIS FILE: https://www.sixnationsrugby.com/en/m6n/fixtures/ returned HTTP 200 with a 257KB body that was a Next.js NOT-FOUND page reading 'We've dropped the ball!' and '404 Error'. A status-code check would have marked this source healthy. Path structure was not resolved; use the World Rugby API for Six Nations data instead."
+    },
+    {
+      "id": "hoganstand",
+      "url": "https://www.hoganstand.com/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Long-running GAA results and news site covering football and hurling at county and club level. robots.txt is User-Agent: * / Disallow: (blank) - fully permitted. 47KB body returned.",
+      "note": "Useful as a GAA cross-check and for club-level results, but unstructured HTML and still scores-only - it does not close the wides/frees/puckouts gap."
+    },
+    {
+      "id": "rte_sport",
+      "url": "https://www.rte.ie/sport/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Irish public broadcaster GAA coverage - results, reports and rule-change reporting. robots.txt permits /sport/ (only /sport/results/img/ and /sport/results/widgets/ are disallowed).",
+      "note": "Best free source for GAA competition-FORMAT changes, which change more often than the playing rules. Note Disallow: /*.csv$ - do not pull CSVs from this host."
+    },
+    {
+      "id": "world_rugby_www",
+      "url": "https://www.world.rugby/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "robots.txt verified: '# All robots allowed' / User-agent: * / Disallow: (blank). Note the apex world.rugby 301-redirects to www.world.rugby - follow redirects when checking policy.",
+      "note": "Policy confirmation for the api.wr-rims-prod.pulselive.com backend, which itself serves no robots.txt (JSON 404)."
+    }
+  ],
+
+  "blocked": [
+    {"id": "espn", "detail": "HARD BLOCK, NOT FETCHED. https://www.espn.com/robots.txt contains 'User-agent: anthropic-ai / Disallow: /'. ESPN and ESPNscrum are otherwise the most complete free rugby archive in existence, which makes this the most expensive single exclusion in this file. Do not fetch, and do not route around it."},
+    {"id": "footywire", "detail": "Reachable, but robots.txt disallows exactly the pages we would want: /fw/web/ft_match_list, /fw/web/ft_match_statistics, /fw/web/fts_match_statistics, /fw/web/ft_ladder, /fw/web/ft_team_stat_splits, /fw/web/ft_player_stat_splits. Effectively blocked for AFL stats. afltables + Squiggle cover the same ground and are permitted."},
+    {"id": "bbc", "detail": "robots.txt has no Disallow for *, but its prose terms expressly forbid what we would be doing: 'No use of BBC content for training or fine-tuning AI models', 'No retrieval-augmented generation (RAG), AI-powered search, agentic AI or grounding using BBC content', 'No text and data mining (TDM) under Article 4'. Treated as blocked on licence grounds despite being technically crawlable."},
+    {"id": "thesportsdb", "detail": "Not blocked, but USELESS here and licence-restricted. Free key 3 returns only 5 soccer leagues from all_leagues.php; AFL exists (idLeague 4456) only via search. It carries scores, never match stats - the same verdict as the volleyball pass. Its robots.txt also sets Content-Signal: ai-train=no, ai-input=no."},
+    {"id": "api_sixnationsrugby_com", "detail": "CONNECT tunnel failed, 502 from OUR egress proxy - never reached the origin, so this is not a site-side block. Same failure signature as dataproject in the volleyball pass. Worth a retest from a GitHub Actions runner."},
+    {"id": "api_premiershiprugby_com", "detail": "CONNECT tunnel failed, 502 from our egress proxy. Not reached. Retest from a GitHub Actions runner. Low priority - the World Rugby API already returns 137 stat keys for English Premiership."},
+    {"id": "rfl_uk", "detail": "CONNECT tunnel failed, 502 from our egress proxy. Not reached. Retest from a runner; would be the route to Championship/League 1 and Challenge Cup."},
+    {"id": "gaelicstats_ie", "detail": "CONNECT tunnel failed, 502 from our egress proxy. Not reached. HIGHEST-VALUE RETEST in this file - it is the most plausible candidate to close the GAA wides/frees/puckouts gap. Retest from a GitHub Actions runner before concluding GAA stats are unavailable."},
+    {"id": "super_rugby_official", "detail": "super.rugby fails at the transport layer: HTTP/2 PROTOCOL_ERROR, and 'Empty reply from server' when forced to HTTP/1.1. Never returned a body. Use the World Rugby API for Super Rugby Pacific instead - it returned 139 stat keys."},
+    {"id": "api_afl_com_au", "detail": "https://api.afl.com.au/robots.txt returns HTTP 403 'Forbidden'. The official AFL API requires credentials (it is a Champion Data-backed commercial feed). Not free - do not build on it. afltables + Squiggle are the free path."},
+    {"id": "rugby_com_au", "detail": "No robots.txt - the URL returns the site's SPA 404 shell with HTTP 200 (another status-vs-body trap). No crawl policy could be established, so left unused."},
+    {"id": "gaa_structured_stats", "detail": "THE BIGGEST BLOCKER IN THIS FILE. No free structured source of GAA match statistics was found for either code. Wides, frees, puckouts won, kickouts won, possession and shot counts exist only inside manual-entry mobile apps (gaastats.app, Gaelic Tracker, GAA Hurling Manager) with no public API or bulk export. gaa.ie, hoganstand and RTE all publish the G-PP scoreline and nothing beneath it. Consequence: hurling and Gaelic football can only be modelled from scorelines, so team totals and any shot-quality decomposition are out of reach for now."},
+    {"id": "irishtimes_balls_ie", "detail": "Used only as WebSearch result summaries for GAA rule-change context, never fetched. balls.ie serves a Cloudflare content-signals robots.txt; the Irish Times blocks GPTBot/ChatGPT-User but not us. Primary GAA rule facts in this file were taken from the two official PDFs instead, so no reliance on these outlets is load-bearing."}
+  ],
+
+  "stat_to_bet": {
+    "_headline": "The scoring values differ across all four codes, so the SAME market name is a different event in each. Never share a totals model, a handicap ladder or a margin-band grid across codes. Measured medians from this pass: rugby union 47-58, rugby league 44, AFL 168. GAA medians are NOT measured here - no free structured GAA feed was reachable, so no GAA total is asserted in this file. 'Total points over 40' is near-certain in AFL, roughly a coin-flip in the NRL (measured 60.3% over), and BELOW the median in every union competition measured.",
+
+    "1x2_or_two_way": {
+      "which_ladder": "THE DRAW DETERMINES WHERE THE SAFETY LADDER STARTS. Rugby union is genuinely three-way and the draw is NOT negligible - measured URC 2026 draw rate 4.6% (7 of 151, all real scorelines), English Premiership 1.1%. In union a safety position starts at DOUBLE CHANCE, never at the moneyline. Rugby league under golden point is effectively two-way but NOT strictly: a drawn NRL regular-season match still happens when the 10-minute golden-point period produces no score (measured 1 in 204 in 2025, 0.49%), so the two-way price is a very slight overstatement. AFL home-and-away is three-way in principle but the draw is vanishingly rare (measured 1 in 216, 0.46%) because behinds make the score near-continuous. GAA is three-way in the group and provincial stages and two-way wherever extra time applies - which round the fixture sits in decides the market shape.",
+      "drivers": {
+        "rugby_union": ["u_scrum", "u_lineout", "u_tackle", "u_kicking", "u_possession_territory", "u_cards"],
+        "rugby_league": ["l_possession", "l_defence", "l_negative", "l_running"],
+        "afl": ["a_model_probs", "a_inside50", "a_clearances", "a_scoring_shots"],
+        "gaa": ["g_goals_points"]
+      }
+    },
+
+    "handicap": {
+      "drivers": {
+        "rugby_union": ["u_metres", "u_tackle", "u_scrum", "u_lineout", "u_possession_territory", "u_penalties_conceded"],
+        "rugby_league": ["l_possession", "l_running", "l_defence", "l_breaks"],
+        "afl": ["a_inside50", "a_disposals", "a_model_probs", "a_scoring_shots"],
+        "gaa": ["g_goals_points"]
+      },
+      "note": "Handicap lines must be quantised to each code's reachable margins. Union margins cluster on 3/5/7 combinations, league on 4/6 combinations plus 1s and 2s from field goals, GAA on multiples of 3 offset by 1s and now 2s. AFL is the only one of the four where essentially every integer margin is reachable, so AFL handicap ladders can be fine while the other three cannot. Measured mean margins: AFL 33.2, English Premiership 19.3, Super Rugby 17.7, Six Nations 15.9, NRL 15.2, URC 14.6."
+    },
+
+    "total_points": {
+      "drivers": {
+        "rugby_union": ["u_ruckspeed", "u_kicking", "u_penalties", "u_tackle", "u_possession_territory", "u_turnovers", "u_cards"],
+        "rugby_league": ["l_ptb", "l_possession", "l_defence", "l_kicking", "l_negative"],
+        "afl": ["a_scoring_shots", "a_inside50", "a_clearances", "a_tackles"],
+        "gaa": ["g_goals_points", "g_two_pointers", "g_wides"]
+      },
+      "note": "In union and league the totals model is tempo (ruck speed / play-the-ball speed) times efficiency times goal-kicking accuracy. In AFL it is scoring shots times a REGRESSED accuracy prior - measured 46.2 shots at 53.1% in 2025; never project a team's recent accuracy forward. In GAA the model is unbuildable beneath the scoreline until the stats gap closes, and for Gaelic football specifically the pre-2025 history is a different sport."
+    },
+
+    "team_totals": {
+      "drivers": {
+        "rugby_union": ["u_lineout", "u_scrum", "u_metres", "u_kicking", "u_tries"],
+        "rugby_league": ["l_running", "l_breaks", "l_kicking", "l_scoring"],
+        "afl": ["a_inside50", "a_marks", "a_scoring_shots", "a_goal_assists"],
+        "gaa": []
+      },
+      "note": "GAA team totals should be treated as UNPRICEABLE on free data - there is no shot-volume or shot-quality feed for either GAA code, so a team-total line can only be reverse-engineered from the match total and the handicap, which adds no information."
+    },
+
+    "winning_margin_bands": {
+      "drivers": {
+        "rugby_union": ["u_conversions", "u_penalties", "u_dropgoals", "u_penalty_try"],
+        "rugby_league": ["l_scoring"],
+        "afl": ["a_behinds", "a_scoring_shots"],
+        "gaa": ["g_goals_points", "g_two_pointers"]
+      },
+      "note": "Margin bands are where the scoring-value differences bite hardest. Union: the 7-point band is special because it is exactly try+conversion and it is also the losing-bonus-point threshold, which distorts late-game behaviour toward it. League: bands must account for 1- and 2-point field goals, which make odd margins reachable that a tries-and-conversions model would assign zero probability. GAA: a single goal is a 3-point jump and a two-pointer a 2-point jump, so band boundaries at 1, 2 and 3 are extremely sensitive. AFL: near-continuous, so bands behave like a normal distribution - the only one of the four where that assumption is safe."
+    },
+
+    "half_markets": {
+      "drivers": {
+        "rugby_union": ["u_possession_territory", "u_cards", "u_kicking"],
+        "rugby_league": ["l_interchange", "l_possession", "l_negative"],
+        "afl": ["a_clearances", "a_inside50"],
+        "gaa": ["g_goals_points"]
+      },
+      "note": "Union is the only code with free HALF-SPLIT inputs: PcPossessionFirst/Second and PcTerritoryFirst/Second, plus a timeline MS event that fires at 40:00 and gives an exact half boundary for splitting scoring events. AFL has QUARTERS, not halves - a half market is the sum of two quarters and must never be modelled as half the match, because quarter length varies with time-on. GAA halves are 35 minutes at inter-county and 30 at club, so a half line is not portable between the two."
+    },
+
+    "race_to_x": {
+      "drivers": {
+        "rugby_union": ["u_penalties", "u_restarts", "u_turnovers", "u_possession_territory"],
+        "rugby_league": ["l_kicking", "l_breaks", "l_ptb"],
+        "afl": ["a_inside50", "a_clearances"],
+        "gaa": ["g_goals_points"]
+      },
+      "note": "Race-to-X is acutely sensitive to the minimum score increment. Race to 10 in union can be reached in two scores (3+7) or three; in league it needs at least two (4+6) but can be crawled to via 2s and 1s; in GAA it is typically many small scores unless a goal lands; in AFL 10 points is two scores at most and often one goal plus a behind. The same X is a different number of scoring events in each code."
+    },
+
+    "first_scoring_play": {
+      "drivers": {
+        "rugby_union": ["u_penalties", "u_tries", "u_turnovers", "u_restarts"],
+        "rugby_league": ["l_scoring", "l_kicking", "l_breaks"],
+        "afl": ["a_clearances", "a_inside50"],
+        "gaa": ["g_goals_points"]
+      },
+      "note": "Union first-score is heavily weighted to PENALTY, not try, because early scrum and breakdown penalties are common and a 3-point shot is the low-risk option - the World Rugby /timeline endpoint gives the exact type and second of every score (T5/C2/P3/PT5) and is the right training data for this market. League first-score is far more try-weighted because penalty goals are only 2 and are usually declined in favour of field position. In AFL the near-universal first score is a behind or a goal from the opening clearance chain."
+    }
+  },
+
+  "rules_critical": [
+    "[ALL] THE HEADLINE TRAP: the scoring values differ across all four codes, so 'total points over 40' is a completely different event in each. Union try 5 + conversion 2 + penalty 3 + drop 3 (penalty try 7); league try 4 + conversion 2 + penalty goal 2 + field goal 1, or 2 from beyond 40m; AFL goal 6 + behind 1; GAA goal 3 + point 1, plus 2 for a Gaelic football point from outside the 40m arc. Measured medians: union 47-58, NRL 44, AFL 168. A totals model, a handicap ladder or a margin grid must NEVER be shared across codes - and Betwinner sport id 7 mixes union and league under one id, so the code must be resolved from the tournament, not the sport id.",
+    "[ALL] Betwinner id 7 is BOTH rugby union and rugby league. Any parser that keys a model off sport_id alone will silently price union fixtures with a league model. Resolve union vs league from the tournament slug before anything else, and fail loudly on an unrecognised tournament rather than defaulting.",
+    "[UNION] Rugby union league and pool matches CAN be drawn and the rate is not negligible: measured 7 draws in 151 URC 2026 matches (4.6%) with genuine scorelines including 17-17, 24-24 and 38-38, plus 1 in 93 English Premiership matches. Treating union as two-way is a real, priced-in error - the safety ladder starts at DOUBLE CHANCE, not the moneyline.",
+    "[UNION] A PENALTY TRY IS 7 POINTS AND NO CONVERSION IS ATTEMPTED. Verified in the World Rugby timeline as type PT5, points 7. Any model reconstructing points as tries*5 + conversions*2 will mis-state the score, and any 'total conversions' or 'both teams to convert' prop is corrupted by it.",
+    "[UNION] Play does NOT stop at 80:00 - the half ends only when the ball next goes dead. A team trailing by 1-3 points with the clock expired can still win with a penalty or drop goal, and a team leading can kick the ball out to end it. This fattens the tail on late scores and makes 'total points' and 'winning margin' materially different from a hard-siren sport like AFL.",
+    "[UNION] Bonus points change end-game behaviour in a way that moves totals and handicaps: 1 point for scoring 4+ tries and 1 for losing by 7 or fewer. A team on 3 tries chases a fourth instead of closing the game out, and a team losing by 8-10 late plays for a 7-point margin rather than the win. Both effects push totals UP and compress margins toward 7. The 7-point band is therefore over-represented and must not be modelled as a smooth continuation of the margin distribution.",
+    "[UNION] The 20-minute red card is a GLOBAL LAW TRIAL, not settled law - the offending player leaves permanently but the team returns to 15 after 20 minutes, and two yellows aggregate to a 20-minute red. World Rugby moved it to global trial in May 2025 with a permanence decision due at the February 2026 'Shape of the Game' meeting. This roughly halves the scoring impact a red card used to carry, so any card-adjusted model trained on pre-trial seasons overstates the swing. Competition-by-competition adoption must be checked, not assumed.",
+    "[UNION] Cards are NOT in the World Rugby team-stats block - there is no card counter among the 129-139 stat keys. They exist only in /timeline as types Yellow and Red. A pipeline that pulls only /stats will silently model rugby with zero card data.",
+    "[UNION] URC returns only 7 stat keys from the World Rugby API - Points, Tries, Conversions, Penalties and the three Missed* fields - while Six Nations returns 129, English Premiership 137 and Super Rugby Pacific 139. The deep stats are ABSENT, not null. A union model that requires ruck speed or territory simply cannot be run on URC fixtures, which is precisely the competition with the highest measured draw rate.",
+    "[UNION] Knockout rugby and league rugby settle differently. Pool and league matches stand as draws; RWC and most cup knockouts go to extra time (2x10), then sudden death, then a kicking competition. Whether Betwinner's 1X2 settles at the end of regulation or after extra time must be read per competition - never inherited from the league-stage convention.",
+    "[LEAGUE] GOLDEN POINT DOES NOT ELIMINATE NRL DRAWS. If scores are level after 80 minutes, two 5-minute periods are played with a change of ends and no break; the first score of any kind wins. If NOBODY scores in those 10 minutes the match IS A DRAW and each team takes one competition point. Measured: 1 drawn match in 204 NRL 2025 regular-season fixtures (0.49%). In finals, play continues until a score, so finals genuinely cannot draw. The regular-season two-way price is therefore slightly overstated and the finals one is not - they are different markets and must not share a settlement rule.",
+    "[LEAGUE] The NRL two-point field goal from beyond the 40m line is live and is a real settlement trap. It makes margins of 1 and 2 reachable in ways a tries-and-conversions model assigns near-zero probability, and it turns a 2-point deficit in the last minute into a winnable position rather than a golden-point position. Confirmed in the NRL data model, which carries onePointFieldGoals and twoPointFieldGoals as SEPARATE player fields - a parser summing a generic 'field goals' column will under-count points.",
+    "[LEAGUE] The six-again restart (a ruck infringement resets the tackle count instead of stopping play for a penalty) raises tempo and fatigue rather than awarding points. It inflates totals through second-half tries, not through penalty goals, so its effect shows up in second-half and race-to-X markets more than in the full-match total.",
+    "[LEAGUE] Super League and the NRL are NOT interchangeable on golden point or on draws, and international rugby league differs again. Verify per competition before reusing an NRL settlement assumption - and note that the NRL's own competition IDs (111 premiership, 161 NRLW, 119 pre-season, 113 NSW Cup) route to different rule sets and very different scoring baselines.",
+    "[AFL] AFL quarters are 20 minutes of NOMINAL play PLUS time-on, so a real quarter runs far longer than 20 minutes and total match time is not 80 minutes. Any totals model built on nominal time is wrong. Model in SCORING SHOTS, not minutes - measured 46.2 scoring shots per match in 2025 at 53.1% accuracy, mean total 168.8.",
+    "[AFL] 2020 quarters were shortened to 16 minutes plus time-on. Any historical dataset spanning 2020 has a STRUCTURAL BREAK in totals and per-quarter scoring. Either exclude 2020 or level-shift it - do not pool it with adjacent seasons.",
+    "[AFL] AFL home-and-away matches CAN be drawn with NO extra time, but the rate is tiny - measured 1 in 216 in 2025 (0.46%) - because behinds make the score near-continuous. This is the opposite situation to union: the draw exists but is small enough that a two-way price is nearly right, whereas in union the draw is small but NOT negligible.",
+    "[AFL] AFL FINALS EXTRA TIME IS NOW UNBOUNDED AND THE GRAND FINAL REPLAY IS GONE. Current rule (afl.com.au, official): after a six-minute break, three minutes plus time-on, immediate change of ends with no break, another three minutes plus time-on, and further periods repeat 'until there is a winner'. The 'golden score' sudden-death mechanism was REMOVED, including for the Grand Final. So a finals match cannot draw, but its total points have no upper bound and can materially exceed a regulation-based line. Also in force in AFLW with a 6m30s break.",
+    "[AFL] A rushed behind still scores 1 point for the attacking team, so a defensive act ADDS to the total. Totals models that treat all scoring as offensive output systematically under-price the over in low-quality, high-pressure matches.",
+    "[GAA-FOOTBALL] THE 2025 TWO-POINTER BREAKS ALL PRIOR HISTORY. A point kicked directly from outside the 40m arc is worth 2, not 1 (a '45' remains 1). A standing foot ON the arc counts as outside. Under the 2025 wording a score was reduced to 1 point if any player touched the ball in flight inside the arc; that was AMENDED FOR 2026 so all scores from outside the arc now count 2. Pre-2025 Gaelic football totals are a different sport - discard or level-shift them, and never pool 2025 with 2026 without adjusting for the touched-in-flight amendment.",
+    "[GAA-FOOTBALL] The published G-PP scoreline is now AMBIGUOUS. '0-15' no longer tells you how many scoring events occurred, because some of those points may be two-pointers. Any model that infers shot volume or scoring-event counts from the notation is broken for 2025 onward, and no verified free feed publishes the two-pointer count separately.",
+    "[GAA-FOOTBALL] The 2025 package changed far more than scoring: kickouts must now travel beyond BOTH the 40m arc and the 20m line, a minimum of 3 outfield players must stay in each half (the 3-up rule), and the solo-and-go lets a free be taken instantly. Together these destroyed the short-kickout possession game and opened the pitch. Kickout-retention priors, possession-share priors and totals priors from before 2025 are all void, not merely stale.",
+    "[GAA-FOOTBALL] Inter-county Gaelic football now uses a COUNTDOWN CLOCK AND HOOTER - the half ends when the hooter sounds, not at referee discretion. A ball in flight when the hooter sounds still counts if it results in a score and no attacking player touches it, and a free or penalty awarded before the hooter may still be taken. This removes the discretionary-injury-time tail that used to fatten late scoring. HURLING HAS NO HOOTER and still runs on referee-added time, so the two GAA codes have genuinely different end-of-half distributions.",
+    "[GAA-HURLING] HURLING DID NOT GET THE TWO-POINTER. Verified negatively against the official GAA 'Hurling - New Rules Congress 2026' PDF, in which 'two point', '2 point' and '40m arc' occur zero times and the entire content is dissent and team-management sanctions. Hurling scoring is unchanged at goal 3 / point 1. Applying the Gaelic football two-point logic to Betwinner sport id 126 would corrupt every hurling total - these are two different sports under two different sport ids and they must not share a scoring map.",
+    "[GAA] GAA draws no longer mean a replay in most rounds - extra time (2x10 minutes) is now applied through the championship, with FINALS the exception: provincial and All-Ireland finals still go to a REPLAY after being level at full time, and only if that replay is also drawn after extra time is it settled by a penalty shoot-out from 12 yards. So the 1X2 market is three-way in group and provincial rounds and in finals, but effectively two-way in the extra-time rounds. Which round a fixture sits in determines the market shape, and Betwinner's settlement basis (regulation vs after extra time) must be confirmed per fixture.",
+    "[GAA] Match length differs by level: senior inter-county is 2x35 minutes, club is 2x30. A totals line, a half line and a per-minute scoring rate are NOT portable between inter-county and club fixtures - and Betwinner lists both under the same sport ids.",
+    "[GAA] GAA competition FORMATS change more often than the playing rules - the football group phase was abolished for a new SFC format, and the hurling preliminary quarter-finals were scrapped for 2026. Format changes alter who plays whom, the value of a draw in a group table, and therefore late-game behaviour. Re-check the format each season rather than caching it.",
+    "[ALL] Shortened, abandoned and forfeited matches have NO standard settlement across these four codes. Betwinner's completion threshold and void policy must be read per sport before any market is trusted - the same rule that mattered for basketball applies here and is unresolved."
+  ],
+
+  "open_questions": [
+    "Does Betwinner's rugby offering under sport id 7 separate union from league in the tournament metadata, or must the code be inferred from the tournament name? This decides whether a code-mismatch guard can be a hard assertion or only a heuristic.",
+    "Does Betwinner settle union 1X2 at the end of regulation or after extra time in knockout fixtures? The basketball pass established that three-way settles at end of regulation there; the union convention must be confirmed separately, not inherited.",
+    "For NRL fixtures, does Betwinner's two-way moneyline void or settle on a golden-point draw? Measured 0.49% of regular-season matches, so it is small but real and it decides whether a two-way price is fair or a hair short.",
+    "Does Betwinner offer GAA markets at club level as well as inter-county? The 2x30 vs 2x35 match-length difference makes a shared totals line indefensible, and the sport ids do not distinguish them.",
+    "Is Betwinner pricing Gaelic football totals on post-2025 (two-pointer) data? If its lines still reflect pre-2025 scoring, that is a structural mispricing - but confirming it needs a fixture pull, and this file makes no value claim without one.",
+    "gaelicstats.ie, api.sixnationsrugby.com, api.premiershiprugby.com and rfl.uk all failed at OUR egress proxy with CONNECT 502 and were never reached. All four need a retest from a GitHub Actions runner. gaelicstats.ie is by far the highest value - it is the most plausible route to closing the GAA stats gap.",
+    "Does the World Rugby API ever populate playerStats? It returned an empty list on the sampled Six Nations match despite the field existing. If it populates for some competitions, player props become reachable.",
+    "What is the World Rugby timeline code for a made DROP GOAL? None appeared across 12 sampled Six Nations 2026 matches, and there is no made-DG team stat key alongside MissedDropGoals. Until observed, drop goals must be derived by subtraction from Points.",
+    "Does Super League publish a match-stats payload comparable to the NRL match centre? The site is reachable and permitted but its match pages were not parsed in this pass.",
+    "Was the 20-minute red card made permanent at the February 2026 'Shape of the Game' meeting, and which competitions adopted it? This changes the card-impact coefficient in every union model."
+  ],
+
+  "key_findings": [
+    "SIXTEEN sources verified by reading the actual response body, not the status code. The single best is the World Rugby Pulselive API (api.wr-rims-prod.pulselive.com/rugby/v3) - free, no auth, no robots restriction, 2336 events, and 129-139 team stat keys per match including ruck speed buckets, scrum and lineout win rates, tackle success, and half-split possession AND territory. It covers club competitions (English Premiership, Super Rugby Pacific) as well as internationals, which was not expected.",
+    "THE BODY-NOT-STATUS RULE PAID OFF IMMEDIATELY. sixnationsrugby.com/en/m6n/fixtures/ returned HTTP 200 with a 257KB body that was a Next.js not-found page reading 'We've dropped the ball! 404 Error'. A status-code check would have recorded that source as healthy and it would have shipped broken.",
+    "IT ALSO CORRECTED A FALSE POSITIVE IN THE OTHER DIRECTION. afltables.com initially returned HTTP 418 with a ZERO-BYTE body to the ClaudeBot UA, which read exactly like a name-based bot ban. Retesting content pages showed HTTP 200 with full bodies for ClaudeBot, Claude-User and a generic UA alike - the 418 was transient. Recording it as blocked would have discarded the best free AFL archive there is.",
+    "BIGGEST BLOCKER: there is NO free structured source of GAA match statistics for either Gaelic football or hurling. Wides, frees, puckouts won, kickouts and possession exist only inside manual-entry mobile apps with no API. gaa.ie, hoganstand and RTE all stop at the G-PP scoreline. Hurling and Gaelic football are therefore scoreline-only sports for this project, and GAA team totals should be treated as unpriceable on free data until gaelicstats.ie can be retested from a runner.",
+    "SHARPEST TRAP #1 - the 2025 Gaelic football two-pointer. A point from outside the 40m arc is worth 2, which is the first change to Gaelic football scoring since 1896, and it was amended again for 2026 (scores touched in flight now still count 2). It voids all pre-2025 totals history AND makes the published G-PP scoreline ambiguous, since '0-15' no longer reveals how many scoring events occurred. Critically, HURLING DID NOT GET THIS RULE - verified negatively against the official GAA hurling 2026 rules PDF - so Betwinner ids 80 and 126 must never share a scoring map.",
+    "SHARPEST TRAP #2 - golden point does not eliminate NRL draws. If nobody scores in the two 5-minute periods the regular-season match IS a draw, measured at 1 in 204 NRL 2025 fixtures. In finals play continues until someone scores, so finals genuinely cannot draw. Regular season and finals are different settlement regimes under one competition, and the two-way price is fair in one and slightly short in the other.",
+    "The draw question splits the four codes cleanly, and it is what decides where a safety ladder starts. Measured draw rates: URC union 4.6%, English Premiership union 1.1%, NRL 0.49%, AFL 0.46%. Union is the only one of the four where a double-chance safety position is genuinely required rather than merely cautious.",
+    "Squiggle is the standout AFL source and has no analogue in the other three codes: alongside goals/behinds splits it publishes per-match WIN PROBABILITIES and EXPECTED MARGINS from about eight independent public models, with their historical accuracy scored in bits. That is a free, external probability estimate directly comparable to Betwinner's implied numbers - something union, league and GAA simply do not have.",
+    "The World Rugby /timeline endpoint is the sleeper asset for derivative markets. It emits every scoring event with a type and a second - T5 try 5, C2 conversion 2, P3 penalty 3, PT5 penalty try 7 - plus Yellow and Red cards and an MS status event that fires at 40:00 to mark the half boundary. That makes first-scoring-play, race-to-X and half markets trainable in union, which they are not in GAA.",
+    "Coverage inside the World Rugby API is UNEVEN and the gap is not visible from the status code: URC returns only 7 stat keys while Six Nations returns 129. The deep stats are absent rather than null, so a union model requiring ruck speed or territory cannot run on URC - the very competition with the highest draw rate and the most need for careful pricing.",
+    "AFL is the structural outlier of the four. Because behinds are worth 1, its score is near-continuous, which makes it the ONLY code of the four where a smooth margin distribution and fine-grained margin bands are defensible. Union, league and GAA all have lumpy reachable-margin sets (3/5/7, 4/6 plus 1s and 2s, and multiples of 3 offset by 1s and 2s respectively) and their handicap ladders must be quantised accordingly.",
+    "ESPN is the most expensive exclusion in this file - its robots.txt names anthropic-ai with Disallow: / and it holds the deepest free rugby archive anywhere. It was not fetched. BBC is excluded on licence rather than robots grounds: its terms explicitly forbid RAG, TDM and AI grounding on its content."
+  ]
+}

@@ -1,0 +1,515 @@
+{
+  "sport": "golf",
+  "betwinner_sport_ids": [41],
+  "researched": "2026-07-25",
+
+  "statistics": [
+    {
+      "id": "sg_total",
+      "name": "Strokes Gained: Total",
+      "definition": "Per-round strokes better or worse than the field average on the same course. The master metric: it is already field- and course-adjusted, so it ports across events in a way raw scoring average never does.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02675",
+      "bet_relevance": "Primary input to every market. Verified live: Scheffler 2.154/rd over 52 measured rounds, McIlroy 1.730 over 34.",
+      "caveat": "Only computed at ShotLink-equipped events. Non-ShotLink events (most DP World Tour, all majors outside the US except via manual capture) produce no SG rows, so a player's sample is biased toward US PGA Tour venues."
+    },
+    {
+      "id": "sg_tee_to_green",
+      "name": "Strokes Gained: Tee-to-Green",
+      "definition": "SG:OTT + SG:APP + SG:ARG. Everything except putting.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02674",
+      "bet_relevance": "The most STABLE component year-to-year and the best single predictor of future finishing position. Weight it above SG:Total for forward-looking markets.",
+      "caveat": "Scheffler's split (86.035 T2G vs 25.998 putting of 112.033 total) shows how a top player's edge is mostly T2G — but a hot putter can beat him over 72 holes."
+    },
+    {
+      "id": "sg_off_the_tee",
+      "name": "Strokes Gained: Off-the-Tee",
+      "definition": "Strokes gained on tee shots on par 4s and par 5s only (par-3 tee shots count as approach).",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02567",
+      "bet_relevance": "Dominant at long, wide, soft courses and at par-70 layouts with reachable par 5s. Verified: McIlroy leads at 0.922/rd.",
+      "caveat": "Do not read as 'distance'. It blends distance and accuracy and is the component that most rewards a specific course archetype."
+    },
+    {
+      "id": "sg_approach",
+      "name": "Strokes Gained: Approach the Green",
+      "definition": "Strokes gained on shots to the green from outside 30 yards, plus all par-3 tee shots.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02568",
+      "bet_relevance": "The largest single share of variance in finishing position among elite fields, and the most predictive of top-10/top-20 markets. If one stat drives place bets, this is it.",
+      "caveat": "Its value is yardage-band dependent — see proximity_by_yardage. A player elite from 150-175 and poor from 200+ is a bad fit for a long par-70."
+    },
+    {
+      "id": "sg_around_the_green",
+      "name": "Strokes Gained: Around-the-Green",
+      "definition": "Strokes gained on shots from inside 30 yards of the green, excluding putts.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02569",
+      "bet_relevance": "Matters most at high-miss courses: firm links, small greens, penal run-offs (Pinehurst, Open rota). Low weight at soft target-golf venues where GIR is high.",
+      "caveat": "Noisy — small sample of shots per round. Shrink hard toward the mean over anything less than ~30 rounds."
+    },
+    {
+      "id": "sg_putting",
+      "name": "Strokes Gained: Putting",
+      "definition": "Strokes gained on the putting surface relative to field, controlled for starting distance.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02564",
+      "bet_relevance": "The highest-variance component and the main driver of one-week outliers — which is exactly why it dominates first-round-leader and winning-score outcomes far more than it should dominate your model.",
+      "caveat": "The classic golf modelling error. Year-to-year correlation is weak; it is close to the tennis 'break points converted' problem. Use as a grass-type fit signal (see course_fit_grass), not as a season-long skill measure."
+    },
+    {
+      "id": "driving_distance",
+      "name": "Driving Distance",
+      "definition": "Average yards on two measured drives per round, chosen on holes facing opposite directions to cancel wind.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 101 (measured), 317 (all drives)",
+      "bet_relevance": "Verified live: tour average 305.4 yds; leader Potgieter 330.6 over 106 drives. Distance separates fields at long par 72s and at altitude.",
+      "caveat": "The 'measured drives' version is only 2 holes/round and is a biased sample; 317 (all drives) is contaminated by layups. Neither is a substitute for SG:OTT."
+    },
+    {
+      "id": "driving_accuracy",
+      "name": "Driving Accuracy Percentage",
+      "definition": "Percentage of tee shots on par 4s and 5s finishing in the fairway.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 102; rough tendency 02435, fairway bunker tendency 01008, distance from centre 02421",
+      "bet_relevance": "Only predictive where rough is genuinely penal: US Open setups, Open rota gorse/fescue, tight tree-lined tracks. At most tour venues accuracy is near-worthless relative to distance.",
+      "caveat": "The single most over-weighted stat in public golf modelling. On wide courses the correlation with scoring flips negative because short accurate players hit fairways and still lose strokes."
+    },
+    {
+      "id": "greens_in_regulation",
+      "name": "Greens in Regulation Percentage",
+      "definition": "Percentage of holes where the ball is on the putting surface in (par - 2) strokes.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 103; by band 326-330, 02330, 02332; from fairway 190; from rough 199",
+      "bet_relevance": "Strongly tied to scoring floor and therefore to cut-making. A high-GIR player is a low-variance player.",
+      "caveat": "A binary that discards distance information — a 40-foot GIR and a 6-foot GIR count the same. SG:APP strictly dominates it. Keep GIR only as a legacy/coverage fallback where SG is unavailable."
+    },
+    {
+      "id": "scrambling",
+      "name": "Scrambling",
+      "definition": "Percentage of holes where a player misses the GIR but still makes par or better.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 130; from rough 363, sand 362, >30 yds 366, sand save 111",
+      "bet_relevance": "Bogey-avoidance mechanism and therefore a cut-making and top-20 input. Rises in importance as expected GIR falls (wind, firm greens, narrow targets).",
+      "caveat": "Confounded with putting: a player 'scrambles' well partly because he putts well. Decompose into SG:ARG plus SG:PUTT rather than using the composite."
+    },
+    {
+      "id": "proximity_by_yardage",
+      "name": "Approach Proximity by Yardage Band",
+      "definition": "Average feet from the hole after an approach, split by starting distance band and by lie.",
+      "source": "pgatour_stats",
+      "source_ref": "statIds 336-340 (>200, 175-200, 150-175, 125-150, 50-125), 074-076 (100-125, 75-100, 50-75), 02358-02361 (200-225, 225-250, 250-275, >275), fairway 431, rough 437",
+      "bet_relevance": "The core of course fit. Build the course's approach-yardage distribution from its scorecard and hole lengths, then weight each player's band proximity by how often that band actually occurs that week.",
+      "caveat": "Bands are thin — a single event's band figures are near-noise. Aggregate over a season minimum, and note the >275 band barely exists for most players."
+    },
+    {
+      "id": "par5_scoring",
+      "name": "Par-5 Scoring and Conversion",
+      "definition": "Scoring average on par 5s, plus birdie-or-better rate and go-for-green rate/success.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 144 (par 5 scoring avg), 114 (par 5 birdie or better), 173 (par 5 performance), 419/436/486/02357 (going for the green), 02532-02536 (par 5 efficiency by length band)",
+      "bet_relevance": "Where tournaments are won on birdie-fest setups. Reachability is the mechanism: a 550-yd par 5 and a 620-yd par 5 are different products, so use the efficiency-by-length-band stats, not the aggregate.",
+      "caveat": "Par-5 scoring is the stat most sensitive to which courses a player has played. Adjust for the par-5 length mix of his schedule before comparing players."
+    },
+    {
+      "id": "bogey_avoidance",
+      "name": "Bogey Avoidance",
+      "definition": "Percentage of holes played in over par (lower is better); complement of par-or-better rate.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 02414; bogey average 02419; birdie-to-bogey ratio 02415; bounce back 160",
+      "bet_relevance": "The single best predictor of MAKING THE CUT and the natural stat for the safety-ladder target market. Cuts are lost by big numbers, not won by birdies.",
+      "caveat": "Directionally opposite to outright-winner modelling, where birdie-making upside matters more. Do not use one weighting for both markets."
+    },
+    {
+      "id": "birdie_making",
+      "name": "Birdie or Better Percentage",
+      "definition": "Percentage of holes played in under par.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 352, birdie average 156, par breakers 105, eagles 106",
+      "bet_relevance": "Upside/variance proxy. Drives outright-winner and first-round-leader equity and pushes winning-score markets to the under.",
+      "caveat": "High birdie rate with high bogey rate is a fat-tailed player: good for outrights and FRL, bad for make-the-cut. Model the two tails separately."
+    },
+    {
+      "id": "three_putt_avoidance",
+      "name": "3-Putt Avoidance and Putting Distance Bands",
+      "definition": "3-putt rate overall and by starting distance, plus make rates from each distance band.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 426 (3-putt avoidance), 068-070/145-147 (by band), 403-408 (putting from bands), 484 (inside 10ft), 413 (one-putt pct)",
+      "bet_relevance": "Green-size and green-speed fit. Big undulating greens create long first putts and reward lag; small greens compress the distribution.",
+      "caveat": "Distinguish lag putting (long range, matters on big greens) from conversion (5-15ft, matters everywhere). They are different skills with different stability."
+    },
+    {
+      "id": "course_history",
+      "name": "Course History",
+      "definition": "A player's prior finishes, round scores and SG at the specific venue.",
+      "source": "pgatour_leaderboard + wikipedia",
+      "source_ref": "leaderboard __NEXT_DATA__ rounds[] per tournamentId; Wikipedia per-tournament result tables",
+      "bet_relevance": "Genuinely real but small and heavily overstated by the market. Most of its apparent signal is course FIT plus the fact that good players play good-for-them events repeatedly.",
+      "caveat": "Sample is tiny (often 3-8 rounds) and the course changes between visits — re-grassing, added length, tree loss. Prefer measured architecture/grass fit over raw history; use history as a tiebreak only."
+    },
+    {
+      "id": "course_fit_architecture",
+      "name": "Course Fit by Architecture",
+      "definition": "Match player skill profile to designer archetype: MacKenzie/Ross (angles, contour, short-game demand), Dye (visual intimidation, forced carries), Fazio (wide, soft, target), links (ground game, wind), Doak/C&C (width, firm, options).",
+      "source": "wikipedia_api",
+      "source_ref": "Course article infobox: architect, par, length, elevation. Verified on Augusta National (Alister MacKenzie, par 72, 7510 yds).",
+      "bet_relevance": "The most durable form of course fit. Drives which SG component to over-weight for the week.",
+      "caveat": "Architect attribution is often shared or heavily revised (Augusta has been redesigned repeatedly). Wikidata property P84 exists but is sparsely populated — the Wikipedia infobox is the richer source."
+    },
+    {
+      "id": "course_fit_grass",
+      "name": "Course Fit by Grass Type",
+      "definition": "Green and fairway grass species: bentgrass, bermuda (and overseed), poa annua, fescue, paspalum, zoysia.",
+      "source": "wikipedia_api",
+      "source_ref": "Course infobox fields 'greens' and 'fairways'. Verified on Augusta National: greens = Bentgrass, fairways = Ryegrass.",
+      "bet_relevance": "The main legitimate mechanism behind putting splits. Bermuda grain and poa bumpiness produce persistent per-player effects that bentgrass does not.",
+      "caveat": "This is the ONLY putting split with a real physical mechanism — beware fitting a hundred other putting splits to noise. Also, overseeding changes the effective surface season to season and the infobox will not say so."
+    },
+    {
+      "id": "wind_performance",
+      "name": "Wind Performance",
+      "definition": "Scoring or SG differential in elevated wind versus calm, ideally per-round wind-matched.",
+      "source": "open_meteo + pgatour_teetimes",
+      "source_ref": "Open-Meteo hourly wind_speed_10m, wind_gusts_10m, wind_direction_10m; join to each group's teeTime epoch",
+      "bet_relevance": "Wind is the largest single exogenous scoring driver and the mechanism behind wave advantage. It also COMPRESSES the favourite's edge by inflating variance — the same effect the volleyball file records for beach.",
+      "caveat": "Player-level 'wind specialist' effects are mostly noise on the samples available; the reliable signal is the wind FORECAST applied to the whole wave, not a per-player wind rating. Open-Meteo snaps to a coarse grid (53.6247,-3.0086 returned as 53.5,-3.0), so it gives regional, not on-course, wind."
+    },
+    {
+      "id": "recent_form",
+      "name": "Recent Form Windows",
+      "definition": "Rolling skill estimates over the last 5 and last 15 events, split by Power / Accuracy / Short Game / Putting / Scoring.",
+      "source": "pgatour_stats",
+      "source_ref": "statIds 02347-02351 (last 5 events), 02352-02356 (last 15 events); season-long comparators 085-088, 02346",
+      "bet_relevance": "PGA Tour publishes these windows directly, so the form/skill blend can be built without re-deriving it from round-level data.",
+      "caveat": "Golf form decays slowly and noisily. A 5-event window is roughly 16-20 rounds — still small. Blend toward the long-run estimate; do not let a hot 5-event window override a season of SG:T2G."
+    },
+    {
+      "id": "field_strength",
+      "name": "Field Strength",
+      "definition": "Aggregate quality of the week's field, from OWGR points-average of entrants or count of top-50 players present.",
+      "source": "owgr_api",
+      "source_ref": "apiweb.owgr.com getRankings: pointsAverage, pointsTotal, divisorActual, divisorApplied, rank, lastWeekRank",
+      "bet_relevance": "Rescales EVERYTHING. A 2.0 SG:Total in an opposite-field event is not a 2.0 in a major. Also sets the baseline for cut lines and winning score.",
+      "caveat": "OWGR pointsAverage uses a divisor with a minimum (divisorApplied vs divisorActual differ), so a player with few events is penalised. Use divisorApplied-aware comparisons, and note LIV players accrue no OWGR points, which distorts field-strength counts."
+    },
+    {
+      "id": "cut_making_rate",
+      "name": "Cut-Making Rate",
+      "definition": "Share of started events in which the player survives the 36-hole cut; plus current and best consecutive-cut streaks.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 122 (consecutive cuts), 137 (YTD consecutive cuts), 116 (scoring average before cut)",
+      "bet_relevance": "Direct input to the make-the-cut market, which is the safest genuine market in golf and the natural laddering target.",
+      "caveat": "Raw rate is field-strength contaminated — a player who only enters weak fields shows a flattering rate. Adjust by the OWGR-derived strength of the fields he actually entered, and note the cut SIZE differs by event (see rules_critical)."
+    },
+    {
+      "id": "wave_advantage",
+      "name": "Wave Advantage (AM/PM tee-time split)",
+      "definition": "Scoring differential between the morning and afternoon draw, caused by wind building through the day, greens drying and bumping up, and rain arriving on one half of the draw.",
+      "source": "pgatour_teetimes + pgatour_stats + open_meteo",
+      "source_ref": "teeTimes __NEXT_DATA__: groups[].teeTime (epoch ms), startTee (1 or 10), backNine, groupNumber. Historical splits: statIds 292 (early scoring avg), 293 (late scoring avg), 209/211 (first tee early/late), 210/212 (tenth tee early/late), 247-284 (early/late by round).",
+      "bet_relevance": "The largest short-horizon edge in golf and the dominant driver of first-round-leader and round-1 markets. Verified on the 2026 Open at Royal Birkdale: R1 had 52 groups, first tee 05:35 UTC, last tee 15:21 UTC — a 9h46m spread across one weather day.",
+      "caveat": "Draw structure matters. That Open R1 had startTee == 1 for every group (single-tee start), so the wave is a pure AM/PM ordering; split-tee events show startTee in {1,10} and the halves are simultaneous, which is a different and much weaker effect. Also the waves SWAP for round 2, so a two-round wave edge partly cancels — it does not cancel for FRL or round-1 markets."
+    },
+    {
+      "id": "scoring_average_adjusted",
+      "name": "Adjusted Scoring Average",
+      "definition": "Scoring average adjusted for the field's scoring average that week.",
+      "source": "pgatour_stats",
+      "source_ref": "statId 120 (adjusted), 108 (actual), 02417 (stroke differential field average)",
+      "bet_relevance": "Coverage fallback where SG is unavailable — it is field-relative, so it survives the non-ShotLink problem better than any raw stat.",
+      "caveat": "Adjusted only for field, not for course difficulty or wave. It is strictly weaker than SG:Total; use only where SG is missing."
+    },
+    {
+      "id": "round_by_round_scoring",
+      "name": "Round-Specific Scoring Profile",
+      "definition": "Scoring average split by round number and by front/back nine.",
+      "source": "pgatour_stats",
+      "source_ref": "statIds 148/149/117/285 (R1-R4 scoring avg), 118 (final round), 219 (final round performance), 207/208 (front/back nine)",
+      "bet_relevance": "Round-1 scoring average is the correct base rate for first-round-leader and round-1 three-balls; final-round performance is the closer signal for outrights from contention.",
+      "caveat": "'Final round performance' is heavily confounded by leaderboard position — players in contention play differently. Treat closer/choker narratives as noise absent a very large sample."
+    },
+    {
+      "id": "ball_striking_composites",
+      "name": "Ball Striking and Total Driving Composites",
+      "definition": "Rank-sum composites: Total Driving (distance rank + accuracy rank), Ball Striking (total driving + GIR).",
+      "source": "pgatour_stats",
+      "source_ref": "statId 129 (total driving), 158 (ball striking), 127 (all-around ranking)",
+      "bet_relevance": "Quick coverage proxies only.",
+      "caveat": "These are RANK SUMS, not measured quantities — they discard magnitude and are not comparable across seasons or field sizes. Never feed a rank-sum into a probability model; prefer the underlying SG components."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "pgatour_stats",
+      "url": "https://www.pgatour.com/stats/detail/{statId}",
+      "auth": "none (scraping the SSR payload)",
+      "verified": true,
+      "coverage": "THE source. Every stat in this file's statistics[] except course fit and weather. Real data read out of the embedded __NEXT_DATA__ JSON: statId 02675 returned 156 player rows (Scheffler 2.154 avg, 112.033 total SG:T, 86.035 SG:T2G, 25.998 SG:P, 52 measured rounds); 02567 returned 156 rows (McIlroy 0.922); 101 returned 157 rows (Potgieter 330.6, tourAvg 305.4). Rows carry playerId, playerName, country, rank, rankDiff, rankChangeTendency and a stats[] array of statName/statValue. Also carries lastProcessed ('Through the The Open Championship, Jul 19'), tourAvg, statDescription, yearPills (2022-2026) and tournamentPills (per-event through-event filters).",
+      "note": "VERIFIED BY BODY: parsed the JSON and read player names and values, not the status code. Data lives at props.pageProps.dehydratedState.queries[N].state.data.rows — the SSR'd statDetails query with year=null; sibling statDetails queries carry only pills and NO rows, so a parser that grabs the first statDetails match gets an empty result. https://www.pgatour.com/stats yields the full catalogue: 607 statId->statTitle pairs, enumerable in one fetch. robots.txt permits /stats (it disallows only /*?*player=*, /*?*group=*, /bin/data/, /elements/ and similar) — so append no player= or group= query string."
+    },
+    {
+      "id": "pgatour_teetimes",
+      "url": "https://www.pgatour.com/tournaments/{season}/{slug}/{tournamentId}/tee-times",
+      "auth": "none (scraping the SSR payload)",
+      "verified": true,
+      "coverage": "The wave-advantage raw material, and the only free verified source for it. teeTimes query returns courses[] (id, courseName), rounds[] with roundStatus, and groups[] carrying groupNumber, teeTime as epoch milliseconds, startTee (1 or 10), backNine, courseId and full players[]. Verified on R2026100 (2026 Open, Royal Birkdale): R1 had 52 groups, teeTime range 2026-07-16 05:35 to 15:21 UTC, startTee == 1 for every group.",
+      "note": "VERIFIED BY BODY. The same page's dehydratedState also carries a leaderboard query (per-player position, total, thru, rounds[] scores, groupNumber, courseId, backNine, playerState, roundStatus, official/projected FedEx points) and an oddsToWin query. oddsToWin returned oddsEnabled:false, players:[] and 'Tournament complete' on this finished event — it exists but must be pulled during a live week."
+    },
+    {
+      "id": "owgr_api",
+      "url": "https://apiweb.owgr.com/api/owgr/rankings/getRankings?pageSize=5&pageNumber=1&sortString=Rank%20ASC&regionId=0&countryId=0&countyId=0",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Clean unauthenticated JSON, no key, no headers needed. rankingsList[] with rank, isTied, pointsTotal, pointsWon, pointsLost, pointsAverage, divisorActual, divisorApplied, endLastYearRank, lastWeekRank, and a nested player object (id, firstName, lastName, fullName, birthDate, gender, isAmateur, country incl. iocCode and region). Verified: rank 1 Scheffler pointsAverage 16.38 divisor 42; rank 2 McIlroy 9.2577; rank 3 Cameron Young.",
+      "note": "VERIFIED BY BODY. Best free source for field strength and for cross-tour player identity. apiweb.owgr.com serves NO robots.txt (302 -> sorry.owgr.com/404.html), so nothing is disallowed there; www.owgr.com robots.txt does disallow the legacy /ranking/ and /players/ HTML paths, which this API host is not. Event endpoints were NOT found — getEvents and getStrokesGainedRankings both 302 to the 404 page."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Course architecture, grass type, par, length, elevation, and tournament results/history. Verified two ways: action=query&prop=extracts on '2026 Open Championship' returned real prose (Royal Birkdale, 16-19 July 2026, Ryan Fox won by one over Cameron Young); action=query&prop=revisions&rvslots=main on 'Augusta National Golf Club' returned 102216 bytes of wikitext whose infobox carries greens = Bentgrass, fairways = Ryegrass, architect Alister MacKenzie, par1 = 72, length1 = 7510 yd, elevation 160-310 ft.",
+      "note": "VERIFIED BY BODY. Pull the RAW WIKITEXT, not the rendered extract — the greens/fairways/architect fields live in the infobox and are stripped from the plaintext extract. Licence CC BY-SA. Course infoboxes are inconsistent across articles and say nothing about overseeding."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none (send a descriptive User-Agent)",
+      "verified": true,
+      "coverage": "Structured golf-club entities (wdt:P31 wd:Q1048525). Returned live SPARQL JSON bindings — Frilford Heath Golf Club, Royal Cinque Ports Golf Club and others.",
+      "note": "VERIFIED BY BODY, but WEAK for this purpose: the architect property P84 was absent on most clubs in the sample, so course-fit attributes must come from the Wikipedia infobox instead. Useful mainly as an ID spine for joining course names across sources."
+    },
+    {
+      "id": "open_meteo",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Wind and precipitation for wave modelling. Verified for Royal Birkdale: hourly wind_speed_10m, wind_gusts_10m, wind_direction_10m, precipitation returned with units and an elevation field (11.0 m).",
+      "note": "VERIFIED BY BODY. Already a trusted source in this repo (research/tennis.json uses it for altitude). CAVEAT: it snapped the requested 53.6247,-3.0086 to 53.5,-3.0 — a coarse grid, so this is regional wind, not on-course wind. Join hourly values to group teeTime epochs to build a per-wave wind exposure."
+    },
+    {
+      "id": "thesportsdb",
+      "url": "https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?s=Golf",
+      "auth": "none (free test key '3')",
+      "verified": true,
+      "coverage": "Returned real JSON but only 5 golf leagues, all minor: PGA Tour of Australasia (2025-2026), PGA Tour Canada (2022), PGA Tour China (2022), China Tour (2026), European Challenge Tour (2025).",
+      "note": "VERIFIED BY BODY AND USELESS HERE — same verdict as the volleyball file gave it. No PGA Tour, no DP World Tour, no majors, and most seasons are stale. Do not build on it."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "espn_golf",
+      "detail": "ROBOTS-DISALLOWED BY NAME — NOT FETCHED. www.espn.com/robots.txt contains an explicit block: 'User-agent: anthropic-ai' followed by 'Disallow: /' (alongside GPTBot, CCBot, ChatGPT-User, Google-Extended, Bytespider). We are named, so ESPN golf leaderboards and stats are off-limits regardless of what they would return. Confirmed by reading the robots.txt body."
+    },
+    {
+      "id": "golf_com",
+      "detail": "ROBOTS-DISALLOWED BY NAME — NOT FETCHED. golf.com/robots.txt carries 'User-agent: anthropic-ai' / 'Disallow: /' (with a knownagents.com comment above it) and the same for CCBot. Their cut-rule and playoff explainers were reachable only via search-result summaries, never fetched."
+    },
+    {
+      "id": "datagolf",
+      "detail": "NO FREE TIER + TERMS FORBID THE USE CASE. feeds.datagolf.com returned HTTP 403 with the body 'invalid api key, check it here: https://datagolf.com/api-access'; that page states 'To get access to the API, you must become a Scratch Plus member' — a PAID subscription, so DataGolf's 'free tier' does not exist for the API. Their Terms (https://datagolf.com/terms-and-conditions, read in full) clause 13 NON-COMMERCIAL USE grants only 'limited, non-exclusive, revocable permission to make personal, non-commercial use of the content and the service' and states 'you will not redistribute or transfer any of the Data Golf Services or Contents'. Copyright 2024 datagolf.com; governing law Estonia. Documented API rate limit 45 requests/minute with a 5-minute suspension for breach. datagolf.com serves NO robots.txt (404 through Cloudflare). VERDICT: do not scrape and do not redistribute. Their free public pages (datagolf-rankings) render rows client-side from JS and ship no static data payload anyway."
+    },
+    {
+      "id": "dp_world_tour",
+      "detail": "HARD 403 — FALSE-STATUS TRAP AVOIDED. https://www.europeantour.com/dpworld-tour/race-to-dubai/ returned HTTP 403 with a 421-byte Akamai body: '<TITLE>Access Denied</TITLE> ... You don't have permission to access ... errors.edgesuite.net'. Separately, their robots.txt disallows /api/ outright (and /european-tour/ and /legends-tour/), so even the reachable paths exclude the JSON. This is the single biggest coverage gap: no verified free source for DP World Tour player stats. OWGR covers DPWT players for RANKING only, not for strokes gained."
+    },
+    {
+      "id": "pgatour_graphql",
+      "detail": "https://orchestrator.pgatour.com/graphql returned a CloudFront '503 ERROR: The request could not be satisfied' HTML page to an unauthenticated POST. The documented-in-the-wild API key route is not open. IRRELEVANT IN PRACTICE: the same GraphQL responses are already SSR'd into the page HTML under __NEXT_DATA__, which is verified working — scrape the page, not the API."
+    },
+    {
+      "id": "pgatour_weather_module",
+      "detail": "LOOKS LIKE A WEATHER SOURCE, ISN'T. The tournament page's dehydratedState contains a ['weather', {tournamentId}] query, but its payload on R2026100 was entirely sponsor chrome — title, sponsorLink, sponsorLogo, Cloudinary asset paths — with no temperature, wind or forecast values anywhere. Recorded because a key-name-only check would wrongly mark it a verified weather feed. Use Open-Meteo instead."
+    },
+    {
+      "id": "betwinner_rules",
+      "detail": "COULD NOT VERIFY — AND THIS IS THE BLOCKER FOR SECTION 4. betwinner.com/en/rules, /en/betting-rules, /rules and /en/info/betting-rules all redirect to betwinner2.com and return HTTP 404 with a real 404 body (<title>404</title>, ~25KB SPA shell). The sitemap index lists 46 language sitemaps; sitemap_en.xml.gz is 214 bytes (effectively empty) and contains no rules/terms URL; sitemap_gb and sitemap_us 404. The 1xBet family equivalent (1xbet.com/en/rules) also 404s with 0 golf and 0 'dead heat' mentions in the body. robots.txt does NOT disallow a rules path, so this is missing content, not a crawl block. CONSEQUENCE: every Betwinner-specific settlement term in rules_critical is marked needs_confirmation and none of it should be presented to a user as Betwinner-confirmed."
+    },
+    {
+      "id": "owgr_event_endpoints",
+      "detail": "apiweb.owgr.com/api/owgr/events/getEvents and .../rankings/getStrokesGainedRankings both returned HTTP 302 to https://sorry.owgr.com/404.html with a 0-byte body. Only getRankings is confirmed. The www.owgr.com sitemap advertises /strokes-gained-world-rating and /events-to-date pages, so the data exists behind some undiscovered route; the Next.js JS chunks did not yield an api/owgr path on inspection."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_ladder_note": "GOLF IS A FIELD SPORT, NOT A TWO-SIDED ONE. A 156-player outright is a 156-outcome market, so the engine/ladder.py logic — walk a fixed direction from aggressive to safe — has almost nothing to walk down. TWO-BALLS AND THREE-BALLS ARE THE ONLY NEAR-TWO-OUTCOME MARKETS IN GOLF AND THEREFORE THE ONLY PLACE A SAFETY LADDER CAN APPLY: a two-ball is a genuine head-to-head (two outcomes, or three where a tie is priced), and a three-ball is a 3-way market that behaves like football's 1X2 with no draw-equivalent to hide in. Everything else — outright, top 5/10/20, FRL, nationality, group — is a many-outcome market where 'safer' means only 'more places', which is not the same guarantee and is precisely where dead-heat reduction eats the payout. SEPARATELY AND MORE IMPORTANTLY: 'TO MAKE THE CUT' IS THE SAFEST GENUINE MARKET IN GOLF AND THE NATURAL LADDERING TARGET. It is binary (made/missed), it resolves for ~half the field, it is driven by the stablest stats in the sport (SG:T2G and bogey avoidance rather than putting variance), and it does not suffer dead-heat reduction. Treat it as the base rung; treat two-balls and three-balls as the only true head-to-head rungs; do not construct a ladder out of top-5 -> top-10 -> top-20, because those rungs are not strictly safer once dead heat is priced in.",
+
+    "outright_winner": [
+      "sg_total",
+      "sg_tee_to_green",
+      "sg_approach",
+      "birdie_making",
+      "par5_scoring",
+      "course_fit_architecture",
+      "course_fit_grass",
+      "course_history",
+      "field_strength",
+      "recent_form",
+      "driving_distance"
+    ],
+    "top_5_finish": [
+      "sg_total",
+      "sg_tee_to_green",
+      "sg_approach",
+      "birdie_making",
+      "course_fit_architecture",
+      "field_strength",
+      "recent_form"
+    ],
+    "top_10_finish": [
+      "sg_tee_to_green",
+      "sg_approach",
+      "sg_total",
+      "bogey_avoidance",
+      "course_fit_architecture",
+      "course_fit_grass",
+      "field_strength",
+      "recent_form"
+    ],
+    "top_20_finish": [
+      "sg_tee_to_green",
+      "bogey_avoidance",
+      "greens_in_regulation",
+      "scoring_average_adjusted",
+      "cut_making_rate",
+      "field_strength"
+    ],
+    "to_make_the_cut": [
+      "bogey_avoidance",
+      "sg_tee_to_green",
+      "cut_making_rate",
+      "greens_in_regulation",
+      "scrambling",
+      "scoring_average_adjusted",
+      "field_strength",
+      "wave_advantage",
+      "driving_accuracy"
+    ],
+    "first_round_leader": [
+      "wave_advantage",
+      "sg_putting",
+      "birdie_making",
+      "round_by_round_scoring",
+      "wind_performance",
+      "course_fit_grass",
+      "field_strength"
+    ],
+    "three_ball": [
+      "sg_total",
+      "sg_tee_to_green",
+      "round_by_round_scoring",
+      "wave_advantage",
+      "recent_form",
+      "course_fit_architecture"
+    ],
+    "two_ball": [
+      "sg_total",
+      "sg_tee_to_green",
+      "round_by_round_scoring",
+      "wave_advantage",
+      "recent_form",
+      "course_fit_architecture"
+    ],
+    "tournament_matchups_72_hole": [
+      "sg_total",
+      "sg_tee_to_green",
+      "course_fit_architecture",
+      "course_fit_grass",
+      "cut_making_rate",
+      "recent_form",
+      "field_strength"
+    ],
+    "nationality_markets": [
+      "field_strength",
+      "sg_total",
+      "sg_tee_to_green",
+      "course_fit_architecture",
+      "recent_form"
+    ],
+    "group_markets": [
+      "sg_total",
+      "sg_tee_to_green",
+      "course_fit_architecture",
+      "recent_form",
+      "field_strength"
+    ],
+    "winning_score": [
+      "field_strength",
+      "wind_performance",
+      "course_fit_architecture",
+      "par5_scoring",
+      "birdie_making",
+      "greens_in_regulation",
+      "scoring_average_adjusted"
+    ]
+  },
+
+  "rules_critical": [
+    "DEAD-HEAT REDUCTION IS THE HEADLINE TRAP: THE QUOTED PRICE IS NOT THE PRICE YOU GET. On top 5/10/20 the stake is multiplied by (available places / players tied) while the ODDS stay unchanged. Worked example verified on PGA Tour's own explainer: four players tied for 10th with one top-10 place left gives a 0.25 multiplier, so a 100 stake at +550 returns 162.50 for 87.50 profit instead of 550 — an 84% cut to the win. Public estimates put 20-30% of top-10 bets into some dead heat, higher for top-20 and first-round leader. Any model that prices a top-10 at face odds is systematically overstating EV by roughly a fifth.",
+
+    "WITHDRAWAL BEFORE TEEING OFF VOIDS, WITHDRAWAL MID-ROUND LOSES — OPPOSITE OUTCOMES FROM A NEARLY IDENTICAL EVENT. The industry norm is that a player who never starts is a non-runner and the bet is voided/refunded, while a player who hits a single tee shot and then withdraws or retires has 'started' and the bet simply loses. The dividing line is one golf shot. Model these as two different states, never as one 'WD' flag, and note that a player withdrawing after teeing off in round 1 also loses a make-the-cut bet outright. BETWINNER'S OWN NON-STARTER AND DEAD-HEAT TERMS MUST BE READ AND CONFIRMED — every attempt to reach their rules pages 404'd (see blocked.betwinner_rules), so both of these headline rules are currently INFERRED FROM INDUSTRY NORM, NOT CONFIRMED FOR THIS BOOK.",
+
+    "54 HOLES IS THE OFFICIAL-STATUS THRESHOLD. A PGA Tour event shortened to 54 holes is still official, with full points and money awarded and a real winner (2024 AT&T Pebble Beach, Wyndham Clark; before that the 2016 Zurich Classic). Stopped before 54 holes can be completed, the event reverts to the 36-hole score and the win is unofficial. Winning-score and round-4 markets therefore have a real probability of never existing, and a 54-hole event settles outrights on a three-round total the model never simulated.",
+
+    "THE CUT SIZE DIFFERS BY EVENT AND THAT CHANGES THE MAKE-THE-CUT BASE RATE. PGA Tour standard is top 65 and ties after 36 holes. Masters top 50 and ties; U.S. Open top 60 and ties; PGA Championship top 70 and ties; The Open top 70 and ties. A single 'makes the cut' probability ported from tour events to the Masters is wrong by roughly 15 places of field depth in a field that is also far stronger and much smaller.",
+
+    "'AND TIES' MAKES THE NUMBER OF SURVIVORS A RANDOM VARIABLE, NOT A CONSTANT. The cut is never exactly 65 players — it is 65 plus everyone level with the 65th. Simulating a fixed-size cut understates make-the-cut probability for every player near the line, which is exactly the population the market prices.",
+
+    "MDF IS A HISTORICAL ARTEFACT ON THE PGA TOUR, NOT A LIVE RULE — AND IT POISONS TRAINING DATA. 'Made cut, did not finish' arose from a secondary 54-hole cut applied when 78 or more players survived 36 holes; the Tour phased it out after the 2018-19 season by lowering the standard cut to top 65 and ties. MDF rows still appear in pre-2019 results. Those players MADE the 36-hole cut, so a backtest that scores MDF as a missed cut mislabels them; other tours and some events retain secondary-cut mechanics, so never assume 'cut = one event at 36 holes' for non-PGA-Tour data.",
+
+    "PLAYOFF FORMAT DIFFERS BY MAJOR AND ONE OF THEM CHANGED. Masters: sudden death starting at 18, then 10, repeating. U.S. Open: two-hole aggregate, then sudden death (replaced the 18-hole Monday playoff in 2018). PGA Championship: three-hole aggregate, then sudden death. THE OPEN SWITCHED FROM A FOUR-HOLE AGGREGATE TO A THREE-HOLE AGGREGATE IN 2019 — most reference material and many older datasets still say four. Standard PGA Tour events are sudden death. A 72-hole-tie simulation that assumes one universal playoff format misprices the winner conditional on a tie in every major.",
+
+    "THE OUTRIGHT SETTLES ON THE PLAYOFF WINNER; POSITION-BASED MARKETS SETTLE ON THE FINISHING POSITIONS. The losing playoff participant is officially second, so he loses the outright but wins top 5/10/20. Conversely a 'winning score' market settles on the 72-hole total, not the playoff holes — playoff strokes are not added to the score. Treat the playoff as deciding one market and no others.",
+
+    "THREE-BALLS ARE A 3-WAY MARKET WITH NO SAFE MIDDLE. Unlike football's 1X2, where the draw is a distinct backable outcome, a three-ball tie is usually handled by dead heat or by a separate tie price — so the 'draw' does not shelter you, it dilutes you. And a three-ball is a SINGLE ROUND: it is decided by that round's 18 holes only, so it is a wave/wind bet as much as a skill bet.",
+
+    "TWO-BALLS ARE THE ONLY GENUINE HEAD-TO-HEAD IN GOLF, AND THE TIE HANDLING DECIDES THEIR VALUE. A two-ball may be priced two-way (tie = void/push) or three-way (tie priced separately); the two are materially different bets at the same headline odds, because a two-way price has the tie probability stripped out and refunded while a three-way price does not. Confirm which form Betwinner lists before treating a two-ball as a ladder rung.",
+
+    "ROUND-BASED MATCHUPS DIE IF EITHER PLAYER DOES NOT COMPLETE THE ROUND. In two-balls and three-balls the standard is that both/all players must tee off for the market to stand, and a mid-round withdrawal usually hands the market to the others rather than voiding it. This is the same before/after-tee-off asymmetry as the outright rule and it bites harder here because the sample is one round.",
+
+    "A MADE-CUT BET CANNOT WIN IF NO CUT IS PLAYED. Limited-field events (WGC-style, LIV, Tour Championship, many invitationals) have NO 36-hole cut at all, and a weather-shortened event may abandon the cut. Markets are then typically voided — but the modelling error is upstream: never emit a make-the-cut selection for an event whose format has no cut.",
+
+    "FIRST-ROUND LEADER IS THE MOST DEAD-HEAT-EXPOSED MARKET IN GOLF. A single round produces far more ties at the top than 72 holes do; five players sharing the R1 lead means a 0.20 stake multiplier on a market already priced at long odds. FRL is also the market most contaminated by wave advantage, so its two biggest drivers are both things a naive model ignores.",
+
+    "THE WAVES SWAP BETWEEN ROUNDS 1 AND 2, SO A DRAW EDGE PARTLY CANCELS OVER 36 HOLES BUT NOT OVER 18. An AM-wave advantage in round 1 is offset when that half plays PM in round 2. Apply wave adjustments at full strength to FRL and round-1 three-balls, at reduced strength to make-the-cut, and at close to zero to the outright — unless the forecast is asymmetric across the two days.",
+
+    "RYDER CUP IS MATCH PLAY AND SHARES NOTHING WITH STROKE PLAY. 28 points across foursomes (alternate shot), four-balls (better ball) and singles; a halved match pays half a point to each side; 14.5 points wins it and AT 14-14 THE HOLDER RETAINS THE TROPHY — so 'Europe/USA to win the Ryder Cup' and 'to lift the trophy' are DIFFERENT BETS for the defending side. Match play also means holes are conceded and matches end early ('3&2'), so no stroke total exists and no stroke-play stat maps onto it without a hole-by-hole model.",
+
+    "AMATEURS COUNT IN THE FIELD AND IN PLACE MARKETS BUT NOT IN THE MONEY. An amateur can make the cut, contend and occupy a top-10 position — taking a place away from a paid finisher — while earning no prize money. OWGR flags this as isAmateur. A place-market model built off a money list rather than the leaderboard will silently shift every position.",
+
+    "LIV PLAYERS EARN NO OWGR POINTS, WHICH BREAKS FIELD-STRENGTH MEASUREMENT. Any field-strength metric built from OWGR points-average systematically understates a field containing LIV players and understates those players individually. The same distortion flows into every market priced off field strength, especially winning score.",
+
+    "OWGR POINTS-AVERAGE USES A MINIMUM DIVISOR. The API returns divisorActual and divisorApplied separately; when they differ, the player's average has been damped by a floor on events played. Comparing pointsAverage across a full-schedule player and a sparse-schedule player without checking the divisor compares two different quantities.",
+
+    "STROKES GAINED ONLY EXISTS AT SHOTLINK EVENTS. A player's SG sample is drawn from US PGA Tour venues; his DP World Tour and LIV rounds contribute nothing. Two players with identical SG:Total can have utterly different total evidence, and a Europe-based player's SG figures may be built on a handful of US starts. Carry the measured-rounds count (available in every stat row) and shrink accordingly.",
+
+    "PREFERRED LIES ('LIFT, CLEAN AND PLACE') SILENTLY LOWERS THE WINNING SCORE. Invoked on wet courses, it is a local rule decided on the morning, not a scheduled condition, and it shifts the whole scoring distribution down. Winning-score and round-total markets priced on a dry-course simulation will sit too high whenever it is in force."
+  ],
+
+  "open_questions": [
+    "BETWINNER'S OWN GOLF TERMS ARE UNREAD — this is the top blocker. Their dead-heat formula (stake reduction vs odds reduction vs pay-in-full), their non-starter definition, their two-ball tie handling and their abandoned-event threshold all remain INFERRED FROM INDUSTRY NORM. Every rules_critical entry that depends on them must be surfaced with needs_confirmation, in the spirit of engine/settlement.py. Retry from a GitHub Actions runner: the operator's machine blocks the site and betwinner.com redirected here to betwinner2.com with an empty English sitemap.",
+    "Which golf markets does Betwinner sportId 41 ACTUALLY list, and under which market group ids? This file maps statistics to the standard golf market set, but the group/outcome ids that engine/bwfeed.py needs have not been pulled. Run a live golf-week fetch and enumerate the groups before wiring anything.",
+    "Does the 22bet-keyed payload documented in PROBE_FINDINGS.md carry golf outrights at all? Outright/ante-post markets are often absent from the same feed that serves match markets, and the catalogue lists separate AntePost sport ids for other sports (132, 133, 151) but none for golf.",
+    "No verified free source for DP World Tour player statistics. europeantour.com is a hard Akamai 403 and its robots.txt disallows /api/. Options not yet tested: a GitHub Actions runner (different egress, which is how this repo already solved comparable blocks), or reconstructing DPWT form from OWGR points movement plus Wikipedia result tables. Until then, any DPWT-only player has form data but no strokes-gained data.",
+    "OWGR's strokes-gained world rating is advertised in their sitemap (/strokes-gained-world-rating) but the API route was not discovered — getStrokesGainedRankings 302s to a 404. If found, it would be the only free CROSS-TOUR strokes-gained measure and would close the DP World Tour gap.",
+    "Does the pgatour oddsToWin query return usable data during a live tournament week? It returned oddsEnabled:false with an empty players[] on a completed event. If populated it is a free second opinion on the outright market — not a sharp reference, but a sanity check on our own ranking.",
+    "Course-level yardage distribution per hole is not sourced. Proximity-by-yardage-band fit needs the week's actual approach distribution; Wikipedia gives total length and par but not a hole-by-hole card for most venues.",
+    "Betwinner's payout cap interacts with golf more than any other sport, because outrights routinely price at 100.00+. CLAUDE.md hard rule 4 already requires the payout-cap caveat on parlays; for golf it must appear on SINGLES too."
+  ],
+
+  "key_findings": [
+    "PGA Tour's own stats site is the single best free golf source and it needs no API key: the full stat table is server-side rendered into __NEXT_DATA__ on every /stats/detail/{statId} page, and /stats yields a catalogue of 607 statId->statTitle pairs in one fetch. Verified by parsing the JSON and reading real values (Scheffler SG:Total 2.154 over 52 rounds; tour driving average 305.4).",
+    "THE WAVE PROBLEM IS SOLVED FOR FREE, WHICH IS UNUSUAL. pgatour.com tee-times pages carry every group's teeTime as an epoch and its startTee, and the stats catalogue publishes historical early/late scoring splits (statIds 292/293, 209-212, 247-284). Joined to Open-Meteo hourly wind, that is a complete AM/PM wave model with no paid data. Verified on the 2026 Open: 52 R1 groups spanning 05:35-15:21 UTC, all off tee 1.",
+    "DataGolf is the obvious source and it is unusable on both counts: the API needs a PAID Scratch Plus membership (403 'invalid api key'), and their Terms clause 13 grants only 'personal, non-commercial use' and states 'you will not redistribute or transfer any of the Data Golf Services or Contents'. There is no free tier to fall back on. Treat as off-limits, not as a stretch goal.",
+    "TWO SITES BLOCK US BY NAME AND WERE NOT FETCHED: ESPN and golf.com both carry 'User-agent: anthropic-ai / Disallow: /'. Checking robots BEFORE fetching is what kept this file clean — the tennis file's Incapsula false-200 lesson generalises, and the name-block variant is invisible in a status code.",
+    "DEAD HEAT is the largest silent modelling error in golf betting. Four players tied for 10th turns a +550 top-10 into an 87.50 profit on a 100 stake, and 20-30% of top-10 bets hit some dead heat. A golf scanner that ranks selections on quoted price without a dead-heat haircut will systematically favour exactly the markets where the haircut is worst.",
+    "THE WD ASYMMETRY IS THE SECOND TRAP: no tee shot usually voids, one tee shot usually loses. Same player, same injury, opposite settlement — and it is decided by an event that happens off-camera before the round.",
+    "STRUCTURALLY, GOLF IS THE OPPOSITE OF THIS REPO'S OTHER SPORTS. Every existing ladder assumes two or three outcomes; a 156-player outright has 156. Only two-balls and three-balls are near-two-outcome, so they are the only true ladder rungs — and 'to make the cut' is the safest genuine market in golf, binary, ~50% base rate, dead-heat-free, and driven by the stablest stats (SG:T2G, bogey avoidance). That is the laddering target, not top-5/10/20, whose 'extra places' are not extra safety once dead heat is priced.",
+    "SG:PUTTING IS GOLF'S 'BREAK POINTS CONVERTED' — the stat that decides single tournaments and predicts almost nothing. SG:Tee-to-Green is the stable signal. The one legitimate putting split is grass type (bermuda grain / poa bumpiness vs bentgrass), which Wikipedia course infoboxes actually carry.",
+    "SETTLEMENT VARIES BY EVENT IN A WAY NO OTHER SPORT HERE DOES: cut size is 65/50/60/70/70 depending on the tournament, playoffs are sudden-death or 2-, 3-hole aggregate depending on the major (The Open changed from four holes to three in 2019, and stale references still say four), and 54 holes is the official-status floor. A single 'golf' settlement rule is guaranteed to be wrong somewhere.",
+    "COVERAGE IS ASYMMETRIC AND THAT IS A MODELLING BIAS, NOT JUST A GAP. Strokes gained exists only at ShotLink events, so US PGA Tour players carry deep evidence while DP World Tour and LIV players carry little or none — and LIV players additionally earn zero OWGR points, breaking field strength. Ranking selections across a mixed field on SG will silently rank the well-measured players."
+  ]
+}

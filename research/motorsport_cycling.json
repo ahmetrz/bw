@@ -1,0 +1,786 @@
+{
+  "sport": "motorsport_cycling",
+  "betwinner_sport_ids": [18, 26, 31, 102, 36],
+  "researched": "2026-07-25",
+  "scope_note": "Five Betwinner sports that share one settlement problem: the bet does not settle on the order at the finish line, it settles on an OFFICIAL CLASSIFICATION published later and amendable later still. 18=Motorsport (NASCAR/IndyCar/WEC/rally), 26=Formula 1, 31=Motorbikes (MotoGP/WSBK), 102=Speedway, 36=Bicycle Racing.",
+
+  "statistics": [
+    {
+      "id": "quali_pace_delta",
+      "scope": "f1, motogp",
+      "definition": "Driver's best qualifying lap as a PERCENTAGE gap to session pole, not a raw second gap.",
+      "why": "Raw seconds do not port across circuits - 0.4s is a chasm at Monaco and noise at Spa. Percentage normalises lap length.",
+      "sources": ["jolpica_f1", "f1_livetiming", "openf1", "motogp_pulselive"],
+      "note": "Jolpica exposes Q1/Q2/Q3 separately. A driver knocked out in Q1 may still have set a fast time - never treat elimination round as a pace measure."
+    },
+    {
+      "id": "race_pace_clean_air",
+      "scope": "f1, motogp, nascar",
+      "definition": "Median stint lap time corrected for fuel burn (linear, ~0.03-0.06s/lap) and tyre age, measured only in clean air (no car within ~1.5s ahead).",
+      "why": "The single best predictor of race result once grid is controlled. Dirty-air laps are a property of track position, not car speed.",
+      "sources": ["openf1", "f1_livetiming", "nascar_cacher"],
+      "note": "openf1 /laps gives lap_duration + is_pit_out_lap; /stints gives the tyre-age join. NASCAR lap-times.json gives LapTime + RunningPos per lap, so clean air is inferable from position."
+    },
+    {
+      "id": "quali_vs_race_pace_gap",
+      "scope": "f1, motogp",
+      "definition": "Rank in qualifying pace minus rank in fuel-corrected race pace, per car, per circuit family.",
+      "why": "The core head-to-head edge. Some cars are one-lap specials (low-fuel, new-tyre peak); others are kind to tyres and gain on Sunday. The market prices the grid; this stat prices the drift off it.",
+      "sources": ["openf1", "jolpica_f1"]
+    },
+    {
+      "id": "sector_time_profile",
+      "scope": "f1",
+      "definition": "Per-sector deltas to the session best (duration_sector_1/2/3), aggregated into low-speed / high-speed / traction strengths.",
+      "why": "Predicts performance at a circuit the car has not yet visited this season by matching corner-type composition.",
+      "sources": ["openf1", "f1_livetiming"]
+    },
+    {
+      "id": "speed_trap_profile",
+      "scope": "f1",
+      "definition": "i1_speed, i2_speed and st_speed (speed trap) relative to field median - a drag/power-level proxy.",
+      "why": "Low-drag cars defend and overtake; high-downforce cars are DRS-vulnerable. Directly drives head-to-head at Monza/Spa/Baku vs Hungary/Monaco.",
+      "sources": ["openf1"]
+    },
+    {
+      "id": "tyre_deg_by_compound",
+      "scope": "f1, motogp",
+      "definition": "Lap-time loss per lap of tyre age, fitted per compound per circuit per team.",
+      "why": "Determines stint length, therefore strategy, therefore whether a fast car ends up behind a slow one.",
+      "sources": ["openf1", "f1_livetiming"],
+      "note": "openf1 /stints carries compound, tyre_age_at_start, lap_start, lap_end. f1_livetiming TyreStintSeries.json carries Compound, New (true/false), TotalLaps, StartLaps - the New flag matters, a scrubbed set degrades differently."
+    },
+    {
+      "id": "pit_stop_time",
+      "scope": "f1, nascar",
+      "definition": "Distribution (median AND 90th percentile) of the team's stop time.",
+      "why": "The tail matters more than the median - one 6s bungle costs 3-4 places. A team with a fat right tail is a worse 'podium' bet than its pace implies.",
+      "sources": ["jolpica_f1", "openf1"],
+      "note": "TRAP: Jolpica /pitstops 'duration' is PIT-LANE time (13.3s at Melbourne 2025); openf1 /pit pit_duration and lane_duration measure different spans and are often null for lap-1 entries. Never pool the two into one distribution."
+    },
+    {
+      "id": "pit_lane_loss_and_stop_count",
+      "scope": "f1",
+      "definition": "Circuit-specific pit-lane time loss and the resulting modal number of stops; undercut vs overcut power.",
+      "why": "A 1-stop circuit compresses the field and rewards track position (bad for cars starting behind); a 2-3 stop circuit lets pace assert itself.",
+      "sources": ["jolpica_f1", "openf1"]
+    },
+    {
+      "id": "dnf_rate_by_team",
+      "scope": "f1, motogp, nascar",
+      "definition": "Retirement rate split into MECHANICAL and INCIDENT causes, per team and per power-unit supplier.",
+      "why": "The whole basis of 'to finish the race' and the hidden term in every head-to-head. Mechanical failure is a team/engine property and correlates ACROSS teammates; incident retirement is a driver property and does not.",
+      "sources": ["jolpica_f1", "motogp_pulselive", "nascar_cacher"],
+      "note": "Jolpica results carry a free-text `status` (Finished, +1 Lap, Engine, Collision, Accident, Gearbox, Hydraulics, Disqualified, Withdrew, Did not start). Parse it into finished / classified-behind / mechanical DNF / incident DNF / DSQ / DNS - collapsing these is the most common modelling error in this sport."
+    },
+    {
+      "id": "dnf_rate_by_circuit",
+      "scope": "f1, motogp, nascar",
+      "definition": "Attrition rate per circuit, and the survivor curve (retirements by lap).",
+      "why": "Street circuits and superspeedways have multiples of the baseline attrition. Correctly prices 'to finish' and fattens the tail on any outright.",
+      "sources": ["jolpica_f1", "nascar_cacher", "f1db"]
+    },
+    {
+      "id": "safety_car_probability_by_circuit",
+      "scope": "f1, motogp, nascar",
+      "definition": "P(at least one SC), P(at least one VSC), expected count, and the lap-distribution of deployments, per circuit.",
+      "why": "Not a side market - a variance term on EVERY position market. A safety car hands a free stop to whoever has not pitted and erases a 20s lead.",
+      "sources": ["openf1", "f1_livetiming", "nascar_cacher"],
+      "note": "VERIFIED shape: openf1 /race_control category='SafetyCar' yields 'VIRTUAL SAFETY CAR DEPLOYED', 'SAFETY CAR DEPLOYED', 'SAFETY CAR IN THIS LAP'. f1_livetiming TrackStatus.jsonStream gives timestamped Status codes. NASCAR race_list_basic.json gives number_of_cautions and number_of_caution_laps as plain fields - the cleanest caution dataset of the three."
+    },
+    {
+      "id": "red_flag_probability",
+      "scope": "f1, motogp",
+      "definition": "P(race suspended) per circuit, and P(suspended and not resumed).",
+      "why": "Gates the reduced-points rule and resets tyre choice for free at a standing restart, invalidating any deg-based strategy model.",
+      "sources": ["openf1", "f1_livetiming"],
+      "note": "openf1 /race_control flag='RED'; TrackStatus.jsonStream red status."
+    },
+    {
+      "id": "overtaking_difficulty_index",
+      "scope": "f1, motogp, nascar",
+      "definition": "Mean absolute position change per car per race at the circuit, excluding pit-cycle and lap-1 shuffles.",
+      "why": "At a low-overtaking circuit the grid IS the result and head-to-head collapses onto qualifying; at a high-overtaking circuit race pace dominates. This stat is the WEIGHTING between quali_pace_delta and race_pace_clean_air.",
+      "sources": ["jolpica_f1", "nascar_loopstats", "f1db"],
+      "note": "NASCAR gives this directly and better than anyone: loopstats has passes_gf, passed_gf, passing_diff and quality_passes per driver per race."
+    },
+    {
+      "id": "grid_to_finish_conversion",
+      "scope": "f1, motogp, nascar",
+      "definition": "Empirical P(win), P(podium), P(points) conditional on starting slot, estimated per circuit with shrinkage to a global curve.",
+      "why": "The base rate every position market should start from. Pole-to-win conversion ranges from roughly coin-flip at overtaking circuits to overwhelming at Monaco.",
+      "sources": ["jolpica_f1", "f1db", "nascar_loopstats"]
+    },
+    {
+      "id": "start_performance",
+      "scope": "f1, motogp",
+      "definition": "Positions gained or lost between the grid and the end of lap 1, per driver, plus launch-phase consistency.",
+      "why": "A recurring, driver-specific, materially large effect that the grid-based price ignores.",
+      "sources": ["openf1", "jolpica_f1"]
+    },
+    {
+      "id": "weather_sensitivity",
+      "scope": "f1, motogp, nascar, cycling",
+      "definition": "Driver/rider wet-vs-dry pace delta, and the team's wet setup record.",
+      "why": "Rain is the single biggest compressor of field quality and the largest source of longshot winners. It is also forecastable, which the closing price does not always reflect.",
+      "sources": ["openf1", "motogp_pulselive", "open_meteo"],
+      "note": "openf1 /weather gives air_temperature, track_temperature, humidity, rainfall, wind_speed, wind_direction at ~1 min cadence. motogp_pulselive /sessions embeds a condition object (track Dry/Wet, air, humidity, ground, weather) per session - a free labelled wet/dry training set."
+    },
+    {
+      "id": "track_temperature_sensitivity",
+      "scope": "f1, motogp",
+      "definition": "Team pace as a function of track temperature (the 'switch-on window' for the tyre).",
+      "why": "Explains why a car dominant in one race is anonymous the next with no development change. Pairs with the forecast.",
+      "sources": ["openf1"]
+    },
+    {
+      "id": "track_specific_driver_history",
+      "scope": "f1, motogp, nascar, speedway",
+      "definition": "Recency-weighted results and pace at THIS circuit, separated from car quality by using the teammate gap rather than the raw result.",
+      "why": "Real but heavily over-claimed. The raw 'X is good at Y' record is mostly car; the teammate-relative version is the part that survives.",
+      "sources": ["jolpica_f1", "f1db", "motogp_pulselive", "nascar_loopstats"]
+    },
+    {
+      "id": "teammate_head_to_head",
+      "scope": "f1, motogp",
+      "definition": "Qualifying H2H and race H2H against the teammate, computed separately, with DNFs excluded from the race version.",
+      "why": "THE cleanest driver-skill signal in motorsport because the machinery is controlled. It is the highest-value input to driver-vs-driver head-to-head markets, which is the only two-outcome market in the sport.",
+      "sources": ["jolpica_f1", "motogp_pulselive"]
+    },
+    {
+      "id": "cross_team_h2h_pair_history",
+      "scope": "f1, motogp",
+      "definition": "Direct record of the specific pair Betwinner has matched, plus the pace gap between their cars.",
+      "why": "Books construct H2H pairs from adjacent drivers. The pair record is small-sample; the CAR gap is the real driver and must dominate the prior.",
+      "sources": ["jolpica_f1", "openf1"]
+    },
+    {
+      "id": "points_finish_rate",
+      "scope": "f1, motogp",
+      "definition": "Rate of finishing in the points-paying positions, conditioned on grid slot and car competitiveness tier.",
+      "why": "Direct input to the 'points finish' market, which is roughly a top-10 (F1) or top-15 (MotoGP) threshold bet.",
+      "sources": ["jolpica_f1", "motogp_pulselive"]
+    },
+    {
+      "id": "fastest_lap_incidence",
+      "scope": "f1",
+      "definition": "Which drivers actually set the fastest lap, split by whether they were leading, had a free pit stop, or were out of position.",
+      "why": "The championship point was abolished from 2025, so the lap is now a pure strategy artefact. The pre-2025 base rates (winner-heavy, top-10-only) are obsolete and will systematically misprice this market.",
+      "sources": ["jolpica_f1", "openf1"]
+    },
+    {
+      "id": "constructor_points_share",
+      "scope": "f1",
+      "definition": "Share of team points by driver, and the team's two-car finishing correlation.",
+      "why": "'Winning constructor' is a team-level bet whose variance is lower than either driver's, because a team wins if EITHER car wins. Correlated mechanical failure is the term that breaks the naive union calculation.",
+      "sources": ["jolpica_f1"]
+    },
+    {
+      "id": "penalty_propensity",
+      "scope": "f1, motogp",
+      "definition": "Per-driver rate of investigations, time penalties, grid drops and disqualifications.",
+      "why": "Directly changes the classification a bet settles on, hours after the flag. High-penalty drivers are a worse podium bet than their pace implies.",
+      "sources": ["fia_documents", "openf1"],
+      "note": "openf1 /race_control carries live 'FIA STEWARDS: INCIDENT INVOLVING CAR n WILL BE INVESTIGATED AFTER THE RACE' messages - a forward-looking flag that a classification may change."
+    },
+    {
+      "id": "grid_penalty_pending",
+      "scope": "f1, motogp",
+      "definition": "Announced power-unit / gearbox component penalties and their expected grid drop, applied after qualifying.",
+      "why": "Divorces the qualifying result from the starting grid. Sometimes known days in advance.",
+      "sources": ["fia_documents"]
+    },
+    {
+      "id": "motogp_crash_rate",
+      "scope": "motogp",
+      "definition": "Rider crashes per session and per race, split practice vs race.",
+      "why": "MotoGP retirement is overwhelmingly a crash, not a mechanical - so DNF risk is a RIDER property here, unlike F1 where it is largely a team property. Inverts the modelling.",
+      "sources": ["motogp_pulselive", "motogp_resources_pdf"]
+    },
+    {
+      "id": "motogp_average_speed_and_gap",
+      "scope": "motogp",
+      "definition": "Race average speed and gap-to-leader per rider, per session.",
+      "why": "Provided as first-class fields in the official classification, so it is the cheapest race-pace measure in this discipline.",
+      "sources": ["motogp_pulselive"],
+      "note": "Verified fields: average_speed, gap.first, gap.lap, total_laps, time, points, status."
+    },
+    {
+      "id": "nascar_driver_rating_and_loop_stats",
+      "scope": "nascar",
+      "definition": "Driver rating, average running position, mid-race position, closing position, laps led, fast laps, top-15 laps, quality passes.",
+      "why": "Finishing position in NASCAR is a noisy read on speed because of cautions and pit cycles. Average running position and quality passes are far more stable and are the right features for both outright and head-to-head.",
+      "sources": ["nascar_loopstats"]
+    },
+    {
+      "id": "nascar_track_type_split",
+      "scope": "nascar",
+      "definition": "Performance split by superspeedway (restrictor_plate flag), intermediate oval, short track and road course.",
+      "why": "On plate tracks driver skill decouples almost entirely from result - pack racing makes the field near-uniform and the modal outcome is a multi-car wreck. Applying an intermediate-track rating there is the classic error.",
+      "sources": ["nascar_cacher"],
+      "note": "race_list_basic.json exposes restrictor_plate as a boolean, plus track_id, scheduled vs actual laps and distance."
+    },
+    {
+      "id": "speedway_heat_by_heat_scoring",
+      "scope": "speedway",
+      "definition": "Rider's points per heat (3-2-1-0) and Calculated Match Average (CMA) across recent meetings.",
+      "why": "Every speedway market - meeting winner, rider match points, H2H - is downstream of the heat programme. CMA is the sport's native rating.",
+      "sources": ["wikipedia_api"],
+      "note": "No permitted machine-readable source found - see blocked."
+    },
+    {
+      "id": "speedway_gate_position_advantage",
+      "scope": "speedway",
+      "definition": "Win rate by starting gate (1 inside to 4 outside), measured PER TRACK.",
+      "why": "A genuinely large, track-specific effect - on some circuits the inside gate wins a clear majority. Because the heat programme and its gate assignments are published in advance, a rider's expected score is knowable before the meeting. A rider-average model that ignores the draw is mis-specified.",
+      "sources": ["wikipedia_api"]
+    },
+    {
+      "id": "speedway_track_specialism",
+      "scope": "speedway",
+      "definition": "Rider average at the specific venue vs their season average.",
+      "why": "Track shape, banking and shale preparation vary far more than in circuit racing, and specialism is correspondingly stronger.",
+      "sources": ["wikipedia_api"]
+    },
+    {
+      "id": "cycling_climbing_profile",
+      "scope": "cycling",
+      "definition": "VAM (vertical ascent metres per hour) on classified climbs, and placings on summit finishes vs flat finishes.",
+      "why": "VAM is the best free watts/kg proxy: w/kg is approximately VAM / (gradient factor x 100). It is computable from public climb length, gradient and split times without any power meter.",
+      "sources": ["cyclingstage", "wikipedia_api", "letourdataset"]
+    },
+    {
+      "id": "cycling_watts_per_kg_proxy",
+      "scope": "cycling",
+      "definition": "Estimated w/kg from VAM plus rider mass estimate, over standard durations (5, 20, 40 min).",
+      "why": "The physical quantity that decides mountain stages. Public power data is sparse and self-reported; VAM is derivable from timing and topography alone.",
+      "sources": ["cyclingstage", "open_meteo"],
+      "note": "open_meteo /v1/elevation supplies climb elevation profile free; verified returning 1477m for an Alpine coordinate."
+    },
+    {
+      "id": "cycling_sprint_profile",
+      "scope": "cycling",
+      "definition": "Bunch-sprint win rate, top-5 rate, and whether the rider needs a lead-out or freelances.",
+      "why": "Stage-winner markets on flat stages are nearly a closed set of 8-10 riders; the discriminator is lead-out quality, not raw speed.",
+      "sources": ["cyclingstage", "wikipedia_api"]
+    },
+    {
+      "id": "cycling_time_trial_ability",
+      "scope": "cycling",
+      "definition": "Time lost per kilometre against the TT winner, split flat TT vs hilly TT vs prologue.",
+      "why": "GC is decided by mountains and time trials. A climber who loses 2s/km over 40km hands back a minute - often the entire GC margin.",
+      "sources": ["wikipedia_api", "letourdataset"]
+    },
+    {
+      "id": "cycling_stage_profile",
+      "scope": "cycling",
+      "definition": "Total elevation gain, count and category of climbs, summit-finish flag, gradient of the final 5km, and road surface.",
+      "why": "Determines the ARCHETYPE of the stage (bunch sprint / breakaway / reduced sprint / summit finish), which determines which rider pool can win at all. This is the first filter on any stage-winner market.",
+      "sources": ["cyclingstage", "wikipedia_api"],
+      "note": "cyclingstage carries per-stage route pages, profile images on cdn.cyclingstage.com and GPX files - the GPX gives road bearing, which is what crosswind modelling needs."
+    },
+    {
+      "id": "cycling_team_strength",
+      "scope": "cycling",
+      "definition": "Depth of domestiques able to control the race, plus the lead-out train's recent success rate.",
+      "why": "A breakaway survives or dies on whether one team is both willing and able to chase. Team strength is the main determinant of P(breakaway wins) - the single largest binary in stage-winner pricing.",
+      "sources": ["wikipedia_api", "cyclingstage"]
+    },
+    {
+      "id": "cycling_climb_specific_history",
+      "scope": "cycling",
+      "definition": "Rider's prior times and placings on THIS climb (Alpe d'Huez, Ventoux, Angliru...).",
+      "why": "Climb-specific ability is real - length and gradient select for different rider builds - and prior times on a fixed course are directly comparable in a way that stage results are not.",
+      "sources": ["wikipedia_api", "cyclingstage"]
+    },
+    {
+      "id": "cycling_crash_and_abandon_rate",
+      "scope": "cycling",
+      "definition": "Historical DNF/DNS/OTL rate, split crash / illness / time cut / withdrawal, plus days-into-race hazard.",
+      "why": "GC-winner and 'to finish' markets are dominated by this hazard, which compounds over three weeks. Illness abandonment clusters (whole teams withdraw).",
+      "sources": ["wikipedia_api", "letourdataset"]
+    },
+    {
+      "id": "cycling_crosswind_exposure",
+      "scope": "cycling",
+      "definition": "Angle between forecast wind vector and road bearing along exposed sections, plus wind speed.",
+      "why": "Echelons split the peloton and put minutes into GC riders on a nominally flat stage. It is forecastable from free data and is the most under-priced input in the sport.",
+      "sources": ["open_meteo", "cyclingstage"],
+      "note": "Verified: open_meteo /v1/forecast returns hourly wind_speed_10m and wind_direction_10m free with no key; road bearing comes from the cyclingstage GPX."
+    },
+    {
+      "id": "cycling_form_and_fatigue",
+      "scope": "cycling",
+      "definition": "Race days in the last 30, altitude-camp signals, and days elapsed within the current stage race.",
+      "why": "Third-week form is a different quantity from first-week form, and grand tour prices are often set on pre-race ratings that do not update fast enough.",
+      "sources": ["wikipedia_api"]
+    },
+    {
+      "id": "cycling_bonus_seconds_accrual",
+      "scope": "cycling",
+      "definition": "Bonus seconds taken at stage finishes and intermediate sprints, and bonuses still available on the remaining route.",
+      "why": "Grand tours are routinely decided by less than the bonus seconds on offer. A GC model on raw stage times is simply wrong.",
+      "sources": ["letourdataset", "wikipedia_api"],
+      "note": "letourdataset TDF_Riders_History.csv carries B (bonus) and P (penalty) as separate columns from Times/TotalSeconds - verified."
+    },
+    {
+      "id": "cycling_classification_scoring_position",
+      "scope": "cycling",
+      "definition": "Current points-classification and mountains-classification standings, plus the scoring weight of remaining stages and climbs.",
+      "why": "These are not 'best sprinter' and 'best climber' markets - they are accumulation races against a specific scoring table, and they are frequently won by riders who win nothing.",
+      "sources": ["wikipedia_api", "cyclingstage"]
+    },
+    {
+      "id": "cycling_time_cut_risk",
+      "scope": "cycling",
+      "definition": "P(rider finishes outside the time limit) on the specific stage, given rider type and stage severity.",
+      "why": "The elimination mechanism for sprinters in the mountains - it ends 'to finish the Tour' bets in a way that has nothing to do with crashes.",
+      "sources": ["wikipedia_api"]
+    },
+    {
+      "id": "cycling_gc_gap_and_route_remaining",
+      "scope": "cycling",
+      "definition": "Current GC time gaps crossed with the number and type of decisive stages left.",
+      "why": "A 40-second gap with one summit finish left is a different market to the same gap with a 50km TT left. Converts a static rating into a live win probability.",
+      "sources": ["wikipedia_api", "cyclingstage"]
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "jolpica_f1",
+      "url": "https://api.jolpi.ca/ergast/f1/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "CURRENT. Ergast's successor, same schema. Read 2026 round 10 (Belgian GP, 2026-07-19) and 2025 round 1. Endpoints confirmed by body: /results (grid, position, points, laps, status, FastestLap.rank+lap+time, Time.millis), /qualifying (Q1/Q2/Q3), /sprint (SprintResults with points), /pitstops (lap, stop, duration), /driverStandings, /constructorStandings, /circuits with lat/long.",
+      "note": "THE SPINE for F1. 2026 season complete to date; /current/last resolves live. No rate-limit headers exposed (Cloudflare, cache-control max-age=3600) - burst behaviour undocumented, so cache aggressively. `status` is free text and must be parsed into finished / classified / mechanical DNF / incident DNF / DSQ / DNS."
+    },
+    {
+      "id": "openf1",
+      "url": "https://api.openf1.org/v1/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "CURRENT to 2026 (verified sessions for 2026 rounds incl. Melbourne 2026-03-08). Bodies read on: /sessions, /laps (duration_sector_1/2/3, i1_speed, i2_speed, st_speed, lap_duration, is_pit_out_lap, per-segment mini-sector codes), /stints (compound, tyre_age_at_start, lap_start, lap_end), /pit (pit_duration, lane_duration), /weather (air_temperature, track_temperature, humidity, pressure, rainfall, wind_speed, wind_direction), /race_control (categories: Flag, SafetyCar, SessionStatus, Drs, Other; flags CLEAR/YELLOW/DOUBLE YELLOW/RED/BLUE/GREEN/CHEQUERED; SafetyCar messages 'SAFETY CAR DEPLOYED', 'VIRTUAL SAFETY CAR DEPLOYED').",
+      "note": "The richest free F1 telemetry layer and the only one giving sector times and tyre compound in plain JSON without a client library. TRAP: filtering /race_control by a category with no rows returns HTTP 404 {'detail':'No results found.'} - that is an empty result, NOT a block. /pit pit_duration is null on out-laps."
+    },
+    {
+      "id": "f1_livetiming",
+      "url": "https://livetiming.formula1.com/static/{Year}/Index.json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "The official F1 timing store that the FastF1 package reads. Index.json for 2026 returned 13 meetings with every session's Path. Bodies read for the 2026 Belgian GP race: TyreStintSeries.json (Compound, New true/false, TotalLaps, StartLaps per car), TrackStatus.jsonStream (timestamped Status/Message stream - Yellow, AllClear, SC, Red), SessionInfo.json (SessionStatus 'Finalised', ArchiveStatus 'Complete').",
+      "note": "CRITICAL USAGE TRAP: the session Path must be taken from Index.json, never constructed. A guessed date component returns HTTP 403 <Error><Code>AccessDenied</Code> from S3, which reads exactly like a block but is really a 404. I hit this and nearly recorded the source as blocked. Also note the files are UTF-8 BOM-prefixed - decode as utf-8-sig or json.load fails. SessionInfo.SessionStatus is a free provisional-vs-final signal."
+    },
+    {
+      "id": "fia_documents",
+      "url": "https://www.fia.com/documents/championships/fia-formula-one-world-championship-14/season/season-2025-2071",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official stewards' documents as PDFs. Body read; extracted links include *_provisional_race_classification.pdf, *_final_race_classification.pdf, *_championship_points.pdf, *_race_scrutineering.pdf and per-car *_infringement_-_car_N_*.pdf decisions.",
+      "note": "THE SETTLEMENT SOURCE. It is the only place that publishes PROVISIONAL and FINAL classification as distinct documents, which is exactly the distinction every head-to-head and podium bet turns on. robots.txt permits (Crawl-delay: 10; disallows only /includes/, /misc/, /modules/, /profiles/, /scripts/, /themes/). www.fia.com/documents 301s - follow the redirect to the season path."
+    },
+    {
+      "id": "fia_sporting_regs_2026",
+      "url": "https://www.fia.com/system/files/documents/fia_2026_f1_regulations_-_section_b_sporting_-_iss_05_-_2026-02-27.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "96-page PDF, Issue 05, WMSC-approved 2026-02-27. Text extracted and quoted directly for: the 90% classification rule, the 2-hour race / 3-hour total and 1-hour sprint / 1.5-hour total limits, race and sprint suspension procedure, and the 'provisional classification ... will be the only valid result subject to any amendments' wording.",
+      "note": "Primary source, not journalism. Every F1 rule in rules_critical below was checked against this document or against the FIA/F1 announcement for the points changes. Pink text in the PDF marks changes from Issue 04 - useful for diffing regulations year on year."
+    },
+    {
+      "id": "motogp_pulselive",
+      "url": "https://api.motogp.pulselive.com/motogp/v1/results/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Full unauthenticated official chain, all bodies read: /seasons (2026 flagged current) -> /categories?seasonUuid= (MotoGP, Moto2, Moto3) -> /events?seasonUuid=&isFinished=true -> /sessions?eventUuid=&categoryUuid= -> /session/{uuid}/classification. Classification carries position, rider, team, constructor, average_speed, gap.first, gap.lap, total_laps, time, points, status ('INSTND').",
+      "note": "BEST NON-F1 MOTORSPORT SOURCE. /sessions embeds a per-session condition object (track Dry/Wet, air, humidity, ground, weather) - a free labelled wet/dry dataset that F1's public APIs do not match. Session types include RAC (race) and the Saturday sprint. www.motogp.com robots.txt permits results paths (it disallows only query-parameter patterns and pre-2015 news) and names no AI crawler."
+    },
+    {
+      "id": "motogp_resources_pdf",
+      "url": "https://resources.motogp.com/files/results/{year}/{CC}/{class}/{session}/Classification.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Verified %PDF-1.4 body for 2025/THA/MotoGP/RAC/Classification.pdf. Per-session set also includes Analysis.pdf (lap-by-lap), AverageSpeed.pdf and FastLapSequence.pdf; per-event CircuitInformation.pdf, Podiums.pdf, PolePositions.pdf.",
+      "note": "Exact URLs are handed to you inside the pulselive /sessions and /events responses (session_files, event_files) - do not construct them. Analysis.pdf is the only free per-lap MotoGP timing."
+    },
+    {
+      "id": "nascar_cacher",
+      "url": "https://cf.nascar.com/cacher/{year}/{series}/race_list_basic.json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Bodies read for 2025 series 1. race_list_basic.json: race_id, track_id, restrictor_plate flag, scheduled vs actual laps and distance, stage_1/2/3_laps, number_of_lead_changes, number_of_leaders, NUMBER_OF_CAUTIONS, number_of_caution_laps, average_speed, margin_of_victory, pole_winner_speed. Also /cacher/{year}/{series}/{race_id}/lap-times.json: per-lap LapTime, LapSpeed and RunningPos for every driver.",
+      "note": "www.nascar.com itself is Cloudflare-blocked ('Sorry, you have been blocked'), but the cf.nascar.com data host is entirely open. number_of_cautions is the cleanest free caution/safety-car dataset in any of these five sports."
+    },
+    {
+      "id": "nascar_loopstats",
+      "url": "https://cf.nascar.com/loopstats/prod/{year}/{series}/{race_id}.json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Body read for 2025 series 1 race 5545. Per driver: start_ps, mid_ps, ps (finish), closing_ps, closing_laps_diff, best_ps, worst_ps, avg_ps, passes_gf, passing_diff, passed_gf, quality_passes, fast_laps, top15_laps, lead_laps, rating.",
+      "note": "TRAP: an invalid race_id returns S3 HTTP 403 AccessDenied, not 404 - I initially recorded this endpoint as blocked on a guessed id. Always take race_id from race_list_basic.json first. avg_ps (average running position) and quality_passes are far better features than finishing position."
+    },
+    {
+      "id": "f1db",
+      "url": "https://github.com/f1db/f1db",
+      "auth": "none",
+      "verified": true,
+      "coverage": "README body read. All-time F1 database released as JSON/CSV/SQL/SQLite per season. Licence CC BY 4.0 (attribution only - commercially usable, unlike the Sackmann tennis datasets).",
+      "note": "Historical depth and base rates; not a live feed. raw.githubusercontent.com is reachable from here; the GitHub REST API is gated in this session, so use raw paths or release assets."
+    },
+    {
+      "id": "letourdataset",
+      "url": "https://raw.githubusercontent.com/thomascamminady/LeTourDataSet/master/data/men/TDF_Riders_History.csv",
+      "auth": "none",
+      "verified": true,
+      "coverage": "CSV bodies read. TDF_Riders_History.csv columns: Rank, Rider, Rider No., Team, Times, Gap, B, P, Year, Distance (km), Number of stages, ResultType, TotalSeconds, GapSeconds - every finisher of every men's Tour 1903-2025. TDF_Stages_History.csv: per-stage Start, End, Winner of stage, Yellow/Green/Polka-dot/White jersey. Women's equivalents under data/women/ (TDFF_*).",
+      "note": "B and P are BONUS and PENALTY seconds held separately from TotalSeconds - the only free cycling dataset seen that models the bonus-second mechanism explicitly. Tour de France only; no other race, no live feed."
+    },
+    {
+      "id": "cyclingstage",
+      "url": "https://www.cyclingstage.com/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Bodies read. Per-race route hubs (verified 'Tour de France 2026: Route and stages'), per-stage pages with route and profile (verified stage-5-tdf-2026, Lannemezan-Pau), profile images on cdn.cyclingstage.com, GPX files, KOM-competition and points-competition pages, and results pages (verified 'Tour de France 2025: Results' with the GC top 10 and stage winners). Grand tours plus the main classics, 2014-2026.",
+      "note": "The best PERMITTED cycling source found - the two obvious ones are hard-blocked. robots.txt: the blanket 'User-agent: * / Disallow: /' is COMMENTED OUT, remaining disallows are wp-admin/images/legacy fantasy pools, and no AI crawler is named. TWO TRAPS: (1) unknown slugs return HTTP 200 with the title '404 - page not found' - a status-code check would mark garbage as valid, so match on <title>; (2) URL slugs are irregular (/tour-de-france-2026-route/stage-5-tdf-2026/ but /tour-de-france-2025-results/) - harvest hrefs from the hub page, never construct them."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php?action=query&prop=revisions&rvslots=main&titles=...",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Bodies read. '2025 Tour de France, Stage 1 to Stage 11' returned 76,530 characters of wikitext with per-stage sections, distances, ITT flags, classification-standings sections and named mid-race withdrawals with causes. REST summary confirmed for '2026 Tour de France'. Also the only permitted source located for speedway: '2026 Speedway Grand Prix' with heat structure, scoring and round results.",
+      "note": "Licence CC BY-SA (attribution + share-alike). Wikitext, not an API contract - templates change between seasons, so any parser needs a regression fixture per race. It is a fallback, not a feed, but for cycling and speedway it is currently the only lawful structured-ish option."
+    },
+    {
+      "id": "open_meteo",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Body read: hourly wind_speed_10m and wind_direction_10m plus elevation (returned 1477m for an Alpine coordinate). /v1/elevation gives terrain elevation for climb profiling.",
+      "note": "No key, no rate limit at this volume. Combined with a stage GPX this is the whole crosswind model; combined with a circuit coordinate from Jolpica it is the whole wet-race model. Already verified in this repo's tennis research."
+    },
+    {
+      "id": "uci_org",
+      "url": "https://www.uci.org/",
+      "auth": "scraping",
+      "verified": false,
+      "coverage": "robots.txt read and is fully permissive ('User-agent: * / Allow: /'), so the editorial site is fetchable. But no DATA payload was verified: api.uci.ch/v1.2/ucibws/WebResources/Rankings returns HTTP 403 {'message':'Forbidden'}, and dataride.uci.ch/iframe/RankingDetails/ returns a Sitefinity/Telerik HTML shell with the rankings behind a JS grid.",
+      "note": "verified:false is deliberate - the site is permitted but I never read a rankings payload. The Telerik grid is likely driven by a POST endpoint that was not discovered. Worth one more attempt from a GitHub Actions runner before writing off UCI rankings."
+    },
+    {
+      "id": "letour_official",
+      "url": "https://www.letour.fr/",
+      "auth": "scraping",
+      "verified": false,
+      "coverage": "robots.txt read. Editorial pages are permitted, but the structured feed is explicitly disallowed: 'Disallow: /api', 'Disallow: /graphql', 'Disallow: /*/ajax'.",
+      "note": "COMPLIANCE, not capability. The official live-timing JSON exists and would be excellent, but it sits behind robots-disallowed paths, so it must not be used. Recorded verified:false because no permitted data payload was read."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "procyclingstats",
+      "detail": "DOUBLE-BLOCKED, DO NOT FETCH. (1) TECHNICAL: Cloudflare managed challenge - www.procyclingstats.com/robots.txt returns HTTP 403 with a 5,422-byte 'Just a moment...' JS interstitial, and /race/tour-de-france/2025/stage-5 returns the same. robots.txt is itself unreadable, so robots compliance cannot even be established, which is on its own a reason to stop. (2) POLICY: PCS state publicly that PCS PRO does not include API access and that they decline the volume of data requests they receive for games, fantasy and hobby projects; third-party scrapers (the `procyclingstats` PyPI package, Apify actors) explicitly place ToS compliance on the user. This is the richest free cycling dataset in existence and it is off-limits - the biggest single gap in this file."
+    },
+    {
+      "id": "firstcycling",
+      "detail": "DO NOT FETCH. firstcycling.com/robots.txt returns HTTP 403 with a 5,287-byte Cloudflare 'Just a moment...' challenge. Same situation as PCS: robots.txt unreadable, so no permission can be established. Second-best cycling source, also unavailable."
+    },
+    {
+      "id": "la_flamme_rouge",
+      "detail": "ROBOTS-DISALLOWED BY NAME. www.la-flamme-rouge.eu/robots.txt contains 'User-agent: ClaudeBot / Disallow: /' plus 'Content-Signal: search=yes,ai-train=no,use=reference' asserted as an Article 4 EU DSM reservation of rights. NOT FETCHED beyond robots.txt. Would have supplied climb gradients and profiles."
+    },
+    {
+      "id": "fim_moto",
+      "detail": "ROBOTS-DISALLOWED BY NAME, TWICE OVER. www.fim-moto.com/robots.txt has an explicit 'AI / LLM crawlers' block listing 'User-agent: anthropic-ai / Disallow: /', 'User-agent: ClaudeBot / Disallow: /' and 'User-agent: Claude-Web / Disallow: /'. NOT FETCHED beyond robots.txt. This is the FIM governing body - the primary rulebook host for motorcycle and speedway disciplines."
+    },
+    {
+      "id": "fimspeedway",
+      "detail": "ROBOTS-DISALLOWED BY NAME. fimspeedway.com/robots.txt contains 'User-agent: ClaudeBot / Disallow: /' with Content-Signal ai-train=no. NOT FETCHED beyond robots.txt. This is the official Speedway Grand Prix site hosting the SGP rulebook, heat programmes and live results - i.e. every speedway statistic in this file is sourceless as a direct consequence."
+    },
+    {
+      "id": "speedway_ekstraliga",
+      "detail": "ROBOTS-DISALLOWED BY NAME. speedwayekstraliga.pl/robots.txt contains 'User-agent: ClaudeBot / Disallow: /'. NOT FETCHED. The Polish Ekstraliga is the deepest speedway league in the world and the main source of Betwinner speedway fixtures."
+    },
+    {
+      "id": "speedwaygp_com",
+      "detail": "DEAD. www.speedwaygp.com/robots.txt HTTP 301 redirects to https://www.wildgreenland.com/reindeertrailrobots.txt - the domain no longer serves speedway content. Any legacy code or bookmark pointing here is stale."
+    },
+    {
+      "id": "ergast",
+      "detail": "DEAD, NOT BLOCKED. ergast.com/api/f1/2024/1/results.json returns HTTP 522 with a 16-byte 'error code: 522' body (Cloudflare origin unreachable). Deprecated at the end of 2024 and now down. Any tutorial or older code targeting ergast.com must be repointed at api.jolpi.ca, which serves the identical schema."
+    },
+    {
+      "id": "nascar_www",
+      "detail": "www.nascar.com/robots.txt returns a Cloudflare 'Sorry, you have been blocked' interstitial. Only the marketing site is blocked - the cf.nascar.com data host used above is fully open, so this is a partial block worth recording so nobody concludes NASCAR is unavailable."
+    },
+    {
+      "id": "api_uci",
+      "detail": "api.uci.ch/v1.2/ucibws/WebResources/Rankings returns HTTP 403 with body {'message':'Forbidden'} - a real API-level rejection, not a challenge page. Requires credentials that are not publicly issued."
+    },
+    {
+      "id": "betwinner_rules",
+      "detail": "COULD NOT BE READ - AND THIS IS THE ONE THAT MATTERS MOST. betwinner.com/en/rules returns HTTP 302 with a zero-byte body from this environment; www.betwinner.com/robots.txt 301s to an empty nginx page. The book's own settlement terms are the binding document for every trap listed below and they remain unverified. The operator must read them in-app: specifically the head-to-head void conditions, the definition of 'taking part', whether post-race classification changes are honoured after grading, shortened-race thresholds, and dead-heat reduction."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_ordering_note": "head_to_head_* first by design - it is the only two-outcome market across all five sports and therefore the only place a safety-ladder / staking progression can be applied at all. Everything else is multi-outcome and cannot support one.",
+
+    "head_to_head_driver_rider": [
+      "teammate_head_to_head",
+      "cross_team_h2h_pair_history",
+      "quali_pace_delta",
+      "race_pace_clean_air",
+      "quali_vs_race_pace_gap",
+      "dnf_rate_by_team",
+      "dnf_rate_by_circuit",
+      "motogp_crash_rate",
+      "grid_to_finish_conversion",
+      "overtaking_difficulty_index",
+      "start_performance",
+      "grid_penalty_pending",
+      "penalty_propensity",
+      "track_specific_driver_history",
+      "weather_sensitivity",
+      "safety_car_probability_by_circuit"
+    ],
+    "head_to_head_cycling_rider": [
+      "cycling_stage_profile",
+      "cycling_climbing_profile",
+      "cycling_sprint_profile",
+      "cycling_time_trial_ability",
+      "cycling_crash_and_abandon_rate",
+      "cycling_form_and_fatigue",
+      "cycling_team_strength",
+      "cycling_crosswind_exposure",
+      "cycling_time_cut_risk",
+      "cycling_climb_specific_history"
+    ],
+    "head_to_head_speedway_rider": [
+      "speedway_heat_by_heat_scoring",
+      "speedway_gate_position_advantage",
+      "speedway_track_specialism"
+    ],
+    "race_winner": [
+      "quali_pace_delta",
+      "race_pace_clean_air",
+      "grid_to_finish_conversion",
+      "overtaking_difficulty_index",
+      "tyre_deg_by_compound",
+      "pit_lane_loss_and_stop_count",
+      "pit_stop_time",
+      "safety_car_probability_by_circuit",
+      "red_flag_probability",
+      "dnf_rate_by_team",
+      "weather_sensitivity",
+      "track_temperature_sensitivity",
+      "start_performance",
+      "grid_penalty_pending",
+      "nascar_track_type_split",
+      "nascar_driver_rating_and_loop_stats"
+    ],
+    "podium_finish": [
+      "quali_pace_delta",
+      "race_pace_clean_air",
+      "grid_to_finish_conversion",
+      "dnf_rate_by_team",
+      "dnf_rate_by_circuit",
+      "pit_stop_time",
+      "safety_car_probability_by_circuit",
+      "penalty_propensity",
+      "start_performance"
+    ],
+    "points_finish": [
+      "points_finish_rate",
+      "grid_to_finish_conversion",
+      "race_pace_clean_air",
+      "dnf_rate_by_team",
+      "dnf_rate_by_circuit",
+      "overtaking_difficulty_index",
+      "safety_car_probability_by_circuit",
+      "weather_sensitivity"
+    ],
+    "to_finish_the_race": [
+      "dnf_rate_by_team",
+      "dnf_rate_by_circuit",
+      "motogp_crash_rate",
+      "safety_car_probability_by_circuit",
+      "nascar_track_type_split",
+      "weather_sensitivity",
+      "start_performance"
+    ],
+    "fastest_lap": [
+      "fastest_lap_incidence",
+      "race_pace_clean_air",
+      "pit_lane_loss_and_stop_count",
+      "tyre_deg_by_compound",
+      "safety_car_probability_by_circuit",
+      "speed_trap_profile"
+    ],
+    "winning_constructor_team": [
+      "constructor_points_share",
+      "race_pace_clean_air",
+      "quali_pace_delta",
+      "dnf_rate_by_team",
+      "pit_stop_time",
+      "grid_to_finish_conversion"
+    ],
+    "qualifying_pole_position": [
+      "quali_pace_delta",
+      "sector_time_profile",
+      "speed_trap_profile",
+      "track_temperature_sensitivity",
+      "weather_sensitivity",
+      "teammate_head_to_head"
+    ],
+    "sprint_markets": [
+      "quali_pace_delta",
+      "start_performance",
+      "grid_to_finish_conversion",
+      "overtaking_difficulty_index",
+      "tyre_deg_by_compound",
+      "dnf_rate_by_circuit"
+    ],
+    "safety_car_yes_no_number_of_cautions": [
+      "safety_car_probability_by_circuit",
+      "red_flag_probability",
+      "dnf_rate_by_circuit",
+      "nascar_track_type_split",
+      "weather_sensitivity"
+    ],
+    "cycling_stage_winner": [
+      "cycling_stage_profile",
+      "cycling_team_strength",
+      "cycling_sprint_profile",
+      "cycling_climbing_profile",
+      "cycling_watts_per_kg_proxy",
+      "cycling_climb_specific_history",
+      "cycling_crosswind_exposure",
+      "cycling_form_and_fatigue",
+      "cycling_gc_gap_and_route_remaining"
+    ],
+    "cycling_gc_winner": [
+      "cycling_climbing_profile",
+      "cycling_watts_per_kg_proxy",
+      "cycling_time_trial_ability",
+      "cycling_gc_gap_and_route_remaining",
+      "cycling_bonus_seconds_accrual",
+      "cycling_crash_and_abandon_rate",
+      "cycling_team_strength",
+      "cycling_form_and_fatigue",
+      "cycling_crosswind_exposure"
+    ],
+    "cycling_points_classification": [
+      "cycling_classification_scoring_position",
+      "cycling_sprint_profile",
+      "cycling_stage_profile",
+      "cycling_crash_and_abandon_rate",
+      "cycling_time_cut_risk",
+      "cycling_team_strength"
+    ],
+    "cycling_mountains_classification": [
+      "cycling_classification_scoring_position",
+      "cycling_climbing_profile",
+      "cycling_stage_profile",
+      "cycling_gc_gap_and_route_remaining",
+      "cycling_crash_and_abandon_rate"
+    ],
+    "cycling_to_finish_the_race": [
+      "cycling_crash_and_abandon_rate",
+      "cycling_time_cut_risk",
+      "cycling_form_and_fatigue",
+      "cycling_stage_profile"
+    ],
+    "speedway_meeting_winner": [
+      "speedway_heat_by_heat_scoring",
+      "speedway_gate_position_advantage",
+      "speedway_track_specialism",
+      "weather_sensitivity"
+    ],
+    "speedway_heat_winner": [
+      "speedway_gate_position_advantage",
+      "speedway_heat_by_heat_scoring",
+      "speedway_track_specialism"
+    ]
+  },
+
+  "rules_critical": [
+    "HEADLINE: SETTLEMENT IS ON THE OFFICIAL CLASSIFICATION, NOT THE ORDER AT THE FLAG. The 2026 F1 Sporting Regulations state that the provisional classification 'will be the only valid result subject to any amendments which may be made under the ISC Code and these Sporting FIA F1 Regulations'. Stewards routinely apply 5s/10s time penalties and disqualifications AFTER publication, reordering podiums hours later, and a right of review can reopen a classification for days. A model that scrapes the finishing order off a live feed will book winners that never settle. Poll the FIA final_race_classification PDF, not the TV graphic, and never grade off a provisional.",
+
+    "HEADLINE: DNS USUALLY VOIDS A HEAD-TO-HEAD, DNF USUALLY DOES NOT - and the two are indistinguishable to a naive model. A driver who never starts normally VOIDS the H2H with stakes returned; a driver who starts and retires on lap 1 normally LOSES it to anyone completing more distance. Both appear as a null finishing position in every results table. You must separate them on the status field (Jolpica's `status` gives 'Did not start' vs 'Accident'/'Engine'; MotoGP gives a status code), and you must read Betwinner's own definition of 'taking part' - formation lap, green flag, or grid slot are three different thresholds and books disagree.",
+
+    "DSQ IS A THIRD STATE. A disqualified runner is normally treated as having lost the head-to-head even though he crossed the line ahead, and a post-race DSQ can flip a market that already looked graded. Never fold DSQ into DNF: DNF loses on distance, DSQ loses on classification, and only DSQ can arrive retroactively.",
+
+    "F1 90% RULE: cars covering LESS THAN 90% of the winner's lap count (rounded down) are NOT CLASSIFIED. A car can run to the chequered flag under its own power and still be absent from the classification. That is not a DNF, it is a non-classification, and 'to finish the race' can settle either way on it depending on whether Betwinner's wording says 'finish' or 'be classified'.",
+
+    "F1 REDUCED POINTS APPLY ONLY IF THE RACE IS SUSPENDED AND CANNOT BE RESUMED - not merely if it is short. Scale: fewer than 2 laps completed = NO points awarded at all; under 25% distance = 6-4-3-2-1 to the top five; 25-50% = 13 points down to 1 for the top nine; 50-75% = 19 points down for the top ten; 75% or more = full points. A race truncated by the time limit WITHOUT a suspension pays FULL points. Both mechanisms produce a short race that looks identical on a timing screen, and 'points finish' and 'winning constructor' both hinge on which one occurred.",
+
+    "F1 RACE DURATION IS CAPPED ON THE CLOCK, NOT THE LAP CHART: two hours of running, extended by the length of any suspension to a maximum three hours total elapsed. Sprint: one hour, extended to a maximum of one and a half hours. Wet races are cut on time, so any 'number of laps' or 'race distance' prop must model the clock and the safety-car laps, not the scheduled distance.",
+
+    "THE F1 FASTEST LAP POINT WAS ABOLISHED FROM 2025 - but the fastest-lap MARKET still trades. With no championship point attached, the old constraint that the setter must finish in the top ten no longer applies and there is no longer any incentive structure pushing it toward the leaders. It is now a pure strategy artefact: any car taking a free late stop on fresh softs can have it. Every pre-2025 base rate for this market is obsolete and favourite-weighted priors will be wrong.",
+
+    "F1 SPRINT IS A SEPARATE EVENT WITH SEPARATE POINTS (top eight only, 8-7-6-5-4-3-2-1) AND ITS OWN CLASSIFICATION. 'Race winner', 'points finish' and 'podium' must be pinned explicitly to the Sprint or to the Grand Prix. Sprint weekends also run an Alternative Format in which session order and parc ferme differ from a Standard Format weekend, so practice-based form reads differently.",
+
+    "MOTOGP SPRINT IS THE OPPOSITE CASE AND THE ASYMMETRY MATTERS: it runs at every round over roughly half distance for half-ish points (12-9-7-6-5-4-3-2-1 to the top nine), but BOTH the Sprint and the Sunday Grand Prix are gridded from the SAME single qualifying. That makes Saturday a genuine leading indicator for Sunday in a way F1's separately-qualified sprint is not - and it means a rider crashing out of the Sprint still starts Sunday from his qualified slot.",
+
+    "GRID PENALTIES ARE APPLIED AFTER QUALIFYING, sometimes announced the evening before the race. 'Winner of qualifying' and 'pole position' can therefore settle on DIFFERENT drivers when the fastest qualifier carries a component penalty. Confirm which of the two Betwinner is actually offering.",
+
+    "RED-FLAG STANDING RESTARTS RESET TYRE CHOICE FOR FREE and repair damage under some conditions. Any undercut/degradation model built on green-flag stint data will systematically misprice a race that gets a red flag, and red-flag probability is a circuit property - street circuits carry multiples of the permanent-circuit rate.",
+
+    "SAFETY CAR AND VSC ARE NOT A SIDE MARKET, THEY ARE A VARIANCE TERM ON EVERY POSITION MARKET. A deployment hands a nearly free pit stop to anyone yet to stop and erases a twenty-second lead. Price P(SC) per circuit before pricing anything else, and note that VSC and full SC have materially different pit-loss economics - collapsing them into one 'caution' flag loses the distinction that matters.",
+
+    "NASCAR RACES CAN RUN PAST THEIR SCHEDULED DISTANCE. NASCAR Overtime (the renamed green-white-chequered) grants a two-lap shootout with up to three restart attempts, so 'number of laps' props are unbounded on the upside. Conversely a rain-shortened race is declared official at halfway or the end of Stage 2, whichever comes first - the leader at that moment simply wins.",
+
+    "NASCAR STAGE RACING SPLITS THE RACE INTO SEPARATE SCORING EVENTS. Stage winners and stage points are distinct markets from the race winner and do not decide it. A driver can dominate two stages and finish 25th.",
+
+    "CYCLING SAME-TIME GROUPING: every rider finishing in one bunch is credited with the SAME time, with a gap recorded only where there is a real separation between wheels. So a stage winner can beat a hundred riders by half a wheel and take zero time on general classification. Head-to-head on STAGE FINISH POSITION and head-to-head on GC TIME are different bets that settle oppositely on the same stage - confirm which one Betwinner has listed before modelling either.",
+
+    "THE 3KM RULE (UCI 2.6.027) BREAKS THE LINK BETWEEN FINISHING TIME AND GC TIME. A rider caught in a duly-noted crash, puncture or mechanical inside the final three kilometres of a road stage is credited with the time of the group he was riding with, so he can cross the line two minutes down and lose nothing on GC. The UCI now permits extending this sprint zone up to five kilometres in 500m increments, DECLARED PER STAGE in the race bible - never hard-code 3km. It does NOT apply to summit finishes, which is exactly where GC head-to-heads are decided.",
+
+    "BONUS SECONDS DECIDE GRAND TOURS AND ARE NOT IN THE STAGE TIMES. Typically 10/6/4 seconds at a stage finish plus smaller bonuses at intermediate sprints, applied to GC. Tours have been won by margins smaller than the bonuses on offer. A GC model built on raw cumulative stage times, without a separate bonus and penalty ledger, is simply computing a different quantity from the one that settles.",
+
+    "CYCLING TIME CUTS ELIMINATE RIDERS WHO FINISHED. A rider outside a percentage of the winner's time is removed from the race despite completing the stage - the standard fate of sprinters on mountain stages. Critically, the commissaires can and regularly do reinstate an entire grupetto with a points penalty when too many riders miss the cut, so 'to finish the Tour' can settle either way on a discretionary judgement made after the stage.",
+
+    "STAGE NEUTRALISATION AND THE EXTREME WEATHER PROTOCOL CAN TAKE TIMES FROM SOMEWHERE OTHER THAN THE FINISH LINE. Protests, mass crashes, snow or heat can neutralise a stage, freeze times at an earlier point on the road, shorten the route mid-stage, or void the stage entirely. The result that settles may bear no relation to who crossed the line first.",
+
+    "THE POINTS CLASSIFICATION IS NOT 'MOST STAGE WINS' AND THE MOUNTAINS CLASSIFICATION IS NOT 'BEST CLIMBER'. Points are scored on a stage-type-weighted table plus intermediate sprints, so a consistent sprinter beats a stage-winning climber; mountains points are scored by climb category with doubling on certain summit finishes, so a breakaway specialist who never contends for GC routinely wins it. Model the scoring table and the remaining route, not the rider's reputation.",
+
+    "SPEEDWAY SCORES PER HEAT, 3-2-1-0, WITH ZERO FOR A FALL, EXCLUSION OR FAILURE TO FINISH. Meeting winner, rider match points and head-to-head all derive from a FIXED, PRE-PUBLISHED heat programme in which each rider meets each other rider a set number of times. The draw is not random and each rider's gate for each heat is known in advance - which makes gate advantage a modellable input rather than noise.",
+
+    "SPEEDWAY GATE POSITION IS A LARGE, TRACK-SPECIFIC EDGE. On some circuits the inside gate wins a clear majority of heats. A rider's expected meeting score is therefore a function of the gates he draws, and any model using only a rider season average against an opponent season average is mis-specified before it starts.",
+
+    "SPEEDWAY RAIN-OFFS AND RE-RUNS SETTLE ASYMMETRICALLY. A meeting abandoned part-way is settled on the completed heats only if enough heats were run, otherwise void. A single heat re-run after an exclusion changes that heat's individual market but not the meeting result. Tactical substitutes and rider replacement additionally let a team field its best rider out of programme for double points in league racing, which breaks any model assuming a fixed rider-to-heat allocation.",
+
+    "DEAD HEATS ARE ROUTINE IN CYCLING, NOT EXCEPTIONAL. Same-time grouping means identical recorded times are the norm, so head-to-head and podium markets dead-heat far more often than in circuit racing. Dead-heat reduction halves the stake at full odds; an EV calculation that ignores it overstates returns on precisely the market this project would lean on hardest.",
+
+    "ANTE-POST AND RACE-DAY RULES DIFFER. A driver or rider replaced before the event through injury, contract or team decision typically voids outright bets struck after the announcement but not before - and in cycling a rider withdrawn at the pre-race sign-on has never started, which pushes every market on him into the DNS branch above.",
+
+    "FINAL AND OVERRIDING: BETWINNER'S OWN TERMS ARE THE BINDING DOCUMENT AND THEY COULD NOT BE RETRIEVED FROM THIS ENVIRONMENT (HTTP 302, empty body). Everything above is the GOVERNING BODY's rule, and the book's settlement rule can and does differ - specifically on what counts as taking part for a head-to-head void, whether post-race classification changes are honoured once a market is graded, the completion threshold for a shortened race, and dead-heat reduction. Nothing in this file should be trusted for settlement until the operator has read those terms in-app."
+  ],
+
+  "open_questions": [
+    "Betwinner's settlement terms for these five sports are UNREAD (302, empty body from this environment). The four that must be resolved before any model is wired: (a) does a DNS void a head-to-head and what counts as 'taking part'; (b) are post-race stewards' amendments honoured after grading; (c) what completion threshold makes a shortened race stand; (d) how is dead-heat reduction applied to head-to-heads.",
+    "This repo's own Betwinner sample (data/betwinner_own_feed_353890790.json) exposes markets as numeric G/GS ids with GN:null - the id-to-market-name dictionary is unresolved, so none of the stat_to_bet keys above can yet be joined to real Betwinner markets. Pull a live motorsport and cycling coupon and map the ids before treating this mapping as executable.",
+    "Which of these markets does Betwinner actually list per sport id? Head-to-head is assumed present for 26/31 and is the whole basis for the safety-ladder argument, but its availability for 18, 102 and 36 is unconfirmed.",
+    "SPEEDWAY HAS NO PERMITTED SOURCE. fimspeedway.com, speedwayekstraliga.pl and fim-moto.com all disallow ClaudeBot by name; speedwaygp.com is dead. Wikipedia alone cannot supply heat-by-heat scoring or gate draws. The operator must decide: licence a feed, obtain written permission from a federation, or drop sport id 102 from scope.",
+    "CYCLING RESULTS DEPTH IS THIN. ProCyclingStats and FirstCycling are both unavailable, leaving cyclingstage (grand tours plus classics, HTML) and Wikipedia (wikitext). Neither gives per-rider historical splits at scale. Is a paid or licensed cycling feed within budget, and is PCS willing to licence?",
+    "UCI rankings were never read - api.uci.ch 403s and dataride.uci.ch hides the data behind a Telerik JS grid whose POST endpoint was not found. Worth one retest from a GitHub Actions runner, as this repo already does for other proxy-suspect sources.",
+    "Jolpica exposes no rate-limit headers (Cloudflare, cache-control max-age=3600). Burst limits are undocumented - establish them before any scheduled pull, per the project's cadence-approval gate.",
+    "OpenF1's historical depth before 2023 was not tested; if the model needs multi-season sector times, confirm how far back /laps actually goes or fall back to f1_livetiming archives.",
+    "Whether Betwinner grades F1 'winning constructor' as the team of the race winner or the team scoring most points in that race - these differ whenever a team finishes 2nd and 3rd. Read the terms."
+  ],
+
+  "key_findings": [
+    "F1 is exceptionally well served for free and is the only one of the five sports where a serious model can be built today: jolpica (results/quali/sprint/pitstops, current to 2026 round 10), openf1 (sector times, tyre compound, weather, safety-car messages), livetiming.formula1.com (the FastF1 backend, reachable) and the FIA documents portal all verified by body.",
+    "The FIA documents portal is the most important source in this file and the one a naive build would omit entirely - it is the only place publishing PROVISIONAL and FINAL classification as separate PDFs, which is precisely the distinction every head-to-head, podium and points bet settles on.",
+    "Two 403s in this research were NOT blocks: a guessed livetiming session path returns S3 AccessDenied, and a guessed NASCAR race_id returns S3 AccessDenied. Both look exactly like a hostile block and both are really 404s. Conversely cyclingstage returns HTTP 200 with a '404 - page not found' title for unknown slugs. Status codes were wrong in both directions here - only the body settled it.",
+    "SPEEDWAY IS EFFECTIVELY UNSOURCEABLE. Every federation and official site checked - fimspeedway.com, speedwayekstraliga.pl, fim-moto.com - disallows ClaudeBot or anthropic-ai by name in robots.txt, and speedwaygp.com is a dead domain. This is a compliance wall, not a technical one, and no amount of retrying from Actions changes it.",
+    "CYCLING IS THE SECOND-WORST GAP. ProCyclingStats is blocked twice over (Cloudflare challenge on robots.txt itself, plus a public statement that they do not offer API access and decline data requests) and FirstCycling is Cloudflare-blocked. The permitted remainder - cyclingstage, Wikipedia, LeTourDataSet, open-meteo - covers stage profiles, results and crosswinds but not per-rider historical depth.",
+    "Head-to-head is the only two-outcome market in any of these five sports, so it is the only place a safety ladder can apply - and it is also the market with the nastiest settlement asymmetry, where DNS voids and DNF loses. The market best suited to a staking progression is the one most likely to be graded in a way a naive model did not predict.",
+    "DNF risk is a TEAM property in F1 (mechanical, correlated across teammates) but a RIDER property in MotoGP (crashes, uncorrelated). The same feature name means opposite things in sport 26 and sport 31 and the models must not share it.",
+    "The abolition of the F1 fastest-lap point from 2025 silently invalidated every historical base rate for a market that books still offer - the clearest case in this file of a rule change that a backtest would not notice.",
+    "NASCAR's cf.nascar.com host is an unexpectedly rich free feed - loop stats give driver rating, average running position, green-flag passes and quality passes per race, which are far better features than finishing position, plus number_of_cautions as the cleanest caution dataset found anywhere in these five sports.",
+    "Weather is the only input in this file that is free, forecastable and near-universally applicable: open-meteo alone drives wet-race pace in F1/MotoGP/NASCAR and crosswind echelons in cycling, and MotoGP's own API hands over a labelled per-session dry/wet condition object at no cost."
+  ]
+}

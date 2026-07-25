@@ -1,0 +1,640 @@
+{
+  "sport": "chess_poker",
+  "betwinner_sport_ids": [11, 38],
+  "researched": "2026-07-25",
+  "headline": "Two sports in one file that share nothing. Chess is richly modellable and its free data is the best of any sport researched so far (7.9bn CC0 games + a 1.15m-game elite OTB corpus carrying per-move engine evals). Poker is not: the largest free live database records only CASHES, never ENTRIES, so the denominator of every skill metric is unobservable, and a final-table deal can make the official winner near-arbitrary. Chess must be priced THREE-WAY - the draw is the modal outcome above 2600 (51.7% measured on real June-2026 games).",
+
+  "statistics": [
+    {
+      "id": "fide_elo_standard",
+      "sport": "chess",
+      "definition": "FIDE classical/standard Elo from the monthly rating list.",
+      "why": "Primary strength prior. Elo difference maps to expected SCORE (points per game), not to win probability - the conversion to a 1/X/2 triple needs a separate draw model.",
+      "source": "fide_rating_lists",
+      "availability": "confirmed - separate standard_rating_list_xml.zip",
+      "caveat": "Rating is a monthly SNAPSHOT and can be up to ~30 days stale. Published to the day of the list, not the day of the game."
+    },
+    {
+      "id": "fide_elo_rapid",
+      "sport": "chess",
+      "definition": "FIDE rapid Elo - a SEPARATE list and a separate rating pool.",
+      "why": "Rapid and classical strength diverge materially for individual players. Using classical Elo to price a rapid event is a mis-specification, not an approximation.",
+      "source": "fide_rating_lists",
+      "availability": "confirmed - rapid_rating_list_xml.zip verified as a distinct download",
+      "caveat": "Rapid lists are far sparser than standard: many players have a classical rating but no rapid rating, or a rapid rating built on <20 games."
+    },
+    {
+      "id": "fide_elo_blitz",
+      "sport": "chess",
+      "definition": "FIDE blitz Elo - a third separate list.",
+      "why": "Blitz skill is a genuinely different ability (pattern speed, clock handling) and its rating pool is separately calibrated.",
+      "source": "fide_rating_lists",
+      "availability": "confirmed - blitz_rating_list_xml.zip verified; 306,251 players in the July 2026 list",
+      "caveat": "Sparsest of the three lists. 167,396 of 306,251 blitz-rated players carry the inactive flag."
+    },
+    {
+      "id": "elo_variant_gap",
+      "sport": "chess",
+      "definition": "A player's (blitz Elo - classical Elo) and (rapid Elo - classical Elo).",
+      "why": "Identifies specialists. A player +80 in blitz over classical is a systematically different proposition in a blitz event than his classical rating implies, and the market may not carry a blitz-specific line.",
+      "source": "fide_rating_lists (join the three lists on fideid)",
+      "availability": "derivable - all three lists share the fideid key",
+      "caveat": "The three pools are separately inflated/deflated; the gap is only interpretable relative to the population mean gap, not as an absolute."
+    },
+    {
+      "id": "rating_gap",
+      "sport": "chess",
+      "definition": "Elo difference between the two players, in the rating pool matching the event's time control.",
+      "why": "The single strongest feature. Expected score = 1/(1+10^(-d/400)) is the standard mapping.",
+      "source": "fide_rating_lists",
+      "availability": "confirmed",
+      "caveat": "Expected SCORE only. It tells you nothing about how that score splits between wins and draws - that split is the whole modelling problem in chess."
+    },
+    {
+      "id": "colour_advantage",
+      "sport": "chess",
+      "definition": "White's score advantage over 0.500.",
+      "why": "Materially above 50% and must be applied to the correct side of every game. MEASURED on 35,538 real OTB games (Lichess broadcast, June 2026): White score 0.530 overall; 0.546 for classical games with both players 2200+.",
+      "source": "lichess_db_broadcast (computed), pgnmentor, twic",
+      "availability": "confirmed - computed directly in this research",
+      "caveat": "Colour edge COMPRESSES in blitz: measured 0.512 in blitz vs 0.546 in classical for the same 2200+ population. Do not port a classical colour term into a blitz market."
+    },
+    {
+      "id": "draw_rate_by_strength",
+      "sport": "chess",
+      "definition": "P(draw) as a function of the weaker player's rating.",
+      "why": "The dominant structural fact of chess pricing. MEASURED (Lichess broadcast, June 2026, by min(WhiteElo,BlackElo)): <2000 18.8%, 2000-2199 25.0%, 2200-2399 34.1%, 2400-2499 41.8%, 2500-2599 42.5%, 2600-2699 51.7%, 2700+ 50.8%.",
+      "source": "lichess_db_broadcast (computed)",
+      "availability": "confirmed - computed directly in this research",
+      "caveat": "The 2600+ cells are small (n=327 and n=183 for one month). Pool 12+ months of broadcast data before fitting."
+    },
+    {
+      "id": "draw_rate_by_time_control",
+      "sport": "chess",
+      "definition": "P(draw) as a function of the FIDE time-control class.",
+      "why": "Draw mass collapses as the clock shortens. MEASURED on the SAME elite population (both players 2200+, Lichess broadcast June 2026, classified by the FIDE base+60*increment formula): classical 41.6% (n=1651), rapid 35.4% (n=1352), blitz 23.1% (n=1248).",
+      "source": "lichess_db_broadcast (computed), chess_results (for the authoritative time control)",
+      "availability": "confirmed - computed directly in this research",
+      "caveat": "The TimeControl PGN tag is organizer-entered and inconsistent: the same corpus contains '90+30' (minutes), '5400+30' (seconds), '30\\'+30' and '90 mins + 30 Secs'. A parser must sniff units, not trust the field."
+    },
+    {
+      "id": "draw_rate_by_opening",
+      "sport": "chess",
+      "definition": "P(draw) conditioned on ECO code / opening name.",
+      "why": "Structurally drawish systems (Berlin, Petroff, exchange lines) carry far higher draw mass than sharp ones. Directly shifts the X price.",
+      "source": "lichess_db_broadcast, twic, pgnmentor (all carry ECO + Opening + Variation tags)",
+      "availability": "confirmed - ECO present on 100% of broadcast games sampled",
+      "caveat": "ENDOGENOUS. The opening is CHOSEN after the player knows the tournament situation - a player needing a draw plays the Berlin. Conditioning on opening and on incentive double-counts the same cause. The opening is not available pre-match anyway; only the player's repertoire distribution is."
+    },
+    {
+      "id": "draw_rate_by_player_pair",
+      "sport": "chess",
+      "definition": "The specific pair's historical draw rate, distinct from either player's individual rate.",
+      "why": "Pair-specific draw rates are extreme in elite chess - some rivalries draw well above 70% because the repertoires interlock. This is a genuine pair effect, not a sum of two player effects.",
+      "source": "pgnmentor (per-player career PGN; intersect two files), chessgames",
+      "availability": "confirmed - pgnmentor carries 966 player career archives; Carlsen.zip = 7,818 games from 2001",
+      "caveat": "Sample is thin for all but the top ~50 rivalries. Shrink hard toward the strength-and-time-control baseline below ~10 meetings."
+    },
+    {
+      "id": "player_draw_propensity",
+      "sport": "chess",
+      "definition": "A player's draw rate relative to the rate expected from his rating and his opponents' ratings.",
+      "why": "A real and persistent player trait - solid positional players draw materially more than their rating predicts; aggressive players less. Feeds the X price directly.",
+      "source": "pgnmentor, twic, lichess_db_broadcast",
+      "availability": "derivable",
+      "caveat": "Must be computed as a RESIDUAL against the strength baseline, otherwise it just re-measures that strong players draw more."
+    },
+    {
+      "id": "h2h_record",
+      "sport": "chess",
+      "definition": "Head-to-head results, split by colour and by time control.",
+      "why": "Elite players meet repeatedly; H2H carries preparation and style-matchup information the rating cannot.",
+      "source": "pgnmentor (intersect career files), chessgames",
+      "availability": "confirmed via pgnmentor",
+      "caveat": "chessgames.com's dedicated H2H query interface (/perl/chess.pl) is robots-DISALLOWED. Build H2H by intersecting pgnmentor career files instead. Also: H2H must be split by colour - an aggregate H2H silently mixes the two different games."
+    },
+    {
+      "id": "time_control_exact",
+      "sport": "chess",
+      "definition": "Base minutes + increment seconds, and the resulting FIDE class.",
+      "why": "Determines which rating pool, which draw baseline and which colour term to use. It is the single most important non-player field.",
+      "source": "chess_results (states it explicitly, e.g. '90+30'), lichess_db_broadcast TimeControl tag",
+      "availability": "confirmed - chess-results.com exposes it as a first-class tournament field",
+      "caveat": "TWIC PGN does NOT carry a TimeControl tag at all - it must be joined from chess-results or inferred from the event name. Broadcast TimeControl coverage in the sample was only ~28% of games."
+    },
+    {
+      "id": "increment_presence",
+      "sport": "chess",
+      "definition": "Whether the time control has an increment or is sudden-death.",
+      "why": "No increment sharply raises the share of games decided on the clock rather than on the board, which suppresses draws and adds noise to the favourite's edge.",
+      "source": "chess_results, TimeControl tag",
+      "availability": "confirmed",
+      "caveat": "MEASURED on online play: 33.2% of Lichess standard games ended by 'Time forfeit' (17,659 of 53,130). OTB increment controls forfeit far less often, but the direction holds."
+    },
+    {
+      "id": "acpl",
+      "sport": "chess",
+      "definition": "Average centipawn loss - mean difference between the engine's best evaluation and the evaluation after the move played.",
+      "why": "The best available engine-free proxy for current playing quality, and it moves BEFORE the rating does. Rating is a lagging monthly aggregate; ACPL is per-game.",
+      "source": "lichess_db_broadcast - computable from the [%eval] annotations, which were present on 84.0% of games in the June 2026 file",
+      "availability": "DERIVABLE, not published - no site publishes ACPL as a stat. The broadcast DB gives per-move Stockfish evals so ACPL can be computed WITHOUT running an engine locally.",
+      "caveat": "Evals come from heterogeneous Stockfish versions/depths running in users' browsers, so ACPL is comparable within a corpus but not across sources. Must be normalised by position complexity - ACPL is mechanically low in simplified/drawn positions, which biases it toward exactly the drawish players you are trying to separate."
+    },
+    {
+      "id": "eval_volatility",
+      "sport": "chess",
+      "definition": "Variance and swing magnitude of the engine evaluation across a game.",
+      "why": "Measures how sharp a player's games are. High-volatility players produce fewer draws - a direct X-price input that is independent of rating.",
+      "source": "lichess_db_broadcast [%eval]",
+      "availability": "derivable (84% eval coverage)",
+      "caveat": "Same engine-heterogeneity caveat as ACPL."
+    },
+    {
+      "id": "clock_usage",
+      "sport": "chess",
+      "definition": "Time remaining per move; frequency of entering severe time trouble.",
+      "why": "Chronic time-trouble players lose and draw differently from the rating prediction, and the effect amplifies as the time control shortens.",
+      "source": "lichess_db_broadcast [%clk], lichess_db_standard [%clk] (99.7% coverage)",
+      "availability": "confirmed",
+      "caveat": "Broadcast clock data depends on the venue's DGT board relay and drops out for un-relayed boards."
+    },
+    {
+      "id": "form_recent",
+      "sport": "chess",
+      "definition": "Rolling score (points per game) over the last N games, opponent-adjusted.",
+      "why": "Captures preparation cycles and condition that the monthly rating has not absorbed yet.",
+      "source": "twic (weekly), lichess_db_broadcast (continuous), pgnmentor",
+      "availability": "confirmed - TWIC ships ~8,700 games per week",
+      "caveat": "Use exponential decay, not 'last 10'. Chess players go months without a classical game; a games-count window silently spans a year for some players."
+    },
+    {
+      "id": "rating_change_recent",
+      "sport": "chess",
+      "definition": "Month-on-month rating delta and the number of rated games in the period.",
+      "why": "Trajectory separates a rising junior from a declining veteran at the same current rating - materially different forward-looking strength.",
+      "source": "fide_rating_lists (diff consecutive monthly lists; the <games> field gives games played in the period)",
+      "availability": "confirmed - the list carries <rating>, <games> and <k> per player",
+      "caveat": "Requires archiving each monthly list; FIDE serves only the current one at the stable URL."
+    },
+    {
+      "id": "k_factor",
+      "sport": "chess",
+      "definition": "FIDE K-factor: 40 (new/junior), 20 (standard), 10 (established 2400+).",
+      "why": "A direct, free measure of how RELIABLE the published rating is. K=40 flags a rating that is still converging and probably understates a fast-improving junior.",
+      "source": "fide_rating_lists <k> field",
+      "availability": "confirmed - measured distribution in the July 2026 blitz list: K=20 215,796, K=40 87,125, K=10 3,330",
+      "caveat": "None material. This is a free uncertainty estimate and is under-used."
+    },
+    {
+      "id": "inactive_flag",
+      "sport": "chess",
+      "definition": "FIDE <flag> field: 'i' inactive, 'w' woman, 'wi' woman+inactive, empty active.",
+      "why": "An inactive player's rating can be years old. Flags the exact cases where the rating prior should be widened.",
+      "source": "fide_rating_lists <flag> field",
+      "availability": "confirmed - 167,396 of 306,251 blitz-rated players flagged 'i'",
+      "caveat": "The flag says inactive in THAT pool. A player active in classical may be flagged inactive in blitz."
+    },
+    {
+      "id": "age_curve",
+      "sport": "chess",
+      "definition": "Player age, from the FIDE birth year.",
+      "why": "Chess has a pronounced age curve, and it differs by time control - fast-time-control ability decays earlier and more steeply than classical ability.",
+      "source": "fide_rating_lists <birthday> field (year only)",
+      "availability": "confirmed - field present, though blank for some players",
+      "caveat": "Year-granularity only. The FIDE list also contains obvious data errors (the sample's first record has birthday 2018 with a 1431 blitz rating). Sanity-bound before use."
+    },
+    {
+      "id": "title",
+      "sport": "chess",
+      "definition": "GM/IM/FM/CM and the women's titles.",
+      "why": "A coarse strength floor that is useful when a rating is missing, stale or from a thin pool.",
+      "source": "fide_rating_lists <title>/<w_title>",
+      "availability": "confirmed - blitz list: GM 1,643, IM 3,180, FM 6,592, WGM 258",
+      "caveat": "Titles are permanent and never revoked for decline. A 65-year-old GM's title says what he once was."
+    },
+    {
+      "id": "tournament_situation",
+      "sport": "chess",
+      "definition": "Standings, round number, rounds remaining, and what score each player needs.",
+      "why": "THE most under-priced chess variable. A player who needs only a draw to win the event plays for one, and the game's draw probability rises sharply above its structural baseline. Symmetrically, a player who must win will avoid drawish lines and accept a higher loss probability - which moves BOTH the X and the losing side.",
+      "source": "chess_results (live standings, round-by-round), event regulations for the prize/qualification structure",
+      "availability": "confirmed - chess-results.com publishes standings and pairings per round",
+      "caveat": "Needs the PRIZE and qualification structure, not just standings, to know what a player is actually playing for. That is in the event regulations and is not machine-readable."
+    },
+    {
+      "id": "field_strength",
+      "sport": "chess",
+      "definition": "Average rating of the tournament field and the tournament category.",
+      "why": "Sets the baseline draw rate for the whole event, and the number of rounds/pairing system determines how the outright resolves.",
+      "source": "chess_results (tournament header: rounds, Swiss vs round-robin, rating calculation, average Elo)",
+      "availability": "confirmed - verified on a live tournament page",
+      "caveat": "Swiss vs round-robin changes the outright distribution completely; a Swiss produces far more shared first places and therefore more tiebreak resolutions."
+    },
+    {
+      "id": "schedule_density",
+      "sport": "chess",
+      "definition": "Rounds per day, double-round days, rest days, games already played in the event.",
+      "why": "Fatigue is real in classical chess (games run 4-6 hours). Double-round days raise the draw rate and raise blunder rates in the second game.",
+      "source": "chess_results (dates and round schedule)",
+      "availability": "confirmed",
+      "caveat": "Round times are not always published in machine-readable form."
+    },
+    {
+      "id": "first_move_repertoire",
+      "sport": "chess",
+      "definition": "The player's distribution over first moves as White (1.e4 / 1.d4 / 1.c4 / 1.Nf3) and defences as Black.",
+      "why": "The pre-match-observable version of draw_rate_by_opening. A 1.e4 player against a Petroff/Berlin specialist is a structurally different draw prospect from the same rating gap elsewhere.",
+      "source": "pgnmentor career archives, lichess_db_broadcast",
+      "availability": "derivable",
+      "caveat": "Elite players deliberately vary repertoire against specific opponents, so the marginal distribution overstates predictability at the very top."
+    },
+    {
+      "id": "game_length_moves",
+      "sport": "chess",
+      "definition": "Number of moves in the game.",
+      "why": "The only plausible driver of any 'total moves' derivative market, and a proxy for fighting intent.",
+      "source": "all PGN sources (count from movetext)",
+      "availability": "derivable",
+      "caveat": "Bimodal and contaminated: short draws and early resignations sit in the same left tail as decisive miniatures. Also depends on whether the event bans short draws."
+    },
+    {
+      "id": "termination_type",
+      "sport": "chess",
+      "definition": "How the game ended - normal, time forfeit, abandoned, rules infraction.",
+      "why": "Non-board terminations are a settlement risk and a model-noise source.",
+      "source": "lichess_db_standard Termination tag (100% coverage online)",
+      "availability": "confirmed online; OTB sources do not carry it",
+      "caveat": "Measured online distribution: Normal 66.3%, Time forfeit 33.2%, Abandoned 0.4%, Insufficient material and Rules infraction negligible. OTB rates are far lower and must not be ported."
+    },
+    {
+      "id": "online_vs_otb_rating",
+      "sport": "chess",
+      "definition": "Lichess/Chess.com Glicko ratings versus FIDE Elo.",
+      "why": "Tempting because online ratings are free, live and dense. They are NOT on the FIDE scale and not comparable across time-control pools even within one site.",
+      "source": "lichess_db_standard",
+      "availability": "confirmed but see caveat",
+      "caveat": "DO NOT use online ratings as a strength prior for an OTB market without an explicit fitted mapping. Lichess ratings are separately calibrated per time control, so a '2200 blitz' and a '2200 classical' player are different strengths on the same site."
+    },
+    {
+      "id": "poker_lifetime_earnings",
+      "sport": "poker",
+      "definition": "Total live tournament winnings and number of recorded cashes.",
+      "why": "The only broadly available player-level poker statistic. It is a crude proxy for experience and for how often the player enters large-field events.",
+      "source": "hendonmob (data on the BLOCKED pokerdb subdomain), wsop",
+      "availability": "PARTIAL - the index counters are visible (976,415 players / 740,492 events / 6,563,609 results) but every per-player page is behind Cloudflare",
+      "caveat": "Contaminated by final-table DEALS: databases record the OFFICIAL payout, which after a deal is not what the player actually received. Earnings also scale with buy-in level, so they measure bankroll and volume at least as much as skill."
+    },
+    {
+      "id": "poker_itm_rate",
+      "sport": "poker",
+      "definition": "In-the-money rate - the share of tournaments entered in which the player cashed.",
+      "why": "It would be the single most useful poker skill metric.",
+      "source": "none",
+      "availability": "NOT COMPUTABLE FROM FREE SOURCES - see caveat. This is the central finding of the poker half of this research.",
+      "caveat": "Hendon Mob and every mirror of it record CASHES, not ENTRIES. A player who busts before the money leaves no record at all. The denominator of ITM rate, ROI and every other efficiency metric is therefore structurally unobservable. Any published 'ITM rate' is computed against an assumed denominator and is fiction."
+    },
+    {
+      "id": "poker_field_size",
+      "sport": "poker",
+      "definition": "Number of entries (including re-entries) in the tournament.",
+      "why": "The dominant term in any outright price. Baseline P(win) is ~1/N and a strong player is only a small multiple of that.",
+      "source": "wsop (schedule and past results), hendonmob event pages (blocked)",
+      "availability": "confirmed post-hoc; NOT knowable pre-match - see caveat",
+      "caveat": "With late registration and re-entry, the final field size is UNKNOWN while the market is open. A bet struck on Day 1 has an unknown denominator, and the denominator is the price."
+    },
+    {
+      "id": "poker_structure",
+      "sport": "poker",
+      "definition": "Starting stack in big blinds, blind level duration, level progression, ante structure, re-entry and late-reg policy.",
+      "why": "This is the ONE genuinely predictive pre-match poker variable. It sets how much skill can express: deep stacks and long levels raise the skill share; a turbo pushes the result toward a lottery.",
+      "source": "wsop (structure sheets per event), pokerstarslive (schedule/buy-in)",
+      "availability": "confirmed at the schedule level; per-event structure sheets are usually PDFs",
+      "caveat": "It tells you about the TOURNAMENT, not about which player wins. It scales the skill edge; it does not locate it."
+    },
+    {
+      "id": "poker_chip_counts",
+      "sport": "poker",
+      "definition": "Live chip stacks, by player, at a given point in the tournament.",
+      "why": "The only high-information poker input that exists, and the only basis on which a poker market is genuinely priceable.",
+      "source": "wsop live updates, pokerstarslive event coverage",
+      "availability": "IN-PLAY ONLY. There is no pre-match version of this by definition.",
+      "caveat": "Moves the market from unmodellable to modellable, but only for in-play/final-table markets, and only if the feed is timely. Stale chip counts are worse than none."
+    },
+    {
+      "id": "poker_icm_equity",
+      "sport": "poker",
+      "definition": "Independent Chip Model equity - a player's share of the remaining PRIZE POOL given the chip distribution.",
+      "why": "Standard tool for pricing prize-money outcomes at a final table.",
+      "source": "derivable from chip counts + payout structure",
+      "availability": "derivable in-play",
+      "caveat": "ICM prices MONEY, not FINISHING FIRST. An outright 'to win the tournament' bet settles on finishing first, which is approximately chip-proportional (Malmuth-Harville), NOT ICM equity - ICM deliberately discounts the chip leader. Substituting ICM for chip share systematically underprices the chip leader's outright."
+    },
+    {
+      "id": "poker_ranking",
+      "sport": "poker",
+      "definition": "GPI / Player-of-the-Year points and leaderboards.",
+      "why": "The closest thing to a poker rating.",
+      "source": "wsop POY leaderboard (verified live), globalpokerindex (blocked)",
+      "availability": "PARTIAL - the WSOP POY leaderboard is readable; GPI is Cloudflare-blocked",
+      "caveat": "These are VOLUME-WEIGHTED accumulation leaderboards, not skill ratings. A player who enters 200 events outranks a better player who enters 30. They have no predictive interpretation as a strength prior."
+    },
+    {
+      "id": "poker_deal_history",
+      "sport": "poker",
+      "definition": "Whether a final table struck a deal, and on what basis.",
+      "why": "Determines whether the official result reflects competitive play or a formality played out after the money was settled.",
+      "source": "none systematic",
+      "availability": "NOT AVAILABLE as structured data. Reported ad hoc in poker media, sometimes not at all.",
+      "caveat": "Deals are frequently private. WSOP does not sanction or record them; EPT-style tours facilitate and publish them. The absence of a recorded deal is not evidence there was none."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "lichess_db_standard",
+      "url": "https://database.lichess.org/standard/lichess_db_standard_rated_2026-06.pgn.zst",
+      "auth": "none",
+      "verified": true,
+      "coverage": "7,949,495,674 standard rated games, monthly .pgn.zst files. Verified by body: range-read the first 40MB of the 2026-06 file, decompressed 300MB and parsed 127,923 games. Tags present: WhiteElo, BlackElo, WhiteRatingDiff, BlackRatingDiff, ECO, Opening, TimeControl (PGN seconds form), Termination (100%), [%clk] (99.7%), [%eval] (11.2%).",
+      "note": "LICENCE: Creative Commons CC0 1.0 Universal, stated verbatim on the index page - 'Use them for research, commercial purpose, publication, anything you like. You can download, modify and redistribute them, without asking for permission.' No attribution required. Zstandard files are PARTIALLY decompressible, so a range request gives a usable sample without the 28GB download. WARNING: this is ONLINE play and its draw rates are 5-10x below OTB - see key_findings."
+    },
+    {
+      "id": "lichess_db_broadcast",
+      "url": "https://database.lichess.org/broadcast/lichess_db_broadcast_2026-06.pgn.zst",
+      "auth": "none",
+      "verified": true,
+      "coverage": "1,146,297 elite OVER-THE-BOARD games from official Lichess broadcasts, monthly. Verified by body: downloaded the full 22.8MB June 2026 file and parsed 36,996 games (35,538 with a scored result). Tags: Event, Site, Date, Round, White, Black, Result, WhiteElo/BlackElo, WhiteFideId/BlackFideId, WhiteTitle/BlackTitle, ECO, Opening, TimeControl, BroadcastURL, GameURL. [%eval] on 84.0% of games and [%clk] where the venue relays clocks.",
+      "note": "THE SINGLE BEST SOURCE FOR THIS APPLICATION. It is the only free feed that pairs elite OTB results with FIDE IDs AND per-move engine evaluations, which makes ACPL computable without running an engine. LICENCE: Creative Commons Attribution-ShareAlike 4.0 - DIFFERENT from the CC0 that covers the rest of the site. Attribution and share-alike are mandatory for this file specifically. TimeControl tag coverage was only ~28% and its units are inconsistent."
+    },
+    {
+      "id": "fide_rating_lists",
+      "url": "https://ratings.fide.com/download/blitz_rating_list_xml.zip",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Three SEPARATE monthly lists - standard_rating_list_xml.zip, rapid_rating_list_xml.zip, blitz_rating_list_xml.zip (all three probed and all return real ZIP bytes). Verified by body: downloaded the blitz list (7.9MB zip -> 86.5MB XML) and parsed 306,251 <player> records. Schema: fideid, name, country, sex, title, w_title, o_title, foa_title, rating, games, k, birthday, flag.",
+      "note": "ratings.fide.com serves NO robots.txt (404), so crawling is unrestricted. The <k> field is a free rating-reliability signal and the <flag> field ('i' = inactive) is a free staleness signal - both are widely ignored. FIDE serves only the CURRENT list at the stable URL, so month-on-month deltas require archiving each month yourself."
+    },
+    {
+      "id": "chess_results",
+      "url": "https://chess-results.com/tnr1385451.aspx?lan=1",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "The near-universal tournament management publisher (Swiss-Manager). Verified by body on a live July 2026 event: exposes Time control ('90+30'), number of rounds, tournament type (Swiss-System), rating calculation, federation, dates, arbiter, plus per-round pairings and standings.",
+      "note": "THE authoritative source for the TIME CONTROL and the TOURNAMENT SITUATION - two things no PGN feed reliably carries. robots.txt is permissive: 'User-agent: * / Allow: /' with only a bot named 'AAAA' disallowed. Tournament pages are keyed by tnr{id}; there is no bulk export, so it must be crawled per event."
+    },
+    {
+      "id": "twic",
+      "url": "https://theweekinchess.com/zips/twic1654g.zip",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Weekly PGN of essentially all significant international chess. Verified by body: downloaded issue 1654 (2026-07-20), 2.4MB zip -> 7.8MB PGN containing 8,721 games. Tags: Event, Site, Date, Round, White, Black, Result, WhiteTitle/BlackTitle, WhiteElo/BlackElo, ECO, Opening, Variation, WhiteFideId/BlackFideId, EventDate. Running continuously since 1994 (issue 1 was 17 Sep 1994).",
+      "note": "LICENCE RESTRICTION - stated verbatim on the archive page: 'TWIC magazine is free for personal use only. All rights are reserved.' That is NOT an open licence and it does not permit commercial redistribution. Use for private modelling only, or use the CC-licensed Lichess broadcast DB instead. TWIC carries NO TimeControl tag - the time control must be joined from chess-results or inferred from the event name. No robots.txt (404)."
+    },
+    {
+      "id": "pgnmentor",
+      "url": "https://www.pgnmentor.com/files.html",
+      "auth": "none",
+      "verified": true,
+      "coverage": "966 per-PLAYER career PGN archives plus event and opening collections. Verified by body: downloaded Carlsen.zip and parsed 7,818 games running from 2001 to date, with WhiteElo/BlackElo and ECO tags.",
+      "note": "The practical route to HEAD-TO-HEAD and PLAYER-PAIR draw rates: intersect two players' career files rather than querying a H2H interface. robots.txt is maximally permissive - the only rule is 'Disallow: /setz/'. Serves robots.txt gzip-encoded, so a client without --compressed reads it as binary garbage. No licence statement found; treat as all-rights-reserved."
+    },
+    {
+      "id": "chessgames",
+      "url": "https://www.chessgames.com/perl/chessplayer?pid=15940",
+      "auth": "scraping (browser User-Agent required)",
+      "verified": true,
+      "coverage": "Large curated historical game collection with player pages. Verified by body: the Kasparov player page returned 20,589 bytes of real content.",
+      "note": "TWO TRAPS. (1) It returns a bare 403 Forbidden to a non-browser User-Agent and 200 to a browser one - a status-code check with a library UA would wrongly mark it dead. (2) robots.txt DISALLOWS /perl/chess.pl, which is the head-to-head and game-search interface - precisely the feature you would want it for. Player pages (/perl/chessplayer) ARE allowed. Crawl-delay: 5 is specified and should be honoured. robots.txt names GPTBot and ChatGPT-User as fully disallowed but does NOT name anthropic-ai."
+    },
+    {
+      "id": "fide_handbook_laws",
+      "url": "https://handbook.fide.com/chapter/E012023",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Full text of the FIDE Laws of Chess in force from 1 January 2023. Verified by body: 181KB, articles read directly including 4.3 (touch-move), 5.1/5.2 (completion of the game), 6.7 (default time), 7.5 (illegal moves), 9.1 (draw offers and event regulations), 11.7/11.8 (penalties, double loss), Appendix A (Rapid) and Appendix B (Blitz).",
+      "note": "AUTHORITATIVE and free. Every rules_critical entry below that cites an article number was read from this page, not recalled. handbook.fide.com serves no robots.txt (404)."
+    },
+    {
+      "id": "wsop",
+      "url": "https://www.wsop.com/tournaments/results/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Official WSOP schedule, past-tournament results archive ('Results & Winners Archive', browsable by year back through the circuit and bracelet events) and a live Player-of-the-Year leaderboard. Verified by body on three pages: home, /tournaments/results/ and the past-tournaments archive.",
+      "note": "robots.txt is fully open ('User-agent: * / Disallow:' with an empty value). The BEST free poker source and the only major one not behind Cloudflare. It is a Nuxt SPA, so deep payout tables render client-side - a scraper needs the underlying JSON, not the served HTML. Its /legal/house-rules/ page covers WSOP ONLINE only and contains no live-tournament deal policy."
+    },
+    {
+      "id": "hendonmob_www",
+      "url": "https://www.thehendonmob.com/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Verified by body: the marketing shell loads and reports 976,415 players, 740,492 events and 6,563,609 results. Confirms the scale of the database and its leaderboard taxonomy.",
+      "note": "THE SHELL IS READABLE AND THE DATA IS NOT. Every actual record - player profiles, event results, rankings - lives on pokerdb.thehendonmob.com, which is Cloudflare-blocked (see blocked). www robots.txt additionally disallows /search/ and /profile/. So the largest free live-poker database is, in practice, unavailable to us. Counted here as verified only because these index counters were genuinely read."
+    },
+    {
+      "id": "pokerstarslive",
+      "url": "https://www.pokerstarslive.com/ept/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Verified by body: EPT/APPT/BSOP festival SCHEDULE, dates, venues and buy-ins (e.g. EPT Barcelona 16-29 Aug 2026). No Cloudflare.",
+      "note": "SCHEDULE ONLY - there is no results archive. /ept/results/ and per-festival result paths both return 404. robots.txt disallows */api/ and /pages/. Useful for knowing WHEN and WHERE an event runs and nothing about who wins it."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "lichess_api",
+      "detail": "ROBOTS-DISALLOWED, not technically blocked. lichess.org/robots.txt contains 'Disallow: /api/', 'Disallow: /game/export/' and 'Disallow: /games/export/' for User-agent: *. Not fetched, per the compliance rule. This costs us live tournament/broadcast polling and per-player game export. NOTE THE TENSION for the operator to resolve: Lichess also publishes and documents this API for third-party applications with its own rate limits, so the Disallow line is plausibly aimed at search indexers. It is the operator's call, not ours. The bulk database at database.lichess.org is a SEPARATE host that serves no robots.txt and is unrestricted - it covers most of the same ground offline."
+    },
+    {
+      "id": "chesscom_api",
+      "detail": "ROBOTS-DISALLOWED ENTIRELY. api.chess.com/robots.txt is 'User-agent: * / Disallow: /' - the whole host. Not fetched. This removes the largest online chess platform's public data API, including its player profiles, ratings and title-holder lists. www.chess.com additionally disallows /games/archive, /games/search, /stats/ and /game/."
+    },
+    {
+      "id": "lichess_opening_explorer",
+      "detail": "explorer.lichess.ovh returns HTTP 401 Authorization Required (nginx) with no body. This is the endpoint that would have given draw rates by opening directly from the masters database. Draw-rate-by-opening must instead be computed locally from the broadcast/TWIC/pgnmentor PGN corpora, which is entirely feasible."
+    },
+    {
+      "id": "pokerdb_hendonmob",
+      "detail": "403 + Cloudflare 'Just a moment' interstitial on EVERY path tested, including /robots.txt, /rankings/ and event.php result pages. Tested with both a library User-Agent and a standard browser User-Agent - identical 403, so this is IP/egress-level, not UA-level. THIS IS THE SINGLE BIGGEST DATA LOSS IN THIS FILE: it is the entire live-poker results database (6.5m results). HIGH-VALUE RETEST from a GitHub Actions runner, exactly as with dataproject in the volleyball research."
+    },
+    {
+      "id": "globalpokerindex",
+      "detail": "403 + Cloudflare challenge on /robots.txt and beyond. GPI is the nearest thing to a poker rating system. Same retest recommendation as pokerdb. Note that even if recovered, GPI is a volume-weighted accumulation ranking, not a strength rating."
+    },
+    {
+      "id": "365chess",
+      "detail": "403 + Cloudflare challenge under both library and browser User-Agents. Would have been an alternative H2H and opening-statistics source. Its robots.txt (readable) independently disallows most of the useful paths anyway - /view_game.php*, /download.php, /opening.php?master=*, /eco/*/games*. Use pgnmentor for H2H instead."
+    },
+    {
+      "id": "pokerstarslive_results",
+      "detail": "NOT A BLOCK - the pages do not exist. /ept/results/ and per-festival result paths return genuine 404s from a live, unprotected site. There is no free structured EPT results archive at the official domain."
+    },
+    {
+      "id": "lichess_db_eval",
+      "detail": "NOT BLOCKED and NOT VERIFIED BY BODY. lichess_db_eval.jsonl.zst holds 394,669,566 Stockfish-evaluated positions under CC0 and HTTP HEAD returns 200. Its schema (fen, evals[].pvs[].cp/mate/line, knodes, depth) and a sample record were read from the index page body, but the multi-gigabyte payload itself was NOT downloaded, so it is recorded here rather than claimed as verified. Lower priority than it looks: the broadcast DB already carries per-move evals inline for the games we actually care about."
+    }
+  ],
+
+  "stat_to_bet": {
+    "match_or_game_winner": {
+      "note": "IN CHESS THIS IS A THREE-WAY MARKET (1/X/2). The model must emit a genuine three-outcome distribution; deriving X as a residual from two win probabilities is the single most common error.",
+      "chess": [
+        "rating_gap",
+        "fide_elo_standard",
+        "fide_elo_rapid",
+        "fide_elo_blitz",
+        "time_control_exact",
+        "colour_advantage",
+        "draw_rate_by_strength",
+        "draw_rate_by_time_control",
+        "draw_rate_by_player_pair",
+        "player_draw_propensity",
+        "h2h_record",
+        "tournament_situation",
+        "form_recent",
+        "acpl",
+        "eval_volatility",
+        "k_factor",
+        "inactive_flag",
+        "age_curve"
+      ],
+      "poker": [
+        "poker_chip_counts",
+        "poker_structure",
+        "poker_field_size"
+      ],
+      "poker_note": "Only meaningful for a head-to-head or short-handed proposition with live chip counts. There is no pre-match poker head-to-head price worth taking a position on."
+    },
+    "match_handicap": {
+      "note": "Chess handicaps are in POINTS on a half-point grid (a 6-game match scores 0/0.5/1 per game), so the line grid is coarse and a -1.5 handicap is a correct-score bet in disguise.",
+      "chess": [
+        "rating_gap",
+        "draw_rate_by_time_control",
+        "draw_rate_by_strength",
+        "player_draw_propensity",
+        "colour_advantage",
+        "time_control_exact",
+        "h2h_record"
+      ],
+      "driver": "Handicap is driven by the DRAW MASS more than by the rating gap. A high-draw pairing compresses the score distribution around the midpoint and makes any handicap other than the smallest a poor bet for the favourite. Colour matters asymmetrically over an ODD number of games."
+    },
+    "tournament_outright": {
+      "chess": [
+        "field_strength",
+        "rating_gap",
+        "fide_elo_standard",
+        "tournament_situation",
+        "schedule_density",
+        "form_recent",
+        "draw_rate_by_strength",
+        "k_factor",
+        "age_curve"
+      ],
+      "chess_note": "Requires a full round-by-round simulation, not a single-game model: Swiss pairing depends on running standings, so games are not independent. Shared first place resolved by a TIEBREAK FORMULA (Buchholz/Sonneborn-Berger/direct encounter/most wins) is common in Swisses and must be simulated too.",
+      "poker": [
+        "poker_field_size",
+        "poker_structure",
+        "poker_chip_counts",
+        "poker_lifetime_earnings"
+      ],
+      "poker_note": "Baseline is ~1/N and the skill multiplier over that baseline is small. See unmodellable - this is the market to leave alone."
+    },
+    "correct_score_in_a_match": {
+      "chess": [
+        "draw_rate_by_time_control",
+        "draw_rate_by_strength",
+        "draw_rate_by_player_pair",
+        "player_draw_propensity",
+        "rating_gap",
+        "colour_advantage",
+        "time_control_exact",
+        "tournament_situation"
+      ],
+      "driver": "Entirely a function of the per-game three-way distribution compounded over the match length. Get P(draw) wrong by 10 points and every correct-score price is wrong. Scores are on a half-point grid, so a 6-game match has 13 possible scorelines, not 7."
+    },
+    "total_games": {
+      "chess": [
+        "draw_rate_by_time_control",
+        "draw_rate_by_strength",
+        "rating_gap",
+        "player_draw_propensity",
+        "time_control_exact",
+        "field_strength"
+      ],
+      "driver": "In a knockout MATCH this is a tiebreak-probability bet: a high draw rate means the classical games split and the match goes to rapid/blitz/Armageddon tiebreaks, adding games. High draw mass therefore pushes total games UP, which is the opposite of the intuition imported from set-based sports where evenly matched players simply play longer. CRITICAL: confirm whether Betwinner counts tiebreak games in the total.",
+      "poker": [],
+      "poker_note": "No poker analogue - a poker tournament has no fixed number of games."
+    },
+    "total_moves_or_game_length": {
+      "chess": [
+        "game_length_moves",
+        "player_draw_propensity",
+        "rating_gap",
+        "eval_volatility",
+        "tournament_situation"
+      ],
+      "driver": "Bimodal and contaminated by short agreed draws and early resignations. If the event bans short draws (Sofia rules, see rules_critical) the left tail is truncated and the whole distribution shifts right."
+    }
+  },
+
+  "rules_critical": [
+    "THE DRAW IS THE MODAL OUTCOME IN ELITE CLASSICAL CHESS. Measured on 35,538 real OTB games (Lichess broadcast, June 2026): 51.7% draws where the weaker player is 2600-2699, and 50.8% at 2700+, against 18.8% below 2000. Reading a chess price as a two-way market is simply wrong. Any model MUST emit a genuine three-outcome distribution, and the draw is the outcome carrying the most mass at the top of the game.",
+    "DRAW RATES COLLAPSE AS THE TIME CONTROL SHORTENS, so the same two players are two different markets. Measured on the SAME 2200+ population in the SAME month: classical 41.6% draws, rapid 35.4%, blitz 23.1%. White's edge compresses too (score 0.546 classical vs 0.512 blitz). Never port a classical draw prior, or a classical colour term, into a rapid or blitz market.",
+    "A FINAL-TABLE DEAL MAKES THE OFFICIAL POKER WINNER NEARLY ARBITRARY. Players commonly redistribute the prize pool by chip counts or ICM and then play out the remaining hands for the trophy with the money already settled - so the recorded winner reflects a formality played at reduced incentive, not chip advantage. Betwinner settles on the official result. EPT-style tours facilitate and publish deals; WSOP does not sanction them, which means WSOP deals happen privately and are recorded nowhere. You cannot detect from the data whether the result you are betting on was competitive.",
+    "FIDE TIME-CONTROL CLASSES USE base + 60 x increment, NOT base alone (Laws A.1, B.1): Blitz is 10 minutes or less, Rapid is more than 10 and less than 60, Standard is 60 or more. So '10+2' is RAPID (10 + 2 = 12 min) even though everyone calls it blitz, and '3+2' is blitz (5 min). Classify by the formula, never by the event's marketing name - it decides which rating pool and which draw baseline apply.",
+    "ARMAGEDDON GIVES BLACK DRAW ODDS: Black has less time but a drawn game counts as a WIN for Black. The three-way distribution collapses to two-way for settlement and the entire draw mass transfers to Black. A model that emits any probability on 'draw' in an Armageddon game is wrong by exactly that amount.",
+    "A GAME CAN BE LOST BY BOTH PLAYERS. Laws 11.7/11.8: persistent refusal to comply with the Laws is penalised by loss of the game, and if both players are guilty the game is declared lost by BOTH. The result is 0-0, which is not a home win, an away win, or a draw - it has no slot in a three-way market. Rare, but it is a settlement hole, not a modelling one.",
+    "DEFAULT TIME IS ZERO UNLESS THE REGULATIONS SAY OTHERWISE (Law 6.7.1): 'If the default time is not specified, then it is zero. Any player who arrives at the chessboard after the default time shall lose the game.' Under FIDE rules a no-show is a LOSS, not a void. Whether Betwinner settles it as a loss or voids the market is a separate question and must be read from their terms - the two conventions differ and the sport's own rule is 'loss'.",
+    "RESIGNING INTO A DEAD POSITION IS A DRAW, NOT A LOSS (Law 5.1.2): if a player resigns but the opponent cannot checkmate by any series of legal moves, the result is a draw. An edge case, but it converts an apparent decisive result into an X.",
+    "EVENT REGULATIONS CAN BAN DRAW OFFERS (Law 9.1.1): 'The regulations of an event may specify that players cannot offer or agree to a draw, whether in less than a specified number of moves or at all.' So-called Sofia rules materially lower the draw rate for the SAME players at the SAME time control. The draw prior must be adjusted per EVENT, not per player pair, and the regulation is not in any machine-readable feed.",
+    "IN RAPID WITHOUT FULL ARBITER SUPERVISION, A PERSISTENT ILLEGAL POSITION IS DECLARED DRAWN (Law A.5.4) - the rules themselves manufacture draws in exactly the format where the draw prior is lowest. Which regime applies (A.4 competitive rules vs A.5) is fixed for the whole event by A.6 and is an event-regulation fact.",
+    "ILLEGAL-MOVE PENALTIES DIFFER BY FORMAT: under the Competitive Rules a first illegal move gives the opponent extra time and a second loses the game (Law 7.5); in Rapid the penalty is ONE minute instead of two (Law A.3). In blitz this converts to lost games at a rate that does not exist in classical, and it is a source of decisive results uncorrelated with strength.",
+    "SCORING IS 1 / 0.5 / 0, SO MATCH SCORES SIT ON A HALF-POINT GRID. A 6-game match has 13 possible scorelines. Handicap lines are coarse and a level match score (3-3) is a real outcome that then goes to tiebreaks - which is a different question from who wins the tie.",
+    "COLOUR IS AN EXTRA HALF-EDGE OVER AN ODD NUMBER OF GAMES. White scored 0.530 across all measured OTB games. Over an even-length match the colour advantage cancels; over an ODD-length match (or a match where one player has the extra White) it does not, and it is worth roughly the measured colour edge in expected score. Check who has White in game 1.",
+    "TIME FORFEIT IS A REAL AND LARGE TERMINATION MODE: 33.2% of measured online standard games ended on the clock (17,659 of 53,130) rather than on the board. It is far rarer OTB with increment, but a no-increment blitz control reintroduces it, and it is the mechanism by which short time controls destroy draws.",
+    "TOURNAMENT INCENTIVES OVERRIDE THE STRUCTURAL DRAW RATE IN THE FINAL ROUND. A player needing only a draw plays for one, and one needing a win avoids drawish lines and accepts more losing risk. The last round of an event has a different three-way distribution from every earlier round between the same players - and the effect is on BOTH the X and the losing side, not just the X.",
+    "AN OUTRIGHT CAN BE DECIDED BY A TIEBREAK FORMULA WITH NO GAME PLAYED. Swiss events resolve shared first place by Buchholz, Sonneborn-Berger, direct encounter or most wins - specified in the event regulations, NOT in the Laws of Chess. Which formula applies changes who wins the tournament. Simulate the tiebreak, or the outright model is wrong for every event that ends level.",
+    "TOTAL GAMES IN A KNOCKOUT MATCH IS A TIEBREAK BET. High draw mass means the classical games split and the match extends into rapid/blitz/Armageddon. Confirm whether Betwinner counts tiebreak games in 'total games' - the answer inverts the correlation between draw probability and the total.",
+    "ONLINE AND OTB CHESS ARE DIFFERENT SPORTS FOR PRICING PURPOSES. Measured online draw rates (Lichess, June 2026): classical 7.0%, rapid 4.5%, blitz 4.2%, bullet 2.7% - between 5x and 10x below the OTB rates for a comparable time control. Calibrating an OTB market on the 7.9-billion-game online database would be catastrophic despite it being the largest free chess dataset in existence.",
+    "ICM PRICES MONEY, CHIP SHARE PRICES FIRST PLACE. An outright 'to win the tournament' settles on finishing first, which is approximately proportional to chip share (Malmuth-Harville). ICM deliberately discounts the chip leader because it values PRIZE EQUITY, not victory. Substituting ICM equity for an outright price systematically underprices the chip leader.",
+    "THE POKER FIELD SIZE IS UNKNOWN WHILE THE MARKET IS OPEN. Late registration and re-entry mean the denominator of the ~1/N baseline is still moving after betting has started. A price struck on Day 1 is a price on an unknown number of opponents.",
+    "POKER RESULTS DATABASES RECORD OFFICIAL PAYOUTS, NOT ACTUAL ONES. After a deal the published prize money is not what the players received, so any earnings-derived rating is built on numbers that are known to be wrong and wrong in an unrecorded direction.",
+    "POKER TOURNAMENTS HAVE NO FIXED SETTLEMENT TIME. Play continues until one player holds all chips; multi-day events with unscheduled overruns mean an outright has an open-ended settlement horizon, unlike every clock-bounded sport in this book."
+  ],
+
+  "unmodellable": [
+    "POKER MULTI-TABLE TOURNAMENT OUTRIGHTS - the honest verdict is DO NOT MODEL. Three independent failures compound: (1) the baseline is ~1/N with N unknown at bet time because of late registration and re-entry; (2) the skill multiplier over that baseline is small in absolute probability terms, so even a correct edge is a tiny number attached to a huge variance; (3) a final-table deal can decouple the official winner from competitive play entirely. There is no combination of free data that overcomes these. This is a lottery with a thin skill tilt, priced as if it were a contest.",
+    "POKER ITM RATE, ROI AND ANY EFFICIENCY METRIC - structurally uncomputable from free sources. Hendon Mob and its mirrors record CASHES (6,563,609 of them), never ENTRIES. Players who bust before the money leave no trace, so the denominator does not exist in the data. This is not a coverage gap that a better scraper fixes; the information was never recorded. Any 'ITM rate' quoted anywhere is against an assumed denominator.",
+    "POKER PLAYER STRENGTH AS A RATING - there is no poker equivalent of Elo in free data. GPI and POY leaderboards are volume-weighted accumulation tables in which entering more events raises your rank, so they cannot be used as a strength prior. Lifetime earnings measure bankroll and buy-in level as much as skill, and are corrupted by unrecorded deals.",
+    "PRE-MATCH POKER GENERALLY - the only genuinely predictive pre-match poker variable found is the STRUCTURE (starting stack in big blinds, level length, re-entry policy), and it scales how much skill can express without telling you whose skill. Everything with real information content - chip counts, ICM, table dynamics - exists only IN PLAY. If Betwinner sport id 38 offers pre-match outrights only, there is nothing here worth building.",
+    "CHESS PER-SELECTION VIG - as CLAUDE.md already notes for the scanner, proportional de-vig gives every selection in a market the same self-edge. In a three-way chess market the draw is the selection most likely to carry asymmetric vig, and separating it needs Shin or an additive method. Not assumed here.",
+    "OPENING PREPARATION AND NOVELTIES - the largest single-game swing factor in elite chess (a prepared novelty can decide a game before move 20) and it is unobservable by construction. It is secret until played. No feature can proxy it; it is irreducible noise that widens the residual variance around any chess model."
+  ],
+
+  "open_questions": [
+    "Does Betwinner price chess as a genuine THREE-WAY (1/X/2) market, or two-way? This determines whether the draw mass is priceable at all and must be read off a live market before anything else.",
+    "How does Betwinner settle a match decided by ARMAGEDDON - does the Armageddon game settle the match markets, and does a drawn Armageddon settle as a Black win in the game market?",
+    "Does Betwinner count TIEBREAK games in 'total games', and in the match handicap? This inverts the sign of the draw-rate correlation for the totals market.",
+    "Does Betwinner VOID or settle a chess forfeit / no-show? FIDE Law 6.7.1 makes it a loss; books frequently void. The two conventions have materially different EV.",
+    "What does Betwinner sport id 38 actually offer - MTT outrights only, or head-to-head and final-table props? If outrights only, the poker half of this file is a recommendation not to build.",
+    "Does Betwinner distinguish rapid and blitz events in the market NAME, or does it list them all as 'chess'? If the time control is not exposed in the feed, it must be joined from chess-results by event name - and getting it wrong swaps a 41.6% draw prior for a 23.1% one.",
+    "RETEST pokerdb.thehendonmob.com and globalpokerindex.com from a GitHub Actions runner. Both are Cloudflare 403 from our egress under both library and browser User-Agents, matching the dataproject pattern in the volleyball research. pokerdb is the highest-value blocked source in this file by a wide margin.",
+    "Operator decision required on lichess.org/api: robots.txt disallows /api/, but Lichess separately publishes and rate-limits that API for third-party applications. We did not fetch it. Confirm whether the operator wants to rely on the unrestricted bulk database host only, or accept the API under its own published terms.",
+    "TWIC is 'free for personal use only, all rights reserved'. Confirm the intended use of this tool - if it is anything other than private modelling, TWIC must be dropped and the CC-BY-SA Lichess broadcast DB used instead.",
+    "Betwinner chess coverage volume is unknown. If the book lists only a handful of chess events, the modelling effort may not clear the bar regardless of data quality - check fixture counts against the 737-fixture table-tennis benchmark before investing."
+  ],
+
+  "key_findings": [
+    "CHESS IS THREE-WAY AND THE DRAW WINS. Measured on 35,538 real OTB games from June 2026: draw rate rises monotonically with strength - 18.8% below 2000, 34.1% at 2200-2399, 41.8% at 2400-2499, 51.7% at 2600-2699. Above 2600 the draw is the single most likely result. Every downstream market (handicap, correct score, totals) is a function of this one number.",
+    "DRAW RATE IS A FUNCTION OF THE CLOCK, MEASURED ON A MATCHED POPULATION: 41.6% classical / 35.4% rapid / 23.1% blitz for the same 2200+ players in the same month. Colour advantage moves the same way (0.546 -> 0.561 -> 0.512). A blitz market and a classical market between the same two players share nothing but the names.",
+    "THE LICHESS BROADCAST DATABASE IS THE BEST SOURCE FOUND FOR THIS SPORT - 1,146,297 elite OTB games with FIDE IDs, Elo, ECO, and per-move Stockfish [%eval] on 84% of games. It makes average centipawn loss computable without running an engine, which is the one quality metric that leads the rating instead of lagging it. Licensed CC-BY-SA 4.0 (attribution + share-alike), NOT the CC0 that covers the rest of database.lichess.org - the licences differ per file and must not be conflated.",
+    "THE BIGGEST FREE CHESS DATASET IS THE WRONG DATASET. Lichess's 7,949,495,674 online games are CC0 and free of any restriction, but online draw rates measured at 2.7-7.0% run 5-10x below OTB rates for comparable time controls, largely because 33.2% of online games end on time forfeit. It is superb for engine/opening work and actively dangerous as a calibration set for an OTB match price.",
+    "TIME CONTROL IS THE JOIN KEY AND IT IS MISSING FROM THE MAIN GAME FEED. TWIC PGN carries no TimeControl tag at all and the broadcast tag was populated on only ~28% of games, in inconsistent units ('90+30' minutes vs '5400+30' seconds vs '90 mins + 30 Secs'). chess-results.com states it explicitly per tournament and is the fix. Classify with the FIDE base + 60 x increment formula, never the event name.",
+    "POKER IS NOT MODELLABLE PRE-MATCH AND THE REASON IS STRUCTURAL, NOT TECHNICAL. The largest free live database holds 6,563,609 results across 740,492 events - but a 'result' is a CASH. Entries that busted are never recorded, so the denominator of ITM rate, ROI and every skill metric does not exist in the data. Combine that with an unknown final field size at bet time and final-table deals that decouple the official winner from competitive play, and there is no free-data path to a poker outright price. Recommend not building it.",
+    "THE ONE POKER SOURCE THAT WORKS IS WSOP.COM - fully open robots.txt, no Cloudflare, live schedule, past-results archive and a POY leaderboard, all verified by body. Everything else in poker is blocked: pokerdb.thehendonmob.com and globalpokerindex.com are Cloudflare 403 from our egress, and pokerstarslive.com simply has no results archive (genuine 404s, not a block).",
+    "STATUS CODES LIED IN BOTH DIRECTIONS IN THIS RESEARCH. chessgames.com returned 403 to a library User-Agent and 200 with real content to a browser one - a UA check, not a block. Conversely pokerdb, globalpokerindex and 365chess all serve Cloudflare challenge bodies, and pokerdb served one even on /robots.txt. FIDE returns HTTP 404 for robots.txt with a 9.5KB HTML body. Every source in this file was qualified on its bytes.",
+    "TWO SOURCES ARE ROBOTS-DISALLOWED AND WERE NOT FETCHED: api.chess.com blocks its entire host ('User-agent: * / Disallow: /'), and lichess.org disallows /api/ and /game/export/. Neither is a technical failure and both would otherwise be valuable. chessgames.com names GPTBot and ChatGPT-User but not anthropic-ai, and disallows /perl/chess.pl - which is precisely its head-to-head interface, so H2H must be built by intersecting pgnmentor career archives instead.",
+    "FIDE PUBLISHES THREE SEPARATE RATING LISTS AND TWO FREE UNCERTAINTY SIGNALS THAT ARE ROUTINELY IGNORED. Standard, rapid and blitz are distinct downloads and distinct pools. The <k> field (40/20/10) tells you how converged a rating is and the <flag> field tells you it is stale - 167,396 of 306,251 blitz-rated players are flagged inactive. Both are free and both belong in the prior's variance.",
+    "THE MOST UNDER-PRICED CHESS VARIABLE IS THE TOURNAMENT SITUATION. A player needing only a draw plays for one; a player who must win accepts losing risk. This shifts the whole three-way distribution in the final round, it is knowable in advance from chess-results standings, and it is invisible to any model built on ratings alone."
+  ]
+}

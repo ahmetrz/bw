@@ -3,14 +3,6 @@
   "researched": "2026-07-25",
   "verified": [
     {
-      "id": "fivb_vis",
-      "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
-      "auth": "none",
-      "verified": true,
-      "coverage": "1530 indoor + 9256 beach tournaments; VNL, Worlds, CEV, Italian Serie A M/W, Brazil National League. PER-SET points AND set duration.",
-      "note": "Does NOT cover PlusLiga or Turkish leagues. Silently drops unknown Fields, so it gives scores/schedule, not skill stats."
-    },
-    {
       "id": "tvf",
       "url": "https://tvf.org.tr/lig/efeler-ligi",
       "auth": "scraping",
@@ -49,6 +41,11 @@
   ],
   "blocked": [
     {
+      "id": "fivb_vis",
+      "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
+      "detail": "ROBOTS-DISALLOWED FOR US, and this entry previously said verified:true. www.fivb.org/robots.txt names our crawler explicitly — 'User-agent: ClaudeBot / Disallow: /' — alongside GPTBot, CCBot, Google-Extended and others, and the wildcard block carries a Content-Signal reservation of ai-train=no, use=reference. Re-read directly on 2026-07-25 to confirm rather than taking it second-hand. The endpoint itself works and its coverage was real (1530 indoor + 9256 beach tournaments; per-set points and set duration; no PlusLiga or Turkish leagues), which is exactly why the restriction matters: this was the primary source for BOTH indoor per-set markets and essentially all of beach volleyball, and there is no comparable free replacement for beach. Do not fetch it. Any use needs written permission from FIVB."
+    },
+    {
       "id": "dataproject",
       "detail": "RICHEST FREE SOURCE (per-set + per-skill team/player stats for SuperLega, PlusLiga, many federations). Blocked by OUR egress proxy (502 to CONNECT), NOT by the site - www.dataproject.com returned 200. HIGHEST-VALUE RETEST from a GitHub Actions runner."
     },
@@ -70,7 +67,8 @@
     }
   ],
   "key_findings": [
-    "Per-set scores confirmed in FIVB VIS, ESPN, TVF, PlusLiga, legavolley, CEV. Absent in TheSportsDB - which makes it unusable for the set-based markets that dominate volleyball.",
+    "COMPLIANCE CORRECTION 2026-07-25: FIVB is robots-disallowed for our crawler by name. It was the single best source here and is now off-limits, so the usable per-set sources are TVF, PlusLiga, legavolley and CEV - all national or continental, none global. Beach volleyball loses its only substantial free archive outright.",
+    "Per-set scores confirmed in TVF, PlusLiga, legavolley, CEV. Absent in TheSportsDB - which makes it unusable for the set-based markets that dominate volleyball.",
     "The 5th set is played to 15, which compresses the favourite's edge to near coin-flip (~50-53%). Total-sets and correct-set-score need a rally-level simulator, not a match-win probability.",
     "Total sets O/U 3.5 is a function of the strength GAP, not team quality: evenly matched strong teams go long, a mismatch ends 3-0. Never feed it raw team ratings.",
     "Side-out % is the master metric (65-72% in top leagues); break-point % is the scarcer skill that separates title teams.",

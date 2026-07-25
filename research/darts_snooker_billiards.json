@@ -1,0 +1,624 @@
+{
+  "sport": "darts_snooker_billiards",
+  "betwinner_sport_ids": [21, 30, 12],
+  "researched": "2026-07-25",
+  "headline": "Three sports, three data worlds. DARTS is the richest free-stats sport on the book: DartsOrakel serves an open JSON stats API over 4354+ players with raw numerator/denominator, and the PDC's own GameChanger backend answers unauthenticated. SNOOKER is the opposite - the two best sources (CueTracker, dartsdatabase-equivalent) disallow Claude bots by name and snooker.org's API is key-gated, so century/pot/safety stats have NO verified free route. POOL has authoritative rules but essentially no free per-match stat feed. In all three the FORMAT VARIES BY ROUND, which makes every total-legs/frames line non-comparable between rounds of the same event.",
+
+  "statistics": [
+    {
+      "id": "three_dart_average",
+      "sport": "darts",
+      "definition": "Points scored per three darts thrown = 3 x (total points / total darts). The master metric.",
+      "drives": ["match_winner", "leg_handicap", "total_legs", "correct_score"],
+      "free_source": "dartsorakel_stats_api (organStat default). Returns sumField1=points, sumField2=darts, so the raw numerator and denominator are exposed and you can re-aggregate or shrink yourself.",
+      "availability": "FREE, verified. Live values read 2026-07-25: Littler 101.36, Humphries 99.72, Price 98.70, Anderson 98.38, van Gerwen 97.30.",
+      "note": "~101 vs ~97 average is roughly a 60/40 leg edge, not a blowout. Averages compress; do not read a 4-point gap as a large match edge."
+    },
+    {
+      "id": "first_9_average",
+      "sport": "darts",
+      "definition": "Average over the first nine darts of a leg - pure scoring power, before the checkout phase contaminates it.",
+      "drives": ["total_legs", "most_180s", "leg_handicap"],
+      "free_source": "dartsorakel_stats_api (First 9 Averages)",
+      "availability": "FREE, verified in the stat menu.",
+      "note": "The correct scoring input for total-legs and 180s markets. Overall average mixes scoring with finishing and double-counts checkout skill."
+    },
+    {
+      "id": "first_3_average",
+      "sport": "darts",
+      "definition": "Average of the opening visit only.",
+      "drives": ["most_180s", "leg_handicap"],
+      "free_source": "dartsorakel_stats_api (First 3 Averages)",
+      "availability": "FREE, verified in the stat menu."
+    },
+    {
+      "id": "checkout_pct",
+      "sport": "darts",
+      "definition": "Doubles hit / doubles attempted.",
+      "drives": ["match_winner", "total_legs", "correct_score", "player_wins_a_leg"],
+      "free_source": "dartsorakel_stats_api (Checkout Pcnt)",
+      "availability": "FREE, verified in the stat menu.",
+      "note": "Highest-variance component of a darts model. Tour range is roughly 33-45%; the sampling error on a single event dwarfs the true-skill spread, so shrink hard toward the tour mean."
+    },
+    {
+      "id": "doubles_attempted",
+      "sport": "darts",
+      "definition": "Darts thrown at a double - the DENOMINATOR of checkout %.",
+      "drives": ["total_legs", "correct_score"],
+      "free_source": "dartsorakel_stats_api exposes sumField1/sumField2 pairs per stat, giving attempts as well as the ratio.",
+      "availability": "FREE, verified (raw pair fields present in API payload).",
+      "note": "Never consume checkout % without its attempts count. A 50% checkout on 12 attempts is noise. This is why the API's raw pair is more valuable than the displayed percentage."
+    },
+    {
+      "id": "functional_doubles_pct",
+      "sport": "darts",
+      "definition": "DartsOrakel metric isolating doubles attempted from a genuine finishing position.",
+      "drives": ["total_legs", "correct_score"],
+      "free_source": "dartsorakel_stats_api (Functional doubles pcnt)",
+      "availability": "FREE, verified in the stat menu."
+    },
+    {
+      "id": "checkout_pct_3_darter",
+      "sport": "darts",
+      "definition": "Checkout success when a three-dart finish is available.",
+      "drives": ["total_legs", "highest_checkout"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED (lock icon on /stats/player). GBP 0.99 day pass / GBP 4.99 month."
+    },
+    {
+      "id": "180s_total",
+      "sport": "darts",
+      "definition": "Count of maximum visits.",
+      "drives": ["most_180s", "total_180s"],
+      "free_source": "dartsorakel_stats_api (180's); mastercaller player pages",
+      "availability": "FREE, verified in the stat menu."
+    },
+    {
+      "id": "180s_per_leg",
+      "sport": "darts",
+      "definition": "180s normalised by legs played - the ONLY form usable for a most-180s market, because raw 180 counts scale with match length.",
+      "drives": ["most_180s", "total_180s"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED (lock icon confirmed). Derivable free: combine free 180's totals with free legs-played counts, or reconstruct from the raw sumField pairs.",
+      "note": "The single most important darts prop stat is behind the paywall in its ready-made form. Budget either the GBP 4.99/month or the derivation."
+    },
+    {
+      "id": "171_180_per_leg",
+      "sport": "darts",
+      "definition": "High-scoring visits (171-180) per leg - broader ceiling measure than 180s alone.",
+      "drives": ["most_180s"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED per-leg; the raw '171-180's' count is FREE."
+    },
+    {
+      "id": "scoring_band_distribution",
+      "sport": "darts",
+      "definition": "Frequency of 140s and 131-140s visits - the shape of the scoring distribution, not just its mean.",
+      "drives": ["total_legs", "most_180s"],
+      "free_source": "dartsorakel_stats_api (140's, 131-140's)",
+      "availability": "FREE, verified in the stat menu.",
+      "note": "Two players on a 99 average can have very different 180 rates. A high-variance scorer beats the most-180s line more often than his average implies."
+    },
+    {
+      "id": "legs_won_pct",
+      "sport": "darts",
+      "definition": "Share of all legs won.",
+      "drives": ["match_winner", "leg_handicap", "total_legs"],
+      "free_source": "dartsorakel_stats_api (Pcnt Legs Won)",
+      "availability": "FREE, verified."
+    },
+    {
+      "id": "hold_pct_legs_won_throwing_first",
+      "sport": "darts",
+      "definition": "HOLD: share of legs won when throwing first. Throwing first is a large structural advantage.",
+      "drives": ["match_winner", "leg_handicap", "total_legs", "correct_score", "player_wins_a_leg"],
+      "free_source": "dartsorakel_stats_api (Pcnt Legs Won Throwing First)",
+      "availability": "FREE, verified.",
+      "note": "Darts is structurally a serve sport. Model hold and break separately, exactly as in tennis, then simulate the leg sequence - do not use a single match-win probability."
+    },
+    {
+      "id": "break_pct_legs_won_throwing_second",
+      "sport": "darts",
+      "definition": "BREAK: share of legs won when throwing second (against the throw).",
+      "drives": ["match_winner", "leg_handicap", "total_legs", "correct_score"],
+      "free_source": "dartsorakel_stats_api (Pcnt Legs Won Throwing Second)",
+      "availability": "FREE, verified.",
+      "note": "Break rate is the scarcer skill and separates elite from tour-average far more than the headline average does. It is also the main driver of total-legs: two high-hold players produce short, chalky matches."
+    },
+    {
+      "id": "with_against_throw_average",
+      "sport": "darts",
+      "definition": "Three-dart average split by whether the player threw first in the leg.",
+      "drives": ["leg_handicap", "total_legs"],
+      "free_source": "dartsorakel_stats_api (With Throw Averages / Against Throw Averages)",
+      "availability": "FREE, verified.",
+      "note": "Against-throw average is the cleaner pressure metric: it measures scoring when chasing."
+    },
+    {
+      "id": "highest_checkout",
+      "sport": "darts",
+      "definition": "Largest finish achieved.",
+      "drives": ["highest_checkout"],
+      "free_source": "dartsorakel_stats_api (Highest Checkout)",
+      "availability": "FREE, verified.",
+      "note": "See rules_critical: the support of this market is DISCRETE and gappy, not continuous."
+    },
+    {
+      "id": "deciding_leg_record",
+      "sport": "darts",
+      "definition": "Win rate in deciding legs.",
+      "drives": ["match_winner", "correct_score"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED (Pcnt Deciding Legs Won).",
+      "note": "Treat as near-noise regardless: deciding-leg samples are tiny and the throw advantage explains most of the variation."
+    },
+    {
+      "id": "opponent_average",
+      "sport": "darts",
+      "definition": "Average conceded by opponents - a strength-of-schedule correction.",
+      "drives": ["match_winner"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED (Opponent Averages).",
+      "note": "Matters a lot on Challenge/Development tour where field strength varies wildly between events."
+    },
+    {
+      "id": "whitewash_rate",
+      "sport": "darts",
+      "definition": "Frequency of winning/losing without conceding a leg or set.",
+      "drives": ["correct_score", "leg_handicap", "player_wins_a_leg"],
+      "free_source": "dartsorakel_stats_api (Whitewashes for / Whitewashes against)",
+      "availability": "FREE, verified.",
+      "note": "This is the DIRECT empirical prior for the 'wins at least one leg' safety rung - it is literally the complement of being whitewashed."
+    },
+    {
+      "id": "high_average_frequency",
+      "sport": "darts",
+      "definition": "Count of matches averaging 95+/100+/105+/110+ - the ceiling and consistency profile.",
+      "drives": ["match_winner", "most_180s"],
+      "free_source": "dartsorakel_stats_api (110+/105+/100+/95+ Averages)",
+      "availability": "FREE, verified."
+    },
+    {
+      "id": "leg_efficiency_12_15_18_darter",
+      "sport": "darts",
+      "definition": "Rate of finishing in 12/15/18 darts when that was available - direct leg-length distribution.",
+      "drives": ["total_legs", "total_180s"],
+      "free_source": "dartsorakel",
+      "availability": "PAYWALLED (all three)."
+    },
+    {
+      "id": "match_win_pct_and_form",
+      "sport": "darts",
+      "definition": "Match win rate; DartsOrakel additionally publishes a proprietary FDI form rating.",
+      "drives": ["match_winner"],
+      "free_source": "dartsorakel_stats_api (Match win pcnt); FDI rankings page",
+      "availability": "FREE, verified.",
+      "note": "FDI is proprietary and opaque - use as a sanity check, never as a model input you cannot reproduce."
+    },
+    {
+      "id": "century_breaks",
+      "sport": "snooker",
+      "definition": "Breaks of 100+ in a match/season. The headline scoring-power metric and a directly traded market.",
+      "drives": ["century_breaks_over_under", "total_frames", "match_winner"],
+      "free_source": "NO VERIFIED FREE ROUTE. CueTracker (the canonical source) disallows ClaudeBot by name; snooker.org's /brk/ breaks database is Disallow'd in robots.txt; the snooker.org API carries no break fields and is key-gated.",
+      "availability": "BLOCKED. Wikipedia tournament pages list centuries per event as prose/tables - the only compliant free fallback, and it is event-level, not player-form-level.",
+      "note": "This is the biggest single data gap in the three sports. A century-breaks market cannot be modelled from a verified free feed today."
+    },
+    {
+      "id": "breaks_over_50",
+      "sport": "snooker",
+      "definition": "Breaks of 50+ - a less noisy scoring-power measure than centuries because the counts are several times larger.",
+      "drives": ["century_breaks_over_under", "total_frames", "frame_handicap"],
+      "free_source": "Same blockage as centuries.",
+      "availability": "BLOCKED.",
+      "note": "Statistically the better input of the two: century counts per match are small-integer Poisson draws with brutal variance."
+    },
+    {
+      "id": "highest_break_and_147s",
+      "sport": "snooker",
+      "definition": "Best break made; count of maximums.",
+      "drives": ["highest_break_market", "century_breaks_over_under"],
+      "free_source": "wst.tv has a '147s' section; Wikipedia maintains maximum-break lists.",
+      "availability": "PARTIAL - WST is client-rendered so the page body carries no data; Wikipedia is the compliant fallback."
+    },
+    {
+      "id": "pot_success_pct",
+      "sport": "snooker",
+      "definition": "Balls potted / pot attempts.",
+      "drives": ["match_winner", "frame_handicap", "total_frames"],
+      "free_source": "None verified free. CueTracker publishes it but is robots-blocked for us.",
+      "availability": "BLOCKED."
+    },
+    {
+      "id": "safety_success_pct",
+      "sport": "snooker",
+      "definition": "Share of safety shots that leave the opponent without a pot.",
+      "drives": ["total_frames", "frame_handicap", "match_winner"],
+      "free_source": "None verified free.",
+      "availability": "BLOCKED.",
+      "note": "The key TOTAL-FRAMES input: two strong safety players grind long, low-scoring frames; the match runs long in TIME but the frame COUNT still depends on the skill gap, not the style."
+    },
+    {
+      "id": "long_pot_pct",
+      "sport": "snooker",
+      "definition": "Success rate on long-range pots - the main determinant of who gets first chance in a frame.",
+      "drives": ["match_winner", "frame_handicap"],
+      "free_source": "None verified free.",
+      "availability": "BLOCKED."
+    },
+    {
+      "id": "frame_time",
+      "sport": "snooker",
+      "definition": "Average minutes per frame.",
+      "drives": ["total_frames_time_markets", "session_structure"],
+      "free_source": "Derivable from snooker.org match pages (scheduled/actual session times) at low fidelity.",
+      "availability": "PARTIAL.",
+      "note": "Frame TIME does not map to frame COUNT. A slow match can still be 10-2. Never substitute one for the other."
+    },
+    {
+      "id": "scoring_per_visit",
+      "sport": "snooker",
+      "definition": "Points per visit to the table - the cleanest continuous measure of scoring threat.",
+      "drives": ["frame_handicap", "total_frames", "century_breaks_over_under"],
+      "free_source": "None verified free.",
+      "availability": "BLOCKED."
+    },
+    {
+      "id": "deciding_frame_record",
+      "sport": "snooker",
+      "definition": "Win rate in final frames.",
+      "drives": ["match_winner", "correct_score"],
+      "free_source": "Derivable by scraping snooker.org result pages, which annotate frame scores and flag frames 'Decided on the final black'.",
+      "availability": "PARTIAL - verified that snooker.org exposes framescores and final-black annotations."
+    },
+    {
+      "id": "frames_won_pct_by_format_length",
+      "sport": "snooker",
+      "definition": "Frame win rate segmented by match distance (Bo7 vs Bo19+).",
+      "drives": ["match_winner", "frame_handicap", "total_frames"],
+      "free_source": "Derivable from snooker.org event/round data plus a format registry.",
+      "availability": "PARTIAL.",
+      "note": "Essential, not optional: several players have a well-known long-format edge, and the round-by-round format change makes this the highest-leverage snooker segmentation."
+    },
+    {
+      "id": "break_and_run_pct",
+      "sport": "pool",
+      "definition": "Share of racks where the breaker pockets a ball on the break and runs out without the opponent ever shooting.",
+      "drives": ["match_winner", "rack_handicap", "total_racks"],
+      "free_source": "No verified free per-match feed. worldnineballtour.com publishes live scores and rankings but not rack-level stats.",
+      "availability": "BLOCKED at rack level.",
+      "note": "The dominant pool statistic. Under WINNER-BREAKS a high break-and-run rate compounds into runouts of many racks; under ALTERNATE BREAK the same skill produces a far tighter match. The rate is only interpretable alongside the break format."
+    },
+    {
+      "id": "break_win_pct_and_dry_break_pct",
+      "sport": "pool",
+      "definition": "Rack win rate when breaking; and the share of breaks that pocket nothing.",
+      "drives": ["match_winner", "rack_handicap", "total_racks"],
+      "free_source": "None verified free.",
+      "availability": "BLOCKED.",
+      "note": "This is pool's hold/break pair, the exact analogue of the darts throw-first/throw-second split."
+    },
+    {
+      "id": "safety_battle_stats",
+      "sport": "pool",
+      "definition": "Safety success rate, escape/kick success, and fouls conceded during safety exchanges.",
+      "drives": ["total_racks", "match_winner"],
+      "free_source": "None verified free; WPA rulebook defines the foul framework (three-foul rule, push-out) that these measure.",
+      "availability": "BLOCKED at stat level, rules VERIFIED."
+    },
+    {
+      "id": "rack_format_effects",
+      "sport": "pool",
+      "definition": "Race length, break format (alternate vs winner-breaks), rack template, and whether a 9-on-the-break wins the rack.",
+      "drives": ["all_pool_markets"],
+      "free_source": "wpa_rulebook (2026 WPA Rules PDF, 44pp); ultimatepoolgroup.com/rules; per-event pages on worldnineballtour.com",
+      "availability": "FREE, verified.",
+      "note": "In pool the FORMAT is a bigger predictor than any player stat. Get the format registry right before touching player form."
+    },
+    {
+      "id": "golden_break_rate",
+      "sport": "pool",
+      "definition": "Ultimate Pool only: rate of potting the 8-ball on the break (instant frame win) and of the Golden Duck (8-ball plus cue ball, or foul = instant frame loss).",
+      "drives": ["total_racks", "correct_score", "match_winner"],
+      "free_source": "ultimatepoolgroup.com/rules confirms the rule exists and is TOURNAMENT-SPECIFIC.",
+      "availability": "Rule VERIFIED; rate not published.",
+      "note": "Adds a fat two-sided tail to frame outcomes that no standard pool model contains."
+    },
+    {
+      "id": "deciding_rack_and_shootout_record",
+      "sport": "pool",
+      "definition": "Record in deciding racks; and in Ultimate Pool, record in the 6-Reds Shootout used to break a tie.",
+      "drives": ["match_winner"],
+      "free_source": "ultimatepoolgroup.com/rules (shootout mechanism verified).",
+      "availability": "Rule VERIFIED; record not published."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "pdc_participants_api",
+      "url": "https://participants.darts.web.gc.pdcservices.co.uk/v2/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "OFFICIAL PDC data, open JSON:API, no key. Body read 2026-07-25 returned Luke Littler id 40676, ranking 1, prizeMoney 4574925, dob 2007-01-21, countryCode GB-ENG, homeTown, makeOfDart, weightOfDart, walkOnSongMusic, isLeftHanded. Per-player detail at /v2/{id}.",
+      "note": "Discovered by reading API hosts out of the pdc.tv JS bundle. The sibling .admin. host is 502'd by our egress proxy; the .web. host answers."
+    },
+    {
+      "id": "pdc_tournaments_api",
+      "url": "https://tournaments.darts.web.gc.pdcservices.co.uk/v2/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "OFFICIAL PDC tournament registry back to 1992. Body read returned id 8303 '1992 UK Masters' with venue, city, seasonID, winnerParticipantID, tournamentTypeID, tournamentCategoryID, startDate/endDate, isRanked, isTelevised, fixtureCount, plus cross-reference ids dartConnectID and sportRadarTournamentID.",
+      "note": "isRanked/isTelevised/fixtureCount make this the natural spine for the FORMAT REGISTRY that the round-by-round trap requires. dartConnectID points at the scoring system that generates per-leg stats."
+    },
+    {
+      "id": "dartsorakel_stats_api",
+      "url": "https://dartsorakel.com/api/stats/player",
+      "auth": "none",
+      "verified": true,
+      "coverage": "THE single best free source across all three sports. Open JSON, no key, no rate limit observed. Body read returned recordsTotal 4354 (default) / 11235 (filtered) with real three-dart averages: Littler 101.36, Humphries 99.72, Price 98.70, Anderson 98.38, van Gerwen 97.30. Crucially exposes sumField1/sumField2 = the raw numerator and denominator, so sample sizes and shrinkage are computable.",
+      "note": "Confirmed query params read out of the page JS: organStat, tourns (All|TV Ranking|TV|PDC|PDCE|Prem|Challenge|Development|Women|WDF|OTHER), minMatches, tourCardYear, dateFrom, dateTo, excludeWGP, showStatsBreakdown, rankKey. The organStat vocabulary is a select2 dropdown and must be read off the live page; my guessed values silently fell back to the default stat rather than erroring - a real trap for a scraper."
+    },
+    {
+      "id": "dartsorakel_excludewgp_flag",
+      "url": "https://dartsorakel.com/api/stats/player?excludeWGP=1",
+      "auth": "none",
+      "verified": true,
+      "coverage": "An explicit 'Exclude Grand Prix' filter exists and measurably changes results: Littler's average moved 101.36 -> 101.87 with excludeWGP=1.",
+      "note": "First-party confirmation that World Grand Prix double-start play contaminates averages. The source itself treats WGP as a different product - so must any model."
+    },
+    {
+      "id": "dartsorakel_stat_menu",
+      "url": "https://dartsorakel.com/stats/player",
+      "auth": "none (free tier) / paid",
+      "verified": true,
+      "coverage": "FREE: Averages, 110+/105+/100+/95+ Averages, Whitewashes for/against, Match win pcnt, 180's, Checkout Pcnt, Pcnt Legs Won, Highest Checkout, First 9 Averages, First 3 Averages, With Throw Averages, Against Throw Averages, Pcnt Legs Won Throwing First, Pcnt Legs Won Throwing Second, 171-180's, 140's, 131-140's, Functional doubles pcnt.",
+      "note": "PAYWALLED (lock icon in body): Pcnt 12/15/18 Darter When Possible, Checkout Pcnt 3 Darter, 180's per leg, 171-180's per leg, Pcnt Deciding Legs Won, Opponent Averages. Pricing read from /subscription/programs: GBP 0.99 one-day pass, GBP 4.99/month."
+    },
+    {
+      "id": "dartsorakel_fixtures_api",
+      "url": "https://dartsorakel.com/api/match/upcoming-matches-datatable",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Open JSON fixture feed. Body read returned 4 live records for 'Womens World Matchplay 2026' quarter finals dated 2026-07-26 with player names and player_key ids.",
+      "note": "Gives the player_key needed to join fixtures to the stats API."
+    },
+    {
+      "id": "mastercaller",
+      "url": "https://mastercaller.com/players/{slug}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "SERVER-RENDERED (unlike pdc.tv and dartsorakel player pages). Body read for gerwyn-price returned real values: eight distinct PDC ranking tables (World, European Tour, World Series, ProTour, Players Championship, and separate Race Tables for Matchplay/Grand Prix/World Championship), plus nickname, age, dart spec, walk-on music. Covers BDO, PDC and WDF. Sections: /matchcenter, /matchcenter/{y}/{m}/{d}, /pdc-tournaments, /pdc-rankings, /nine-darters, /players.",
+      "note": "No robots.txt at all (404) so nothing is disallowed. The per-date matchcenter is the most useful part: it is a dated results archive, which dartsorakel's fixture API is not."
+    },
+    {
+      "id": "snooker_org_api",
+      "url": "https://api.snooker.org/",
+      "auth": "GATED - requires an approved X-Requested-By header value obtained by emailing webmaster@snooker.org",
+      "verified": true,
+      "coverage": "Verified GATED, not open. An arbitrary X-Requested-By returns HTTP 401.5 Unauthorized (IIS) on every data endpoint - /?e=1 and /?p=1 both 401.5. Only the docs page and help.html render.",
+      "note": "LICENCE: the docs state it is 'free for non-commercial use as long as you mention the original source' and that COMMERCIAL use requires contacting them first. A betting product is plausibly commercial - this is a licence question, not just a key question. Documented endpoints (if approved): event, match, player, events-in-season, matches-of-event, ongoing matches, matches-for-player-in-season, players-in-event, players, rankings, round info. NO break/century/pot/safety fields exist in the schema, so approval would still not deliver snooker scoring stats."
+    },
+    {
+      "id": "snooker_org_api_help",
+      "url": "https://api.snooker.org/help.html",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Field catalogue read in full, ungated. Event Format: 1 Cup, 2 Round-robin, 3 Cup-and-round-robin. Round ids enumerated (Qualifying 1-8, Round Robin 19, Wildcard 16, Rounds 1-6, QF 13, SF 14, Final 15, Bronze final 18). Match Status: 0 not started, 1 ongoing, 2 ON BREAK (between sessions), 3 finished. HeldOver flag = match moved to the main arena. Estimated flag = no fixed start time, plays when the previous match ends.",
+      "note": "CRITICAL LINE, quoted from the docs: 'When Value Type is CLR you will know that matches can end 3-0, 3-1 or 2-2 (unless it's the final).' A 2-2 is a DRAW - snooker round-robin events produce drawn matches. See rules_critical."
+    },
+    {
+      "id": "snooker_org_site",
+      "url": "https://www.snooker.org/res/index.asp?event={id}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Server-rendered event pages. Body read for event=1477 returned 'German Masters Qualifiers (2023)', round structure ('Qual Round 1 (Last 128)'), a framescores toggle, and the annotation 'Decided on the final black'.",
+      "note": "robots.txt ALLOWS this path. It disallows /cgi-bin/, /forum/, /res/scorekeeper/admin/ and - importantly - /brk/, which is the breaks (century) database. The one thing we most need from snooker.org is the one path robots.txt forbids."
+    },
+    {
+      "id": "wpa_rulebook",
+      "url": "https://wpapool.com/wp-content/uploads/2026/01/2026.01.02-WPA-Rules.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Authoritative current World Pool-Billiard Association rulebook. Verified by body: real PDF (magic bytes %PDF-1.7) with /Count 44 pages. Sibling PDFs on the same site: Sports Regulations, Sanctioning Regulations, Equipment Specifications, Pyramid Rules, Heyball Rules, International 8-Ball Rules (Feb 2021).",
+      "note": "robots.txt is Disallow-empty (allow all). The rules are the free, reliable part of pool; the statistics are not."
+    },
+    {
+      "id": "worldnineballtour",
+      "url": "https://worldnineballtour.com/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "matchroompool.com 301s here. Server-rendered. Body read returned live nav for Live Scores, Schedule, Rankings, Players, NXTGEN, plus current news (Reyes Cup, US Open Pool Championship, Mosconi Cup).",
+      "note": "Matchroom's official pool property - the authority for event FORMAT (race lengths, break format), which is what pool modelling actually needs. Rack-level statistics are not published."
+    },
+    {
+      "id": "ultimate_pool",
+      "url": "https://ultimatepoolgroup.com/rules",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "ultimatepool.tv 301s here. Body read in full. Confirms: all UPG events use International 8-Ball Rules (formerly 'Supreme Rules'); GOLDEN BREAK (8-ball off the break = instant frame WIN) and GOLDEN DUCK (8-ball plus cue ball, or a foul = instant frame LOSS); 6-REDS SHOOTOUT to decide a tied contest; and a MATCH CLOCK. Live event data at /home shows European Open 2026, Pro Series, Champions League.",
+      "note": "The page states these extras are applied per-event ('several televised Ultimate Pool events have additional tournament specific rules attached') - so they cannot be assumed from the league name."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php",
+      "auth": "none",
+      "verified": true,
+      "coverage": "The ONLY compliant free source that reliably carries ROUND-BY-ROUND FORMAT, which is the headline trap. Verified by body: the 2026 PDC World Darts Championship Format section states all players including 32 seeds enter round 1 (a change from prior years), matches are set format with sets-to-win increasing by round, all non-deciding sets are best of five legs, the deciding set applies a 2-2 tie-break where a player must lead by two legs, and at 5-5 a sudden-death leg decides. Also verified: 2025 World Snooker Championship qualifying was best of 19 over two sessions; Snooker Shoot Out is one frame, max 10 minutes, with a shot clock.",
+      "note": "Licence CC BY-SA - attribution required if any text is redistributed. Wikipedia is the format registry; it is NOT a per-match stats feed."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Endpoint verified live by body: returned well-formed application/sparql-results+json for a test query.",
+      "note": "HONEST LIMIT: my test query used a QID that returned ZERO bindings, so the endpoint is proven live but darts/snooker/pool COVERAGE is NOT proven. Do not treat as a confirmed data source until a real query is run."
+    },
+    {
+      "id": "wst_tv",
+      "url": "https://www.wst.tv/rankings/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "VERIFIED AS UNUSABLE BY SCRAPING, which is the point of recording it. HTTP 200 and 190,890 bytes, but the rendered body reads 'Loading...' - the page is a client-side Nuxt app. The embedded __NUXT__ state shows the data shape (snookerStore: rankings, players, draws, tournaments, framesHome/framesAway, pointsHome/pointsAway, currentBreak, numberOfFrames, currentFrame, ballsRemaining) but ships it EMPTY.",
+      "note": "A status-code check would score this a healthy 200. /results/, /livescores/ and /calendar/ return only a 6,169-byte SPA shell. Data comes from gc.wstservices.co.uk, which our proxy blocks - see blocked."
+    },
+    {
+      "id": "pdc_tv_site",
+      "url": "https://www.pdc.tv/rankings",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "VERIFIED AS AN EMPTY SHELL. HTTP 200 and 1,207,939 bytes downloaded, yet stripping script/style tags leaves ZERO visible text and the payload contains no player names. /rankings, /stats and /statistics all return byte-identical responses - a catch-all route, not three pages.",
+      "note": "The strongest illustration in this research of the verification rule: 1.2 MB and a 200 that contains nothing. Its only value was the API hostnames in the JS bundle, which led to the two working PDC endpoints above."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "cuetracker",
+      "detail": "COMPLIANCE BLOCK - NOT FETCHED. cuetracker.net/robots.txt contains an explicit 'User-agent: ClaudeBot / Disallow: /'. It additionally sets Content-Signal: ai-train=no, use=reference, and disallows /api/ and /App/ for every agent. CueTracker is the canonical free snooker statistics database (centuries, breaks 50+, pot success, safety success, long pots, per-frame detail) - so the single richest snooker source is off-limits by name. Only a licensing conversation with the operator, not a technical workaround, unblocks this."
+    },
+    {
+      "id": "dartsdatabase",
+      "detail": "COMPLIANCE BLOCK - NOT FETCHED. www.dartsdatabase.co.uk/robots.txt contains 'User-agent: ClaudeBot / Disallow: /' plus Content-Signal: ai-train=no, use=reference. Same Cloudflare-managed block list as CueTracker. Loss is mitigated: DartsOrakel, Mastercaller and the PDC API together cover darts well."
+    },
+    {
+      "id": "dartswdf",
+      "detail": "COMPLIANCE BLOCK - NOT FETCHED. dartswdf.com/robots.txt is 'User-agent: * / Disallow: /' with Allow re-granted ONLY to named search engines (Googlebot, Bingbot, DuckDuckBot, Slurp, Yandex) and Meta crawlers. We are not on the allowlist, so the whole site is disallowed. This removes the official WDF/BDO source; WDF results must come via Mastercaller (which covers WDF and has no robots.txt) instead."
+    },
+    {
+      "id": "wst_gamechanger_backend",
+      "detail": "gc.wstservices.co.uk - the World Snooker Tour data backend - fails with 'CONNECT tunnel failed, response 502'. This is OUR egress proxy, NOT the site, and NOT a robots issue. Same failure signature as the volleyball 'dataproject' finding. HIGH-VALUE RETEST from a GitHub Actions runner: it is the only plausible route to official WST rankings/draws/live frame state."
+    },
+    {
+      "id": "pdc_matches_api",
+      "detail": "matches.darts.web.gc.pdcservices.co.uk and matches.darts.admin.gc.pdcservices.co.uk both fail with 502 CONNECT tunnel failed via our proxy, while the participants and tournaments hosts on the SAME domain answer fine. Almost certainly a proxy/DNS artefact rather than a block. HIGH-VALUE RETEST from Actions - this is the official PDC match-results feed and would complete the darts stack."
+    },
+    {
+      "id": "snooker_org_breaks_db",
+      "detail": "www.snooker.org/brk/ is explicitly Disallow'd in snooker.org's robots.txt for all agents. That path is the century/high-break database. Not fetched. The rest of snooker.org (/res/) is allowed and was used."
+    },
+    {
+      "id": "app_mastercaller",
+      "detail": "app.mastercaller.com fails TLS with 'self-signed certificate' even against the proxy CA bundle. The main site mastercaller.com is fine and was used instead. Not investigated further; do not disable TLS verification to reach it."
+    },
+    {
+      "id": "betwinner_market_vocabulary",
+      "detail": "NOT A SITE BLOCK - A DATA GAP. This repo's cached Betwinner data (data/*.json, fixtures/sample.json) contains sport_id 1 (football) only. The actual Betwinner market names, market-group ids and settlement wording for sport ids 21/30/12 have NOT been pulled or read. Every stat_to_bet mapping below is therefore keyed to GENERIC market names, not to confirmed Betwinner market ids."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_safety_ladder_note": "All three are two-outcome sports with no draw in normal play (the round-robin snooker exception is flagged in rules_critical). The safest directional expression of a view is therefore NOT the match winner but the 'wins at least one unit' rung: darts = player to win at least 1 leg (equivalently, leg handicap +N.5 at the whitewash boundary, or NOT to be whitewashed); snooker = player to win at least 1 frame (frame handicap +N.5 at the whitewash boundary); pool = player to win at least 1 rack. Betwinner does not always list these as named markets - where absent, the rung is constructed from the largest available underdog handicap, and the empirical prior for it is the opponent's WHITEWASH-FOR rate, which DartsOrakel publishes free.",
+
+    "match_winner": {
+      "darts": ["hold_pct_legs_won_throwing_first", "break_pct_legs_won_throwing_second", "three_dart_average", "checkout_pct", "match_win_pct_and_form", "opponent_average"],
+      "snooker": ["frames_won_pct_by_format_length", "scoring_per_visit", "long_pot_pct", "safety_success_pct", "deciding_frame_record"],
+      "pool": ["break_win_pct_and_dry_break_pct", "break_and_run_pct", "rack_format_effects"],
+      "note": "Build from the unit level (leg/frame/rack), never fit match win probability directly - only a unit model prices the handicap, total and correct-score consistently."
+    },
+    "leg_frame_rack_handicap": {
+      "darts": ["hold_pct_legs_won_throwing_first", "break_pct_legs_won_throwing_second", "with_against_throw_average", "whitewash_rate"],
+      "snooker": ["frames_won_pct_by_format_length", "scoring_per_visit", "breaks_over_50"],
+      "pool": ["break_and_run_pct", "break_win_pct_and_dry_break_pct", "rack_format_effects"],
+      "note": "A handicap is a statement about the MARGIN distribution and is only meaningful once the match distance is known. The same -3.5 is a routine line in a Bo19 and near-impossible in a Bo7."
+    },
+    "total_legs_frames_racks": {
+      "darts": ["hold_pct_legs_won_throwing_first", "break_pct_legs_won_throwing_second", "first_9_average", "checkout_pct", "leg_efficiency_12_15_18_darter"],
+      "snooker": ["frames_won_pct_by_format_length", "safety_success_pct", "scoring_per_visit"],
+      "pool": ["break_and_run_pct", "rack_format_effects", "golden_break_rate"],
+      "note": "Driven by the strength GAP, not by quality - the same lesson as volleyball total sets. Two elite high-hold players produce a SHORT match; a mismatch also produces a short match; the long matches are the evenly-matched mid-tier. The relationship is non-monotonic in team quality and strictly a function of closeness."
+    },
+    "correct_score": {
+      "darts": ["hold_pct_legs_won_throwing_first", "break_pct_legs_won_throwing_second", "whitewash_rate", "deciding_leg_record"],
+      "snooker": ["frames_won_pct_by_format_length", "deciding_frame_record"],
+      "pool": ["break_and_run_pct", "break_win_pct_and_dry_break_pct"],
+      "note": "Correct score is the full unit-count distribution. If your model cannot emit it, it cannot honestly price the handicap or total either."
+    },
+    "most_180s": {
+      "darts": ["180s_per_leg", "first_9_average", "first_3_average", "scoring_band_distribution", "171_180_per_leg", "high_average_frequency"],
+      "note": "MUST use a per-leg rate and then multiply by the EXPECTED LEG COUNT for that specific format. Raw 180 counts are length-contaminated. Also confirm the dead-heat rule: a tie on 180s is common and its treatment (dead heat vs push vs tie-outcome offered) changes EV materially."
+    },
+    "total_180s": {
+      "darts": ["180s_per_leg", "first_9_average", "scoring_band_distribution", "leg_efficiency_12_15_18_darter"],
+      "note": "A joint bet on scoring power AND match length. In a set-format event the leg count is far more variable than in leg format, which fattens both tails."
+    },
+    "highest_checkout": {
+      "darts": ["highest_checkout", "checkout_pct_3_darter", "checkout_pct"],
+      "note": "The support is DISCRETE and gappy - see rules_critical. Treat as a bet on the number of long finishes attempted, which scales with leg count and with how often players are left above 100."
+    },
+    "century_breaks_over_under": {
+      "snooker": ["century_breaks", "breaks_over_50", "scoring_per_visit", "highest_break_and_147s", "frames_won_pct_by_format_length"],
+      "note": "Currently UNMODELLABLE from a verified free source - the required stats are all behind the CueTracker/snooker.org robots blocks. Per-match century counts are small-integer Poisson draws; the expected count scales with FRAME COUNT, so the round's format is as important as the players."
+    },
+    "player_to_win_a_set_frame_leg": {
+      "darts": ["whitewash_rate", "break_pct_legs_won_throwing_second", "hold_pct_legs_won_throwing_first"],
+      "snooker": ["frames_won_pct_by_format_length", "scoring_per_visit"],
+      "pool": ["break_win_pct_and_dry_break_pct", "break_and_run_pct"],
+      "note": "THIS IS THE SAFETY-LADDER RUNG. It is the highest-probability directional market in each sport and the one with the smallest model-error exposure, because it only asks whether the underdog is competitive at all - not whether he wins. Its empirical prior is the FAVOURITE'S WHITEWASH-FOR RATE, published free by DartsOrakel. Note the rung shifts with format: winning at least one LEG is far easier than winning at least one SET, and in a set-format event a player can win five legs and still be whitewashed on sets."
+    },
+    "first_leg_frame_winner": {
+      "darts": ["hold_pct_legs_won_throwing_first", "first_9_average"],
+      "snooker": ["long_pot_pct", "scoring_per_visit"],
+      "note": "In darts this is close to a pure throw-advantage bet - identify who throws first (bull-off winner or scheduled order) before anything else."
+    }
+  },
+
+  "rules_critical": [
+    "HEADLINE TRAP - FORMAT VARIES BY ROUND IN ALL THREE SPORTS. A 'total frames over 8.5' is not the same bet in round 1 as in the semi-final of the SAME tournament, and a Bo11 model applied to a Bo19 final is a different bet entirely. Never inherit distance from the tournament name; resolve it per fixture. Confirmed instances: 2025 World Snooker Championship qualifying was best of 19 over two sessions while main-stage rounds lengthen toward a Bo35 final; the PDC World Championship increases sets-to-win each round.",
+    "DARTS 501 DOUBLE-OUT: a leg is won only by hitting a DOUBLE (or the 50 bull) that lands the score exactly on zero. Overshooting, landing on 1, or reaching zero without a double is a BUST - the visit is void and the score reverts to what it was before the visit. Busts make leg length right-skewed and are the main reason checkout % is so noisy.",
+    "MAXIMUM 3-DART CHECKOUT IS 170 (T20 T20 Bull), and the impossible ('bogey') checkouts at or below 170 are exactly 159, 162, 163, 165, 166, 168 and 169 - computed exhaustively, not recalled. The maximum 2-dart checkout is 110. Consequence for the HIGHEST CHECKOUT market: the support above 160 is only {161, 164, 167, 170}. An 'over 160.5' line has four reachable values, so a continuous or normal-shaped model of that market is simply wrong.",
+    "DARTS LEG FORMAT vs SET FORMAT ARE DIFFERENT PRODUCTS. In set format a set is normally first-to-3-legs and the match is best-of-N SETS. A 'total legs' line and a 'total sets' line are not interchangeable, and a player can win more legs than his opponent and still lose the match. Verify which unit Betwinner's market counts before pricing anything.",
+    "PDC WORLD CHAMPIONSHIP DECIDING SET (current format, confirmed on the 2026 edition): non-deciding sets are best of five legs, but in the DECIDING set, if the score reaches 2-2 a player must then lead BY TWO LEGS to win, and if that deciding set reaches 5-5 the match is settled by a single SUDDEN-DEATH LEG. Total-legs and correct-score models that assume a fixed five-leg set will misprice the tail of every deciding set.",
+    "WORLD GRAND PRIX IS DOUBLE-START AND DOUBLE-FINISH - a leg cannot begin until a double is hit. This depresses averages, inflates darts-per-leg, and makes WGP data non-comparable with every other event. DartsOrakel ships an explicit excludeWGP filter for exactly this reason, and toggling it moved Littler's average 101.36 -> 101.87. Any average, 180-rate or checkout stat pooled across events MUST exclude the Grand Prix or segment it.",
+    "THROW ADVANTAGE IS THE STRUCTURAL EDGE IN DARTS AND ALTERNATES EVERY LEG. Who throws first in leg 1 is decided by a bull-off (nearest the bull). This makes darts a serve sport: model hold and break separately. It also means a match starting with the underdog throwing is a materially different bet from the same match with the favourite throwing - and in a deciding leg the throw is the single largest term.",
+    "'MUST WIN BY TWO CLEAR LEGS' RULES EXIST IN SOME PDC LEG-FORMAT EVENTS, with a sudden-death leg at a defined cap. This uncaps the leg total above the nominal race length, so total-legs overs carry a tail that a fixed best-of model does not contain. VERIFICATION STATUS: Wikipedia confirms the World Matchplay 'is played in a legs format' (not sets) and that race lengths escalate by round, but I could NOT confirm the exact two-clear-legs application per round from a primary source - treat it as unresolved and read the event rules before pricing a Matchplay total.",
+    "SNOOKER FRAME SCORING: reds are 1, then yellow 2, green 3, brown 4, blue 5, pink 6, black 7. While reds remain, colours are re-spotted after being potted; once reds are gone, colours are potted in ascending order and stay down. Maximum break is 147 (155 with a free ball). Fouls award the opponent a minimum of 4 points and up to 7. Frame points totals are therefore heavily right-skewed - never model them symmetrically.",
+    "SNOOKER RE-SPOTTED BLACK: if the scores are level after the final black is potted, the black is re-spotted and the frame is decided on it - effectively a coin flip that resolves a whole frame. snooker.org annotates these frames as 'Decided on the final black'. This puts a hard floor of roughly 50% on the weaker player in any frame that reaches parity, and it fattens the deciding-frame distribution in every close match.",
+    "SNOOKER MATCHES CAN BE DRAWN. Quoted from the snooker.org API docs: 'When Value Type is CLR you will know that matches can end 3-0, 3-1 or 2-2 (unless it's the final).' Round-robin formats such as Championship League produce 2-2 DRAWS. A two-way match-winner market on a round-robin snooker fixture has a third outcome the model must handle - and Betwinner's settlement for it (void vs three-way pricing) must be read, not assumed.",
+    "SNOOKER MATCHES SPAN SESSIONS AND DAYS. The snooker.org API has a dedicated match Status value 2 = 'On break (typically between sessions)'. A Bo19 is played over two sessions and a Bo33+ over several days. Any staleness window tuned for a 90-minute football match will wrongly suppress or wrongly trust a snooker fixture that is legitimately mid-match for eighteen hours.",
+    "SNOOKER SCHEDULING IS SOFT. The API carries an 'Estimated' flag meaning the match has no specific start time and simply follows the previous one, and a 'HeldOver' flag meaning the match has been moved to the main arena within the event's date range. Kick-off times are therefore unreliable inputs for staleness or for in-play cutovers.",
+    "SNOOKER SHOOT OUT IS NOT SNOOKER FOR MODELLING PURPOSES: every match is a SINGLE FRAME capped at 10 minutes with a shot clock, and it is a full ranking event. Frame handicaps, total frames and century markets are meaningless or degenerate here. Route it to a separate model or suppress it - a normal snooker model applied to the Shoot Out is nonsense.",
+    "SNOOKER MISS RULE AND FRAME CONCESSION: repeated failures to hit the object ball can be called as misses with the shot replayed, and a frame can be forfeited under the three-miss rule. Players also routinely CONCEDE frames and matches while mathematically alive once 'needing snookers'. Concession means observed frame scores systematically understate how close a frame was, and it truncates frame-point totals.",
+    "SNOOKER RE-RACKS: a referee may declare a stalemate and re-rack the frame. The frame is replayed and contributes no result. Rare, but it means frame counts within a match are not strictly monotonic in time and a live frame-count feed can appear to go backwards.",
+    "POOL IS RACE-TO-N, NOT BEST-OF-N. A race to 9 is first to 9 with no fixed match length and no fixed maximum; total racks range from 9 to 17. Applying a best-of intuition inverts the total-racks distribution. Read the race length per event, and note that races are frequently different for the winners' and losers' brackets of the same tournament.",
+    "POOL BREAK FORMAT IS THE BIGGEST SINGLE MODELLING SWITCH: under WINNER-BREAKS a strong breaker can run multiple racks without the opponent ever shooting, producing lopsided scorelines and short matches; under ALTERNATE BREAK the same player's edge is roughly halved and matches tighten sharply. A break-and-run % is uninterpretable unless you know which format produced it, and a total-racks line is not comparable between the two.",
+    "ULTIMATE POOL GOLDEN BREAK / GOLDEN DUCK: in several televised Ultimate Pool events, potting the 8-ball on the break WINS the frame instantly, while potting the 8-ball together with the cue ball (or otherwise fouling) LOSES it instantly. Confirmed on ultimatepoolgroup.com/rules, and stated there to be TOURNAMENT-SPECIFIC rather than universal. This adds a two-sided fat tail to frame outcomes that no standard pool model contains.",
+    "ULTIMATE POOL RUNS A MATCH CLOCK AND BREAKS TIES WITH A 6-REDS SHOOTOUT (fastest to pot six reds wins). A timed match means the rack total is capped by time rather than by skill, and it means a DRAW is a reachable state resolved by a non-pool tiebreak. Confirm whether Betwinner settles the match-winner market on the shootout result or voids.",
+    "POOL DISCIPLINES ARE NOT ONE SPORT. Betwinner id 12 'Billiards' can carry 9-ball, 10-ball, American 8-ball, English/International 8-ball (Ultimate Pool), Chinese 8-ball/Heyball, and possibly carom or English billiards - the WPA publishes separate rulebooks for several of these, including distinct Heyball and Pyramid rules. Scoring units, rack sizes and win conditions differ completely. Route by DISCIPLINE, never by the sport id.",
+    "RETIREMENT AND WALKOVER CONVENTIONS ARE NOT UNIFORM AND ARE THE MOST COMMON SETTLEMENT SURPRISE. A walkover (opponent never starts) almost always voids everything; a mid-match retirement is the ambiguous case, with books variously voiding all undetermined markets, standing all markets, or settling only those already decided. In darts and snooker this matters more than in tennis because matches are long and mid-match withdrawal for illness is not rare. Betwinner's own rule must be READ - do not import the tennis convention.",
+    "ABANDONMENT / POSTPONEMENT: snooker sessions and darts sessions can be suspended and resumed the next day without the match being void. Whether a market voids depends on the book's completion window (12h/24h/48h), which for a multi-day snooker match is routinely exceeded by normal play. A generic postponement rule will wrongly void legitimate snooker fixtures.",
+    "BETWINNER'S OWN TERMS ARE UNREAD FOR ALL THREE SPORTS. This repo's cached Betwinner data contains football only; no darts, snooker or billiards market has been pulled. Every settlement statement above is sport-rule truth, NOT confirmed Betwinner behaviour. Per CLAUDE.md hard rule 5 and the engine/settlement.py convention, these must carry needs_confirmation=true until the operator reads the book's rules.",
+    "DEAD HEAT ON PROP MARKETS: 'most 180s' and 'highest checkout' tie frequently - two players ending on the same 180 count or the same best finish is common, not exotic. Whether Betwinner offers a tie outcome, applies dead-heat reduction, or pushes changes the EV of these markets substantially and must be confirmed before either is priced."
+  ],
+
+  "open_questions": [
+    "Does Betwinner actually list markets for sport ids 21 (Darts), 30 (Snooker) and 12 (Billiards) on the operator's key, and what are the market-group ids and names? Nothing beyond football has been pulled into this repo.",
+    "Betwinner's retirement rule for darts and snooker: all-void, stand-if-decided, or leader-wins? And is a walkover treated differently from a mid-match retirement?",
+    "Betwinner's abandonment/postponement window - and does it accommodate snooker matches that legitimately span multiple days between sessions?",
+    "How does Betwinner settle a DRAWN snooker round-robin match (the 2-2 CLR case)? Is the match-winner market offered three-way, voided, or not offered at all for those events?",
+    "Dead-heat treatment on 'most 180s' and 'highest checkout', and whether a tie outcome is offered as a third selection.",
+    "Does Betwinner's darts 'total legs' market count LEGS in a set-format event, or does it switch to sets? And is the market label explicit about it?",
+    "For Ultimate Pool: does Betwinner settle the match winner on the 6-Reds Shootout result, or void a match that finishes level on the match clock?",
+    "Is a betting product 'commercial use' under snooker.org's licence? Their terms permit free non-commercial use with attribution but require prior contact for commercial use - the operator should decide before any key is requested from webmaster@snooker.org.",
+    "RETEST FROM A GITHUB ACTIONS RUNNER (highest-value follow-up): gc.wstservices.co.uk and matches.darts.web.gc.pdcservices.co.uk both fail with 502 CONNECT through our egress proxy while sibling hosts on the same domains answer. If they resolve from Actions, we gain official WST data and the official PDC match feed.",
+    "Is the DartsOrakel GBP 4.99/month tier worth buying? It unlocks 180s-per-leg, deciding-leg record, opponent averages and leg-efficiency - the per-leg normalisation that the most-180s market actually needs. Operator decision, and a licence question too (their terms of use for automated access were not located).",
+    "Given CueTracker and the snooker.org breaks database are both off-limits, is there ANY compliant free route to century counts, pot success and safety success - or must snooker prop markets simply be excluded from the product?",
+    "What is the exact round-by-round 'two clear legs' application at the World Matchplay in the current format? Not confirmed from a primary source here."
+  ],
+
+  "key_findings": [
+    "DARTS IS SOLVED, SNOOKER IS NOT. dartsorakel.com/api/stats/player is an open, unauthenticated JSON API over 4354+ players that returns three-dart average, checkout %, 180s, first-9, with/against-throw averages and legs-won-throwing-first/second - and exposes the raw numerator and denominator so sample size and shrinkage are computable. Snooker's equivalent sources are all closed to us.",
+    "THE PDC RUNS AN OPEN OFFICIAL API AND APPARENTLY DOES NOT ADVERTISE IT. participants.darts.web.gc.pdcservices.co.uk/v2/ and tournaments.darts.web.gc.pdcservices.co.uk/v2/ answer unauthenticated with official rankings, prize money and a tournament registry back to 1992 carrying isRanked/isTelevised/fixtureCount. Found by reading API hostnames out of the pdc.tv JS bundle, because pdc.tv itself renders nothing.",
+    "TWO SNOOKER SOURCES DISALLOW CLAUDE BOTS BY NAME. cuetracker.net and www.dartsdatabase.co.uk both ship 'User-agent: ClaudeBot / Disallow: /'. dartswdf.com disallows everyone except named search engines. These were NOT fetched. CueTracker's loss is severe - it is the canonical free source for centuries, pot success, safety success and long-pot %, and there is no compliant substitute.",
+    "SNOOKER.ORG'S API IS KEY-GATED AND ITS BREAKS DATABASE IS ROBOTS-BLOCKED. Data endpoints return HTTP 401.5 without an approved X-Requested-By value, the licence is non-commercial-only with attribution, and /brk/ is Disallow'd. Even with a key the schema carries no break, pot or safety fields - so approval alone would not deliver snooker scoring stats.",
+    "STATUS CODES LIED REPEATEDLY IN THIS RESEARCH. pdc.tv/rankings returns HTTP 200 with 1,207,939 bytes and ZERO visible text, and /rankings, /stats and /statistics are byte-identical catch-alls. wst.tv/rankings returns 200 with 190,890 bytes whose rendered body reads 'Loading...'. Both would have passed a status-code check and both are useless to a scraper.",
+    "THE FORMAT REGISTRY IS THE PRODUCT. Because the distance changes by round in all three sports, the highest-value artefact is not a stats table but a per-fixture (event, round) -> format map. Wikipedia is the only compliant free source that reliably carries it; the PDC tournaments API supplies the spine to hang it on.",
+    "DARTS IS A SERVE SPORT AND MUST BE MODELLED AS ONE. Throw alternates every leg and is decided initially by a bull-off. DartsOrakel publishes legs-won-throwing-first and legs-won-throwing-second FREE - a ready-made hold/break pair. Fit those, simulate the leg sequence, and every other market (handicap, total, correct score, first leg) falls out consistently.",
+    "THE HIGHEST-CHECKOUT MARKET HAS A GAPPY DISCRETE SUPPORT. Exhaustive computation confirms the max 3-dart checkout is 170 and that 159, 162, 163, 165, 166, 168 and 169 are impossible - so above 160 only {161, 164, 167, 170} can ever settle. Any smooth distribution over that market is wrong by construction.",
+    "THE WORLD GRAND PRIX POISONS POOLED DARTS STATS. It is double-start, and DartsOrakel ships a dedicated excludeWGP filter; toggling it shifted Littler's average by half a point. Any model pooling averages, 180 rates or checkout % across events must segment or exclude it.",
+    "SNOOKER CAN END IN A DRAW - the snooker.org docs state round-robin (CLR) matches can finish 2-2. A two-way match-winner model applied to a Championship League group fixture is missing an outcome, and Betwinner's settlement of it is unknown.",
+    "POOL'S BREAK FORMAT MATTERS MORE THAN ANY PLAYER STAT. Winner-breaks lets a strong breaker run out unopposed; alternate break roughly halves that edge. Add Ultimate Pool's Golden Break / Golden Duck (instant frame win / instant frame loss off the break) and a match clock with a 6-reds shootout tiebreak, and 'Billiards' id 12 is really several unrelated sports sharing one id.",
+    "THE SAFETY RUNG IS 'WINS AT LEAST ONE LEG/FRAME/RACK', AND ITS PRIOR IS FREE. It is the smallest model-error exposure in each sport, and the direct empirical prior is the favourite's whitewash rate - which DartsOrakel publishes free as 'Whitewashes for'. Note the rung moves with format: in a set-format event a player can win five legs and still be whitewashed on sets."
+  ]
+}
