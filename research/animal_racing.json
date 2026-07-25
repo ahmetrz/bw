@@ -1,0 +1,536 @@
+{
+  "sport": "animal_racing",
+  "betwinner_sport_ids": [44, 132, 68, 151, 92, 133],
+  "researched": "2026-07-25",
+  "scope_note": "Three distinct animals and three ante-post twins: 44/132 Horse Racing, 68/151 Greyhound Racing, 92/133 Trotting. They share a settlement rulebook and almost nothing else. Thoroughbred pace/weight/going logic does not transfer to a 30-second greyhound sprint or to a gaited trotter that can be disqualified for galloping.",
+
+  "statistics": [
+    {
+      "id": "speed_figure",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Final time converted to a comparable number by adjusting for distance, track and going. Competing systems disagree by design: Timeform ratings and Racing Post Ratings (RPR) are subjective/performance-based, Beyer Speed Figures and Equibase Speed Figures are US time-based, Thoro-Graph and Ragozin are 'sheet' figures with weight and trip built in, Topspeed is time-vs-standard. Two systems can rank the same two horses in opposite order.",
+      "why": "The single densest summary of ability. But every named system above is a commercial product; none is free.",
+      "free_availability": "NO free thoroughbred figure exists. The free substitute must be BUILT from raw times: HKJC gives finish time + going + course config; GBGB gives resultRunTime AND a pre-computed resultAdjustedTime; ATG and PMU give kmTime / reductionKilometrique. Everything else is paywalled."
+    },
+    {
+      "id": "sectional_times",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Split times through the race, and the derived running style (front-runner, closer). For greyhounds the first sectional to the bend IS the early-pace measure.",
+      "why": "Separates a horse that won slowly off a crawl from one that won fast. Pace shape predicts which runners get a soft lead.",
+      "free_availability": "VERIFIED FREE in two places only: GBGB resultSectionalTime per dog, and HKJC per-split sectionals plus per-call Running Position. Total Performance Data sells the UK thoroughbred equivalent. Sporting Life mentions sectionals in prose commentary but does not expose them as fields."
+    },
+    {
+      "id": "going_track_condition",
+      "applies": ["horse", "trot"],
+      "what": "Firm / Good to Firm / Good / Good to Soft / Soft / Heavy on turf; Standard / Slow / Fast on all-weather. Plus the rail/course configuration (HKJC 'A', 'B', 'C' courses move the running rail and change the effective distance).",
+      "why": "Going changes which horses can act and compresses or stretches the field. A soft-ground specialist on fast ground is a different horse.",
+      "free_availability": "VERIFIED FREE: Sporting Life going + going_shortcode + surface per race; HKJC Going + Course; ATG track.condition; PMU course conditions. Greyhound equivalent is the GBGB raceGoing allowance (see going_allowance)."
+    },
+    {
+      "id": "going_allowance_greyhound",
+      "applies": ["greyhound"],
+      "what": "A per-meeting time correction in hundredths of a second published by the track, added to or subtracted from raw run times so times across nights are comparable. GBGB exposes it as raceGoing (observed values '10' and '20' = +0.10s / +0.20s).",
+      "why": "Without it, run times from a fast night and a slow night are not comparable at all. GBGB already applies it: resultAdjustedTime = resultRunTime +/- allowance.",
+      "free_availability": "VERIFIED FREE and pre-applied in the GBGB API. This is the single cleanest speed-figure input found in the whole category."
+    },
+    {
+      "id": "distance_suitability",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Whether the runner is proven at today's trip. Built from form-line distances, wins-by-distance, and pedigree. ATG stores records bucketed by distance class (short/medium/long) and by start method.",
+      "why": "Stamina limits are hard. A miler dropping to 5f or stretching to 12f is a different proposition at the same rating.",
+      "free_availability": "VERIFIED FREE derivable: Sporting Life previous_results carry distance per past run; ATG horse.statistics.records are already keyed by distance class; PMU musique plus race distance."
+    },
+    {
+      "id": "draw_stall_bias",
+      "applies": ["horse"],
+      "what": "Advantage conferred by starting stall, which varies by TRACK, DISTANCE and GOING together — never by track alone. Chester's tight left-hand turn favours low draws over sprint trips; straight-course sprints at Ascot/Newmarket can favour whichever side of the track is riding faster that day.",
+      "why": "At some track/distance/going combinations the draw is worth more than several pounds of ability.",
+      "free_availability": "PARTIAL. draw_number is VERIFIED FREE in Sporting Life and Dr. in HKJC, and the bias must then be ESTIMATED by us from historical finishing positions by draw. No free source publishes a ready-made bias table."
+    },
+    {
+      "id": "trap_bias_greyhound",
+      "applies": ["greyhound"],
+      "what": "Trap 1 (inside/red) and trap 6 (outside/black) are structurally advantaged at most tracks because a railer from 1 and a wide runner from 6 both avoid the crowded middle. Bias is track- and distance-specific.",
+      "why": "In a 6-dog race over ~30 seconds, the first bend decides most races and the trap largely decides the first bend.",
+      "free_availability": "VERIFIED FREE: GBGB trapNumber on every historical runner, so the bias is directly computable from their own results archive."
+    },
+    {
+      "id": "railing_preference_greyhound",
+      "applies": ["greyhound"],
+      "what": "Whether a dog runs the rails, the middle or wide, and whether it crowds/checks rivals. GBGB encodes this in resultComment tokens: observed 'EarlyPace,Rls,Led2,HeldOn' and 'EarlyPace,MidToRls,Led4' — Rls = rails, MidToRls = middle-to-rails.",
+      "why": "A railer drawn in trap 6 must cross the field; a wide runner in trap 1 gets buried. Trap number only matters relative to running style.",
+      "free_availability": "VERIFIED FREE in the GBGB resultComment string. Requires writing a token parser; the vocabulary is undocumented and must be learned from the corpus."
+    },
+    {
+      "id": "early_pace_greyhound",
+      "applies": ["greyhound"],
+      "what": "Sectional time to the first bend, and how often the dog leads at the first call. GBGB comments carry 'EarlyPace', 'Led1'..'Led4', 'QAw' (quick away), 'SAw' (slow away).",
+      "why": "Greyhound racing is close to a pure early-pace sport — trouble in running is the main source of variance and the leader avoids it.",
+      "free_availability": "VERIFIED FREE: GBGB resultSectionalTime plus the comment tokens."
+    },
+    {
+      "id": "trainer_form_strike_rate",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Wins / runners over a trailing window, ideally split by course, distance, class and by days-since-last-run band. Also stable form cycle (yard in or out of form).",
+      "why": "A genuine effect, but the raw percentage is heavily confounded by the quality of horses the trainer receives. Shrink hard and compare against the trainer's own runners' odds, not against the field.",
+      "free_availability": "VERIFIED FREE and PRE-COMPUTED for trotting only: ATG trainer.statistics.years gives starts, earnings, placements 1/2/3 and winPercentage per year. For thoroughbreds Sporting Life gives trainer NAME only — the strike rate must be aggregated by us from historical racecards."
+    },
+    {
+      "id": "jockey_form_strike_rate",
+      "applies": ["horse"],
+      "what": "Rider win/place strike rate, plus the trainer-jockey combination strike rate, plus claiming allowance for apprentices (a 3/5/7lb weight reduction).",
+      "why": "Jockey booking is also an INFORMATION signal: a yard putting its stable jockey on one of three runners is telling you something. The claim is a real weight advantage that the handicapper has not priced.",
+      "free_availability": "PARTIAL — jockey name VERIFIED FREE in Sporting Life and HKJC; strike rates must be self-aggregated. No free ready-made table."
+    },
+    {
+      "id": "driver_form_trot",
+      "applies": ["trot"],
+      "what": "Harness driver strike rate and earnings. In trotting the driver matters more than a flat jockey because tactical position in the sulky field is decisive and gait control is partly the driver's job.",
+      "why": "A catch-driver upgrade is one of the most reliable positive angles in harness racing.",
+      "free_availability": "VERIFIED FREE and PRE-COMPUTED: ATG driver.statistics.years (starts, earnings, placements, winPercentage). PMU gives driver name plus a driverChange boolean flag."
+    },
+    {
+      "id": "class_change",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Movement between race grades — BHA Class 1-7 and Pattern/Group/Listed for horses; GBGB letter grades (observed A1-A8, OR = Open Race, S1) for greyhounds; earnings-banded conditions for trotters.",
+      "why": "A dropper in class meeting weaker rivals is the oldest angle in the sport. A horse stepping up in class off a career-best needs to improve again.",
+      "free_availability": "VERIFIED FREE: Sporting Life race_class + has_handicap; GBGB raceClass; ATG/PMU race terms and prize money as a class proxy."
+    },
+    {
+      "id": "weight_carried",
+      "applies": ["horse"],
+      "what": "Actual weight carried including any apprentice claim and any overweight. HKJC separates Act. Wt. (carried) from Declar. Horse Wt. (the horse's own bodyweight).",
+      "why": "The classic rule of thumb is roughly 1lb ~ 1 length over a mile, but the effect is non-linear and strongest at the extremes of the handicap. Bodyweight change since last run is a separate fitness signal entirely.",
+      "free_availability": "VERIFIED FREE: Sporting Life handicap field ('9-2' = 9st 2lb); HKJC Act. Wt. AND Declar. Horse Wt. Horse bodyweight is NOT published in Britain, only in Hong Kong and a few other jurisdictions."
+    },
+    {
+      "id": "handicap_mark_official_rating",
+      "applies": ["horse"],
+      "what": "The BHA/handicapper's official rating (OR), and crucially the DELTA — whether the horse is running off a mark higher or lower than when it last won, and whether it is 'well-in' because the mark has not yet caught up with recent improvement.",
+      "why": "The mark is the handicapper's own opinion, and betting handicaps is largely betting against that opinion.",
+      "free_availability": "VERIFIED FREE: Sporting Life exposes official_rating per ride (observed OR 65-79 across a York Class 4 handicap). The historical mark for each past run must be assembled by us to compute the delta."
+    },
+    {
+      "id": "days_since_last_run",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Freshness / layoff. Distinguish a normal 14-30 day turnaround from a quick 6-day back-up and from a 100+ day absence, and note whether the yard wins first time after a break.",
+      "why": "Fitness and intent. A horse returning off a long layoff for a small-field conditions race is often a prep run.",
+      "free_availability": "VERIFIED FREE: Sporting Life last_ran_days (observed 6 to 36 in one race). Derivable everywhere else from dated form lines."
+    },
+    {
+      "id": "headgear_change",
+      "applies": ["horse"],
+      "what": "Blinkers (b), visor (v), cheekpieces (p), hood (h), tongue strap (t), eyeshield. The signal is the CHANGE — first-time headgear, or headgear reapplied after being left off.",
+      "why": "First-time blinkers is an explicit statement of intent from a yard that thinks the horse is not trying hard enough. The effect is real but decays fast on repeat application.",
+      "free_availability": "VERIFIED FREE and unusually well-modelled: Sporting Life headgear entries carry symbol, name AND count — count == 1 means FIRST TIME. Observed [{'symbol':'p','name':'Cheek pieces','count':21}] vs count 3. PMU gives oeilleres (SANS_OEILLERES / with)."
+    },
+    {
+      "id": "shoeing_trot",
+      "applies": ["trot"],
+      "what": "Whether the horse races barefoot (shoes removed, front and/or hind) and whether that changed from last start. The harness equivalent of first-time blinkers, and arguably stronger.",
+      "why": "Removing shoes is worth a meaningful time improvement and is a deliberate trainer decision signalling a targeted run.",
+      "free_availability": "VERIFIED FREE in BOTH major trotting feeds: ATG shoes.front/back {hasShoe, changed}; PMU deferre (observed DEFERRE_ANTERIEURS_POSTERIEURS = both ends barefoot). The 'changed' boolean is the money field."
+    },
+    {
+      "id": "sulky_type_trot",
+      "applies": ["trot"],
+      "what": "Standard vs American/modified sulky, with a changed flag.",
+      "why": "Equipment change is a tactical signal, same family as shoeing.",
+      "free_availability": "VERIFIED FREE: ATG sulky.type {code, text, changed}."
+    },
+    {
+      "id": "gait_break_trot",
+      "applies": ["trot"],
+      "what": "A trotter that breaks into a gallop is penalised or disqualified. The per-horse break rate is the dominant risk statistic in harness racing — a fast horse that breaks 25% of the time is a bad bet at any price.",
+      "why": "It converts a pure speed ranking into an expected-value ranking. Nothing in thoroughbred racing behaves like it.",
+      "free_availability": "VERIFIED FREE and EXPLICIT: ATG result carries boolean galloped and boolean disqualified per start (26 galloped / 6 disqualified flags across 8 sampled races). PMU musique encodes it as a letter code (D = disqualified) inside the form string, e.g. '3a4a2a2a1a9a9a(25)3a9a'."
+    },
+    {
+      "id": "start_method_trot",
+      "applies": ["trot"],
+      "what": "THREE different formats that must never be pooled. AUTOSTART (mobile gate, all horses level, post position is close to a pure draw). VOLT/standing start (horses start from a standing position behind a line; a bad volt start loses many lengths and rewards technique). HANDICAP start (better horses start 20m/40m/60m further back and physically run a LONGER RACE).",
+      "why": "In a handicap start the winner is not the fastest horse over the nominal distance. Comparing kmTime across start methods without adjustment is simply wrong.",
+      "free_availability": "VERIFIED FREE: ATG race.startMethod ('auto' / 'volte') AND a per-start distance field, and horse records are keyed by start method. PMU gives handicapDistance per participant (observed 2750m in a race with runners on different marks)."
+    },
+    {
+      "id": "post_position_trot",
+      "applies": ["trot"],
+      "what": "Starting position, inside vs outside, and second-tier (behind the front row) placement.",
+      "why": "Inside front-row draws in autostarts are worth a great deal because they get an economical trip; a second-tier draw must go around the field.",
+      "free_availability": "VERIFIED FREE: ATG postPosition per start; race terms text even explains the draw-allocation rule."
+    },
+    {
+      "id": "km_rate_trot",
+      "applies": ["trot"],
+      "what": "The trotting speed figure: seconds per kilometre. ATG kmTime {minutes, seconds, tenths}; PMU reductionKilometrique (observed 73200 = 1'13\"2 per km).",
+      "why": "It is the only cross-race comparable in harness racing — but only within the same start method and roughly the same distance class.",
+      "free_availability": "VERIFIED FREE in both ATG and PMU, including per-horse lifetime bests bucketed by start method and distance."
+    },
+    {
+      "id": "breeding_pedigree",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Sire and dam (and damsire) as a prior for distance aptitude, surface preference (turf vs dirt vs all-weather), and precocity in unraced or lightly-raced runners.",
+      "why": "It is the ONLY evidence available for a first-time-out two-year-old, where form-based models have nothing to work with.",
+      "free_availability": "VERIFIED FREE: GBGB dogSire/dogDam on every dog; ATG pedigree father/mother/grandfather; PMU nomPere/nomMere; Sporting Life encodes it in prose commentary ('No Nay Never colt. Dam, 5f winner...') which needs NLP rather than a field read."
+    },
+    {
+      "id": "market_move",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Price movement from opening show to SP, and the size/timing of the move.",
+      "why": "In racing the market is an exceptionally strong predictor and late money is the most informative single variable available. It is also the one input we can always get, because it comes from the book itself.",
+      "free_availability": "VERIFIED FREE: Sporting Life betting.historical_odds (observed ['6/5','11/10','1/1','11/10','6/5','5/4','11/8','5/4']) plus bet_movements ('op 6/5 tchd Evens'); PMU dernierRapportDirect vs dernierRapportReference with a trend indicator; ATG result.finalOdds and lastFiveStarts.averageOdds."
+    },
+    {
+      "id": "field_size",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Number of declared runners, and the number still standing after non-runners.",
+      "why": "Not a form stat — a SETTLEMENT stat. It sets the each-way place terms and therefore changes what the identical bet pays.",
+      "free_availability": "VERIFIED FREE everywhere, including Betwinner's own feed (EC = selection count)."
+    },
+    {
+      "id": "weather_at_track",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Temperature, cloud, wind speed/direction, pressure, humidity, precipitation probability.",
+      "why": "A forward-looking proxy for how the going will change between now and the off — the going published on the racecard can be stale by hours.",
+      "free_availability": "VERIFIED FREE FROM BETWINNER ITSELF: the LineFeed MIS block carries K7 venue, K9 temp, K21 conditions, K23/K24 wind, K25 pressure, K27 humidity, K35 precipitation %. Observed on both a horse race (Albury) and a trotting race (Hobart). This is the only rich per-race metadata that arrives with the odds."
+    },
+    {
+      "id": "bitch_season_greyhound",
+      "applies": ["greyhound"],
+      "what": "Date a bitch last came into season. Performance is depressed for a period around it and often peaks some weeks after.",
+      "why": "A well-known angle that is invisible unless the date is published.",
+      "free_availability": "VERIFIED FREE: GBGB dogSeason (observed '15.Ap.26', '13.Sp.25'), null for dogs."
+    },
+    {
+      "id": "runner_weight_greyhound",
+      "applies": ["greyhound"],
+      "what": "Racing weight at the kennel check, and the change from the dog's recent norm.",
+      "why": "A dog several pounds off its racing weight is not itself.",
+      "free_availability": "VERIFIED FREE: GBGB resultDogWeight (observed 32.5, 27.2)."
+    },
+    {
+      "id": "trip_and_trouble",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Whether the runner met interference, was badly away, raced wide, or was denied a clear run — i.e. whether the finishing position understates the performance.",
+      "why": "The main source of exploitable error, because the recorded position is the thing most people model and it is sometimes a lie.",
+      "free_availability": "VERIFIED FREE as TEXT, never as a field: Sporting Life ride_description ('Midfield, ridden over 2f out, headway entering final furlong...'); GBGB resultComment tokens; PMU commentaireApresCourse. All require NLP."
+    },
+    {
+      "id": "stewards_and_casualty",
+      "applies": ["horse", "greyhound", "trot"],
+      "what": "Stewards' enquiries, objections, amended results, and non-completion codes (fell, unseated, pulled up, brought down, refused).",
+      "why": "Determines whether the result on the page is the result that settles, and removes false negatives from form (a faller was not beaten).",
+      "free_availability": "VERIFIED FREE: Sporting Life stewards field (observed 'NONE') and a per-ride casualty object; ATG finishOrder codes in the 38-62 range denote non-finish/disqualified outcomes alongside the explicit galloped/disqualified booleans."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "sportinglife_racing_api",
+      "url": "https://www.sportinglife.com/api/horse-racing/racing/racecards/{YYYY-MM-DD} and /api/horse-racing/race/{race_id}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "BEST FREE THOROUGHBRED SOURCE FOUND. 23 meetings on the sampled day across ENG, Eire, FR (incl. trotting tracks Enghien/Le Mans/Vichy) and USA (Saratoga, Del Mar, Gulfstream, Woodbine...). Per race: going + going_shortcode, surface, race_class, has_handicap, distance, off_time, winning_time, ride_count, number_of_placed_rides, on_course_book_percentage, stewards, tote/place/exacta/trifecta/straight_forecast dividends, betting_forecast, deductions. Per ride: draw_number, cloth_number, official_rating, handicap (weight carried), headgear (symbol+name+COUNT, so first-time headgear is detectable), trainer, jockey, owner, last_ran_days, age, sex, formsummary, full previous_results form lines (each with going, distance, class, weight, position, runner_count, odds and a narrative ride_description), betting.current_odds + historical_odds array, bet_movements, commentary, casualty, medication, horse_lifetime_stats, race_history_stats.",
+      "note": "VERIFIED BY BODY, repeatedly. robots.txt contains NO Disallow rules at all (159 bytes, sitemap + host only). Undocumented internal API. ride_status enum observed = RUNNER / NONRUNNER / WITHDRAWN. deductions observed live as [{'type':'BoardPrices','value':10.0}] on York race 929719 where Paladin was withdrawn — i.e. this feed publishes actual Rule 4 deductions. No licence grant of any kind is offered; treat as ToS-grey and rate-limit."
+    },
+    {
+      "id": "gbgb_api",
+      "url": "https://api.gbgb.org.uk/api/results?date=YYYY-MM-DD | /api/results/meeting/{meetingId} | /api/results/race/{raceId}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "OFFICIAL UK greyhound regulator feed, and by far the best free data in the whole animal-racing category. Per race: raceClass, raceDistance, raceHandicap, raceGoing (the going ALLOWANCE in hundredths), racePrizes, raceForecast and raceTricast DIVIDENDS, raceType. Per trap: trapNumber, trapHandicap, dogId/dogName/dogSire/dogDam/dogOrigin/dogBorn/dogColour/dogSex, dogSeason (bitch season date), trainerName, ownerName, SP as a fraction plus resultPriceNumerator/Denominator, resultPosition, resultMarketPos/Cnt, resultBtnDistance, resultSectionalTime, resultRunTime, resultAdjustedTime (going-corrected), resultDogWeight, resultComment (running-style tokens e.g. 'EarlyPace,Rls,Led2,HeldOn').",
+      "note": "VERIFIED BY BODY on 2026-07-24 and 2026-07-25 (Romford, Yarmouth). robots.txt permissive (135 bytes, only wp-admin/plugins/refer disallowed) — the api subdomain is not mentioned. /api/results/meeting?date=... 404s; the WORKING paths are the three listed. Community reports advise a delay on bulk requests to avoid Cloudflare. Sectionals + a pre-applied going allowance + running comments, free and official, is a combination that exists nowhere else in racing."
+    },
+    {
+      "id": "atg_racinginfo",
+      "url": "https://www.atg.se/services/racinginfo/v1/api/calendar/day/{YYYY-MM-DD} and /api/races/{raceId}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "BEST FREE TROTTING SOURCE. Swedish tote (also carries Norwegian/Danish cards). Race level: distance, startMethod (auto/volte), prize, full terms text incl. the draw-allocation rule, track {name, condition, countryCode}, result.victoryMargin, result.scratchings. Per start: postPosition, per-horse distance (so handicap starts are explicit), horse {age, sex, record by start method + distance class, money, colour, owner, breeder, homeTrack, per-year AND lifetime statistics with starts/earnings/placements/winPercentage/placePercentage/earningsPerStart, lastFiveStarts.averageOdds}, pedigree {father, mother, grandfather}, shoes {front/back: hasShoe + changed}, sulky {type + colour + changed}, trainer and driver each with per-year statistics including winPercentage, and result {place, finishOrder, kmTime, prizeMoney, finalOdds, galloped, disqualified}.",
+      "note": "VERIFIED BY BODY: 89.5 KB calendar, 31.3 KB race detail, then 8 further races sampled to decode result codes. galloped=true appeared 26 times and disqualified=true 6 times across those 8 races, so the gait-break statistic is directly available rather than inferred. finishOrder 1..n = finishers; codes 38-62 = non-finish/disqualified/scratched. robots.txt permits /services/ (135 bytes, only konto/kod/ratta/preview disallowed). Amounts are in ore (divide by 100); winPercentage is scaled by 100."
+    },
+    {
+      "id": "pmu_turfinfo",
+      "url": "https://online.turfinfo.api.pmu.fr/rest/client/61/programme/{DDMMYYYY} and .../{DDMMYYYY}/R{n}/C{n}/participants",
+      "auth": "none",
+      "verified": true,
+      "coverage": "French totalisator. Covers BOTH galop and trot (attele and monte). 295 KB day programme. Per participant: statut (PARTANT / NON_PARTANT — non-runners explicit), musique (the French form string, which encodes discipline and disqualification per run, e.g. '3a4a2a2a1a9a9a(25)3a9a'), oeilleres (blinkers), deferre (barefoot shoeing state), driver + driverChange flag, entraineur, handicapDistance (per-horse start distance), reductionKilometrique (km rate), tempsObtenu, nombreCourses/Victoires/Places, gains split career/wins/places/this-year/last-year, nomPere + nomMere, jumentPleine, allure, avisEntraineur (the trainer's own stated opinion), commentaireApresCourse, dernierRapportDirect and dernierRapportReference (live odds, reference odds and a trend indicator).",
+      "note": "VERIFIED BY BODY (14 participants, Cabourg R1C1, a trotting card). robots.txt on www.pmu.fr does not disallow the API host and the api host is a separate domain. Client id in the path (61) is a version token and may need bumping over time."
+    },
+    {
+      "id": "hkjc_localresults",
+      "url": "https://racing.hkjc.com/en-us/local/information/localresults?RaceDate=YYYY/MM/DD",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "RICHEST FREE THOROUGHBRED DETAIL ANYWHERE, but Hong Kong only (~88 meetings/yr). Fully SERVER-RENDERED HTML — no JS needed. Per race: class, distance, rating band, Going, Course (turf 'A'/'B'/'C' rail configuration or All Weather Track), prize, cumulative split times AND per-furlong Sectional Times. Per runner: placing, horse no., horse name + lifetime ID, jockey, trainer, Act. Wt. (weight carried), Declar. Horse Wt. (BODYWEIGHT — almost never published elsewhere), Dr. (draw), LBW (lengths behind winner), Running Position at every call, Finish Time, Win Odds.",
+      "note": "VERIFIED BY BODY: 217 KB page, extracted a real result table (Race 1, Class 5, 1600M, Going GOOD TO FIRM, Course TURF 'C', sectionals 24.08/22.86/23.02, full 14-runner table). NO robots.txt exists on either www.hkjc.com or racing.hkjc.com (both 404/302 to a maintenance page), so robots imposes no restriction; site ToS still applies. Betwinner did NOT list Hong Kong among its 40 meetings on the sampled day."
+    },
+    {
+      "id": "veikkaus_toto",
+      "url": "https://www.veikkaus.fi/api/toto-info/v1/cards/today",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Finnish state tote. Race cards with raceType (observed 'TROT'), trackName/trackNumber, meetDate, per-race start times and status (OFFICIAL), pool types (VOI/SIJ/KAK/TRO/DUO/T4/T75) and jackpot amounts.",
+      "verified_depth": "Card/meeting level confirmed by body (10.3 KB JSON). Per-runner form fields NOT confirmed — the runner-level endpoints were not reached in this session.",
+      "note": "Useful as a Finnish trotting schedule spine and pool-liquidity signal, not yet proven as a form source. robots.txt disallows several query-string patterns on the www site but not the /api/ path."
+    },
+    {
+      "id": "betwinner_linefeed_racing",
+      "url": "https://betwinner.com/service-api/LineFeed/GetChampsZip?sport={44|68|92|132|151|133} and Get1x2_VZip?champs={id}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "The book's OWN racing feed, pulled live. Sport 44 Horse: 40 meetings / ~291 races (Australia 13, US 10, Japan 3, South Korea 2, UK 2, then one each of Argentina, Canada, Germany, India, Ireland, Jamaica, Malaysia, Mexico, New Zealand, Sweden). Sport 68 Greyhound: 1 meeting (Darwin) / 2 races. Sport 92 Trotting: 14 meetings / ~152 races (USA 8, Canada 3, Australia 2, Sweden 1). Sports 132/151/133 (all three AntePost): ZERO meetings at pull time. Each race carries exactly ONE market group and nothing else: horse racing T=2637/G=26, trotting T=6414/G=7571, with GE and AE both empty. Selections are named '№{cloth} {Runner Name}', so the saddle-cloth/program number is parseable. MIS carries track weather (venue, temp, conditions, wind, pressure, humidity, precipitation %).",
+      "note": "VERIFIED BY BODY. THE DECISIVE FINDING OF THIS RESEARCH. Two further observations: (1) trotting races were returned with C (price) = None on every selection, so racing markets are published unpriced and only priced close to the off; (2) champs that returned games at one moment returned zero a few minutes later — racing fixtures churn on a minutes-to-hours timescale, not the days-long horizon the existing 48h scanner assumes."
+    },
+    {
+      "id": "hf_jp_racing_horse",
+      "url": "https://huggingface.co/datasets/KBlueLeaf/jp-racing-horse",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Japanese racing, all_races_1990-2025.db — a 1,036,701,696-byte (1.03 GB) SQLite database, plus all_races_2005-2024.db and a db.py helper. Licence apache-2.0, last modified 2025-05-06.",
+      "verified_depth": "Existence, licence, file list and exact byte size confirmed via the HF API and a HEAD on the resolve URL. The DATABASE SCHEMA WAS NOT OPENED in this session — do not assume which columns exist.",
+      "note": "The only genuinely open, permissively-licensed, large historical racing dataset found. Wrong jurisdiction for most of Betwinner's book (Japan was 3 of 40 meetings) but the right shape for building and back-testing a speed-figure model before any live use."
+    },
+    {
+      "id": "geegeez_rule4_chart",
+      "url": "https://www.geegeez.co.uk/geegeez-faq/rule-4-deductions-chart/",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Full Tattersalls Rule 4 deduction table read in full from the page body — all 19 bands from '1/9 or shorter = 90p' down to 'over 14/1 = no deduction'. Also states deductions come out of PROFIT, not total return, and that 'there is no real limit to how many rule 4 deductions there can be in a single race'.",
+      "note": "Third-party explainer, NOT a primary rulebook and NOT Betwinner's terms. Explicitly checked and CONFIRMED ABSENT from this page: any cumulative deduction cap figure, the new-market rule, whether Rule 4 applies to ante-post, and dead heats. robots.txt permissive."
+    },
+    {
+      "id": "sportinglife_ew_guide",
+      "url": "https://www.sportinglife.com/free-bets/guides/basics/what-is-an-each-way",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Each-way place-terms table read from the body: 5-7 runners = 1/4 odds 2 places; 8+ non-handicap = 1/5 odds 3 places; 5-7 handicap = 1/4 odds 2 places; 8-11 handicap = 1/5 odds 3 places; 12-15 handicap = 1/4 odds 3 places; 16+ handicap = 1/4 odds 4 places.",
+      "note": "The 2-4 runner case (win-only, no place market) is NOT on this page and is therefore unverified here. The page says nothing about how non-runners affect place terms and nothing about dead heats — both checked and confirmed absent."
+    },
+    {
+      "id": "ustrotting",
+      "url": "https://www.ustrotting.com/",
+      "auth": "scraping",
+      "verified": false,
+      "coverage": "US Trotting Association. Reachable — 200, 98 KB of real HTML, robots.txt permissive (only /ads disallowed, ClaudeBot NOT named).",
+      "note": "MARKED UNVERIFIED DELIBERATELY: only the homepage was fetched. No form/results data layer was located or read, so nothing about its usable content is claimed. This is the highest-value RETEST target because Betwinner's trotting book is 8/14 meetings in the USA and no verified free source covers US harness racing."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "racing_australia",
+      "detail": "ROBOTS-DISALLOWED, NOT FETCHED. robots.txt names Googlebot, MSNBot, Slurp, Teoma and Yahoo with empty Disallow, then 'User-agent: * / Disallow: /' plus explicit Disallow on /InteractiveForm/, /FreeServices/, /FreeFields/, /SearchServices/ — i.e. the free form pages are named and barred to everyone but search engines. THIS IS THE MOST DAMAGING SINGLE BLOCK: Australia is Betwinner's largest racing jurisdiction (13 of 40 horse meetings and 2 of 14 trotting meetings)."
+    },
+    {
+      "id": "harness_australia",
+      "detail": "CLAUDEBOT DISALLOWED BY NAME, NOT FETCHED. harness.org.au robots.txt has 'User-agent: * / Allow: /' but then an explicit 'User-agent: ClaudeBot / Disallow: /' block (alongside Amazonbot, Applebot-Extended, Bytespider, CCBot). Australian harness racing is therefore off-limits to us specifically."
+    },
+    {
+      "id": "hri_ie",
+      "detail": "CLAUDEBOT DISALLOWED BY NAME, NOT FETCHED. Horse Racing Ireland robots.txt carries Cloudflare content-signals (search=yes, ai-train=no, use=reference) and an explicit 'User-agent: ClaudeBot / Disallow: /'. Ireland appears in Betwinner's book (Gowran Park was on the Sporting Life card the same day)."
+    },
+    {
+      "id": "horseracingnation",
+      "detail": "CLAUDEBOT AND CLAUDE-WEB DISALLOWED BY NAME, NOT FETCHED. US thoroughbred form/results site; robots.txt lists Claude-Web and ClaudeBot in a blocked agent group with GPTBot, CCBot, Bytespider and others."
+    },
+    {
+      "id": "greyhound_recorder_au",
+      "detail": "ROBOTS-DISALLOWED, NOT FETCHED. thegreyhoundrecorder.com.au robots.txt ends with 'User-agent: * / Allow: /ads.txt / Allow: /app-ads.txt / Disallow: /' — a blanket block on all real content."
+    },
+    {
+      "id": "punters_com_au",
+      "detail": "TERMS PROHIBIT AUTOMATED COLLECTION. robots.txt opens with an explicit notice: 'Collection of content and other data on www.punters.com.au through automated means is prohibited unless you have express written permission'. No ClaudeBot line, but the stated prohibition is unambiguous. Not fetched for data."
+    },
+    {
+      "id": "bha_feeds",
+      "detail": "ROBOTS-DISALLOWED. britishhorseracing.com robots.txt is 'Disallow: /wp-admin/ + Disallow: /feeds/ + crawl-delay: 10', and the site's own Angular code calls apiaddress+'/bha/v1/fixtures/' and '/bha/v1/racecourses/' — i.e. the racing data feed lives under the one path that is barred. Confirmed there is NO bha namespace on the permitted wp-json route (namespaces are oembed, wpe, cptui, wp/v2 etc. only), so no compliant JSON route exists. The public site itself is a WordPress marketing site; official ratings and the handicapping guide are HTML/PDF pages, not a feed."
+    },
+    {
+      "id": "betwinner_own_rules",
+      "detail": "COULD NOT BE READ — AND THIS MATTERS MORE THAN ANY OTHER BLOCK. betwinner.com/en/rules returns an empty-bodied 302; the redirect target betwinner2.com/en/rules 404s, as do /en/rules/, /en/info/rules and /en/bet-rules; the only rules links on the live homepage are /en/bonus/rules. service-api content routes 404. So the book's OWN Rule 4 table, dead-heat clause, each-way terms and ante-post policy were NOT obtained. Every settlement statement in rules_critical is therefore GENERIC INDUSTRY PRACTICE, not Betwinner's terms."
+    },
+    {
+      "id": "bookmaker_rules_pages",
+      "detail": "ALL GEO/BOT-BLOCKED FROM THIS ENVIRONMENT: williamhill 500 (redirected to a US gateway), coral 200 but redirected to help.coral.co.uk/closed, paddypower help 403, promo.betfair.com 403, oddschecker 403. Cross-checking the industry Rule 4 and each-way tables against a real bookmaker's published rules was therefore not possible here."
+    },
+    {
+      "id": "tattersalls_committee",
+      "detail": "thetattersallscommittee.co.uk — 502 CONNECT tunnel failure from our egress proxy. The primary authority for Rule 4 was unreachable, so the deduction table stands on a third-party explainer only. RETEST from a GitHub Actions runner."
+    },
+    {
+      "id": "rules_britishhorseracing",
+      "detail": "JS SHELL, NO STATIC CONTENT. rules.britishhorseracing.com returns 200 and 75 KB but yields 5 characters of extractable text — a client-side app. The Rules of Racing are not statically readable. GBGB's equivalent sits at rules.gbgb.org.uk (a separate microsite; the /rules-of-racing/ landing page carries only a welfare Code of Practice PDF)."
+    },
+    {
+      "id": "theracingapi",
+      "detail": "AUTH REQUIRED. api.theracingapi.com/v1/racecards/free returns 401 {'detail':'Not authenticated'}. Freemium — an account is needed even for the endpoint literally named 'free'. Not a no-auth source."
+    },
+    {
+      "id": "equibase",
+      "detail": "REGISTRATION-GATED AND COMMERCIAL. The page surfaced as 'Free Dataset Registration' is a storefront: Equibase Premium/Basic PPs, TrackMaster Platinum, Daily Racing Form, Thoro-Graph, Ragozin-style sheets, E-Speed Figures — all products for sale. robots.txt permits crawling with crawl-delay 5, but the data itself is behind registration and licensing. This is the clearest single illustration that US thoroughbred data is a retail market, not an open one."
+    },
+    {
+      "id": "huggy_database_fr",
+      "detail": "PAID PRODUCT WEARING A DATASET'S CLOTHES. huggingface.co/datasets/huggy-engine/horse-racing-database-fr advertises '356,000+ races, 30 years, 40+ variables per runner' for French racing 1996-2026 including shoeing, blinkers, weather, autostart and pedigree — but the actual repo contains ONLY sample_1999_q1/courses.csv and rapports.csv, and the README's own licence table prices it at R&D Pack EUR 950 / Full Archive EUR 4,500. licence: other / commercial-contact. Verified by reading the README and the sample CSV header."
+    },
+    {
+      "id": "greyhound_data",
+      "detail": "403 BODY. greyhound-data.com robots.txt does NOT name ClaudeBot, but the site returns HTTP 403 with a 5.5 KB block page. Would otherwise be the obvious international greyhound pedigree/form source."
+    },
+    {
+      "id": "tab_nz",
+      "detail": "COUNTRY-BLOCKED. tab.co.nz returns a Cloudflare error 1009 redirect (HTTP 403) — geographic block. New Zealand racing is in Betwinner's book (1 meeting on the sampled day)."
+    },
+    {
+      "id": "thedogs_com_au",
+      "detail": "403 Forbidden on robots.txt itself, so the site could not even be assessed for compliance. Australian greyhound racing."
+    },
+    {
+      "id": "github_api_rpscrape",
+      "detail": "SESSION-GATED, NOT REPO-GATED. api.github.com returns 403 'GitHub access to this repository is not enabled for this session'. rpscrape (the well-known Racing Post scraper) could not be evaluated. Note it would raise ToS problems regardless: racingpost.com robots.txt disallows exactly the valuable paths — /profile/horse/*/*/stats, /pedigree, /entries, /form/ugc/."
+    },
+    {
+      "id": "timeform_racingpost_paywall",
+      "detail": "THE RATINGS THEMSELVES ARE THE PRODUCT. Timeform robots.txt blocks GPTBot and a list of crawlers outright; Racing Post disallows the horse stats/pedigree/entries paths. Timeform ratings, Racing Post Ratings and Topspeed are subscription products. There is no free, licensed route to any established thoroughbred speed figure."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_market_reality_check": "VERIFIED AGAINST THE LIVE FEED: Betwinner's pre-match LineFeed exposes exactly ONE market per race — the win market (horse T=2637/G=26, trot T=6414/G=7571), with GE and AE empty on every race sampled. No place, each-way, forecast, tricast, match-bet or ante-post market appeared in the feed, and sports 132/151/133 returned zero meetings. The mappings below are therefore written for completeness and for the site UI, but ONLY win is confirmed present in the data this project actually ingests.",
+    "win": [
+      "speed_figure",
+      "sectional_times",
+      "going_track_condition",
+      "going_allowance_greyhound",
+      "distance_suitability",
+      "draw_stall_bias",
+      "trap_bias_greyhound",
+      "early_pace_greyhound",
+      "railing_preference_greyhound",
+      "class_change",
+      "weight_carried",
+      "handicap_mark_official_rating",
+      "trainer_form_strike_rate",
+      "jockey_form_strike_rate",
+      "driver_form_trot",
+      "days_since_last_run",
+      "headgear_change",
+      "shoeing_trot",
+      "gait_break_trot",
+      "start_method_trot",
+      "post_position_trot",
+      "km_rate_trot",
+      "breeding_pedigree",
+      "market_move",
+      "trip_and_trouble",
+      "weather_at_track"
+    ],
+    "each_way_and_place": [
+      "field_size",
+      "class_change",
+      "handicap_mark_official_rating",
+      "distance_suitability",
+      "trip_and_trouble",
+      "early_pace_greyhound",
+      "gait_break_trot",
+      "market_move",
+      "draw_stall_bias",
+      "trap_bias_greyhound"
+    ],
+    "_each_way_note": "An each-way bet is TWO bets and the place half is a different question from the win half. Field size is a FIRST-CLASS input here, not context: it sets the number of paid places and the odds fraction. The runner type that wins the place half is the consistent, trouble-free, reliable-finishing type — high gait-break rate or a habitual trouble-getter is far more damaging to the place half than to the win half, because the place half is sold on reliability.",
+    "forecast_tricast": [
+      "early_pace_greyhound",
+      "trap_bias_greyhound",
+      "draw_stall_bias",
+      "sectional_times",
+      "railing_preference_greyhound",
+      "start_method_trot",
+      "post_position_trot",
+      "speed_figure",
+      "field_size",
+      "market_move"
+    ],
+    "_forecast_note": "Forecast/tricast needs a JOINT distribution over finishing order, not N independent win probabilities. Naive Harville/Plackett-Luce from win probabilities systematically misprices these because it ignores the correlation that pace and draw create: two front-runners drawn together do not finish 1-2, they cut each other's throats. This is the market where trap/draw/pace matter most and where a win-probability model transfers worst. GBGB publishes historical raceForecast and raceTricast dividends, which is a rare free calibration target.",
+    "match_bets_two_runners": [
+      "speed_figure",
+      "handicap_mark_official_rating",
+      "class_change",
+      "distance_suitability",
+      "going_track_condition",
+      "draw_stall_bias",
+      "trap_bias_greyhound",
+      "gait_break_trot",
+      "days_since_last_run",
+      "trainer_form_strike_rate",
+      "jockey_form_strike_rate",
+      "driver_form_trot",
+      "market_move"
+    ],
+    "_match_bet_note": "THE ONLY TWO-OUTCOME MARKET IN RACING, and therefore the ONLY place the project's safety ladder can apply — everywhere else the outcome space is the whole field and there is no 'safer form of the same view' to walk to. Two further cautions specific to match bets: (a) they are usually settled on which runner finishes AHEAD, so a non-completion (fell, pulled up, disqualified, gait break) resolves the bet rather than voiding it — the gait-break rate is a direct input, not a footnote; (b) a match bet normally VOIDS if either runner is a non-runner, which makes it the one racing market where non-runner risk is refunded rather than deducted. Both must be confirmed against Betwinner's terms.",
+    "ante_post_futures": [
+      "class_change",
+      "distance_suitability",
+      "breeding_pedigree",
+      "handicap_mark_official_rating",
+      "trainer_form_strike_rate",
+      "market_move",
+      "days_since_last_run"
+    ],
+    "_ante_post_note": "The dominant variable in an ante-post price is NOT ability — it is PARTICIPATION PROBABILITY. Because the stake is normally lost if the runner never starts, the correct model is P(runs) x P(wins | runs), and P(runs) depends on entry stage, alternative engagements, ground preference versus the forecast going, and trainer intent. Modelling ante-post with the same function as a same-day win bet is the single biggest category error available here. Note also: all three AntePost sport ids (132/151/133) returned ZERO meetings in the live pull, so there is currently nothing to model."
+  },
+
+  "rules_critical": [
+    "READ THIS FIRST: Betwinner's own rules pages could NOT be retrieved from this environment (empty 302 on betwinner.com/en/rules, 404 on the betwinner2.com mirror and on every other path tried), and every third-party bookmaker rules page tested returned 403/500. Every statement below is GENERIC INDUSTRY PRACTICE assembled from readable secondary sources. Betwinner's Rule 4 table, dead-heat clause, each-way terms and ante-post policy MUST be read manually and this file corrected before any of it is treated as fact.",
+    "RULE 4 CUTS A BET YOU HAVE ALREADY STRUCK: if a horse is withdrawn before the off, deductions are taken from the WINNINGS of bets already placed at fixed odds. The price you took is not the price you get paid. Table as read from a secondary source: 1/9 or shorter 90p; 2/11-2/17 85p; 1/4-1/5 80p; 3/10-2/7 75p; 2/5-1/3 70p; 8/15-4/9 65p; 8/13-4/7 60p; 4/5-4/6 55p; 20/21-5/6 50p; evens-6/5 45p; 5/4-6/4 40p; 8/5-7/4 35p; 9/5-9/4 30p; 12/5-3/1 25p; 16/5-4/1 20p; 9/2-11/2 15p; 6/1-9/1 10p; 10/1-14/1 5p; longer than 14/1 nothing.",
+    "THE DEDUCTION IS DRIVEN BY THE WITHDRAWN HORSE'S PRICE, NOT YOURS, AND IT COMPOUNDS: a short-priced favourite coming out takes up to 90p in the pound off YOUR winner's profit, and multiple withdrawals stack — the source read states 'there is no real limit to how many rule 4 deductions there can be in a single race'. Any cumulative cap must be confirmed against Betwinner's terms; none was verified here.",
+    "DEDUCTIONS COME OUT OF PROFIT, NOT TOTAL RETURN. A 40p Rule 4 on a winning £10 bet at 4/1 removes 40% of the £40 profit (£16), returning £34, not 40% of the £50 payout. Getting this wrong overstates the damage; getting the base wrong understates it.",
+    "THE DISPLAYED PRICE IS NOT NECESSARILY THE DEDUCTION PRICE. Sporting Life's York race 929719 carried deductions [{'type':'BoardPrices','value':10.0}] with the withdrawn runner Paladin showing 12/1 — a price that sits in the 5p band, not the 10p band. The deduction is set by the withdrawn runner's price at the moment of withdrawal, which is not the last price you can see. Never recompute a Rule 4 from a stale displayed price.",
+    "ANTE-POST BETS NORMALLY DO NOT REFUND IF THE RUNNER NEVER STARTS. This is a completely different risk from a same-day bet: the stake is simply lost if the horse is not declared, is injured, is aimed elsewhere or is withdrawn for the ground. Same-day bets refund non-runners; ante-post bets do not. NEVER model the two with the same function — an ante-post price must be decomposed into P(runs) x P(wins | runs).",
+    "THE ANTE-POST / DAY-OF-RACE BOUNDARY IS THE FINAL DECLARATION STAGE, and it is the moment the risk profile flips from 'stake lost on a non-runner' to 'stake refunded, Rule 4 applied'. Bets placed either side of that line behave differently even at the same price on the same horse. The exact cutover (commonly the 24- or 48-hour declaration) and any 'with a run' / non-runner-no-bet concession are bookmaker-specific and were NOT verified for Betwinner.",
+    "DEAD HEATS SPLIT THE STAKE AND HALVE THE RETURN. In a 2-way dead heat, half the stake is settled at full odds and the other half is lost: a £10 win bet at 4/1 in a 2-way dead heat returns £25, not £50. The general rule is stake x (places available / runners dead-heating), settled at full odds. A 3-way dead heat for the last paid place pays a third. This applies to the place half of an each-way bet independently of the win half, and to forecasts and tricasts.",
+    "EACH-WAY TERMS VARY BY FIELD SIZE, so the same 'this one will make the frame' idea settles differently race to race. Terms read from a secondary source: 5-7 runners 1/4 odds 2 places; 8+ non-handicap 1/5 odds 3 places; 5-7 handicap 1/4 odds 2 places; 8-11 handicap 1/5 odds 3 places; 12-15 handicap 1/4 odds 3 places; 16+ handicap 1/4 odds 4 places. The 16+ handicap band paying a fourth place is the single biggest step change in the table.",
+    "NON-RUNNERS CAN COLLAPSE THE PLACE TERMS AFTER YOU HAVE BET. A 16-runner handicap backed each-way at 1/4 odds 4 places can lose a place if withdrawals drop the field to 15, and drop to 3 places at 1/5 if it falls to 11. Whether terms are recalculated at the off or fixed at strike time is bookmaker-specific and was explicitly NOT covered by the source read — this is the highest-value unknown in the each-way market and must be confirmed with Betwinner.",
+    "SMALL FIELDS KILL THE PLACE HALF ENTIRELY: with 4 runners or fewer there is normally no place market at all and each-way bets are win-only or void. Any 'top 3' logic must first check the field size actually exists to support it.",
+    "GREYHOUND EACH-WAY IS A DIFFERENT ANIMAL: standard races are 6 dogs, which sits in the 5-7 band at 1/4 odds and only TWO places. A 'top 3' idea that works in a 16-runner handicap has no market at all in a 6-dog race.",
+    "A TROTTER THAT BREAKS GAIT CAN BE DISQUALIFIED AFTER PASSING THE POST, so the horse that crossed the line first is not always the horse that settles. ATG publishes galloped and disqualified as separate booleans, which means the two states are distinct: a horse can break and still be placed, or break and be thrown out. Never settle or back-test trotting on finishing order alone.",
+    "HANDICAP-START TROTTING RACES DO NOT HAVE ONE DISTANCE. Better horses start 20/40/60m behind, so runners in the same race cover different ground — ATG carries a per-start distance and PMU a per-participant handicapDistance. A km-rate compared across horses on different marks, or across autostart and volt starts, is comparing different races.",
+    "'UNDER STARTER'S ORDERS' IS THE LINE THAT DECIDES REFUND VERSUS NO REFUND. A runner withdrawn BEFORE coming under orders is a non-runner (stake refunded, Rule 4 on the rest); one that comes under orders and then takes no part generally counts as a runner and the stake is lost. Sporting Life's feed distinguishes exactly this, carrying NONRUNNER and WITHDRAWN as separate ride_status values alongside RUNNER.",
+    "A GREYHOUND THAT FAILS TO LEAVE THE TRAP IS STILL A RUNNER. It has come under orders; the bet loses. There is no non-runner refund for a dog that simply does not go.",
+    "THE RESULT IS NOT FINAL UNTIL 'WEIGHED IN'. Photo finishes, stewards' enquiries and objections can reverse or amend the placings, and settlement follows the amended result. Betting on the first-past-the-post signal rather than the weighed-in signal will book phantom winners; Sporting Life exposes a stewards field for exactly this reason.",
+    "A NON-RUNNER USUALLY VOIDS A FORECAST OR TRICAST leg-by-leg rather than deducting — the treatment differs fundamentally from a win bet's Rule 4, and combination bets may be reduced to a lower permutation rather than refunded in full. Confirm Betwinner's specific treatment before pricing these at all.",
+    "A WALKOVER (one runner left) is normally void with stakes returned, not a winning bet at the price you took. An abandoned or void race returns stakes for same-day bets — but for ANTE-POST bets an abandonment or a move to another course/date frequently does NOT return the stake. Same event, opposite outcome, purely because of when the bet was struck.",
+    "SP IS NOT THE PRICE YOU TOOK. Board/early prices, Best Odds Guaranteed and SP all settle differently, and Rule 4 applies to fixed-odds bets while tote/SP returns already have the withdrawal absorbed into the pool. Sporting Life labels its deduction type 'BoardPrices' precisely because the deduction is scoped to a price type — a scanner that ignores which price type a selection belongs to will mis-settle."
+  ],
+
+  "verdict": "EXCLUDE from the product for now — and the reason is not primarily the paywall, it is a COVERAGE MISMATCH plus a MARKET-SHAPE MISMATCH, both verified against live data rather than assumed. (1) THE DATA IS PAYWALLED, but less absolutely than feared: five genuinely free, no-auth, robots-permitted sources were verified by body — Sporting Life (draw, official rating, weight, headgear with a first-time counter, days since last run, going, full form lines, live Rule 4 deductions), GBGB (official UK greyhound data with sectionals, a pre-applied going allowance, adjusted times, trap numbers and running-style comments), ATG (trotting with shoeing changes, start method, km rates, driver and trainer strike rates, and explicit galloped/disqualified booleans), PMU (French trot and galop with musique, deferre, handicap distances and live-vs-reference odds) and HKJC (per-furlong sectionals, running positions, draw, carried weight AND bodyweight). What is NOT free is the finished product: every established speed figure — Timeform, RPR, Beyer, Topspeed, Thoro-Graph, Ragozin — is a subscription, Equibase's 'free dataset' is registration-gated, The Racing API 401s on the endpoint named 'free', and the richest French dataset on Hugging Face turns out to be a EUR 950-4,500 storefront. A figure would have to be BUILT from raw times, which is real work but not impossible. (2) THE COVERAGE DOES NOT LINE UP, and this is what actually kills it. Betwinner's live book on the sampled day was 40 horse meetings led by Australia (13) and the USA (10), 14 trotting meetings led by the USA (8) and Canada (3), and a single greyhound meeting at Darwin. Our best free sources cover Britain, Ireland, France, Sweden, Hong Kong and Japan. The overlap is 2 UK horse meetings out of 40. Worse, the mismatch is not accidental: Racing Australia blanket-disallows all non-search-engine agents and NAMES the free-form paths it is barring, harness.org.au and Horse Racing Ireland disallow ClaudeBot BY NAME, the Greyhound Recorder blanket-disallows, TAB NZ country-blocks us and thedogs.com.au 403s. Every route into Betwinner's single biggest jurisdiction is closed to us specifically and lawfully. The one free source that perfectly matches a Betwinner market — GBGB, for UK greyhounds — is matched against a book that offered ONE greyhound meeting, in Australia, that GBGB does not cover. (3) THE MARKET SHAPE DEFEATS THE ENGINE ANYWAY. Every race in the feed carries exactly one market group and nothing else: no place, no each-way, no forecast, no tricast, no match bets, and all three AntePost sport ids returned zero meetings. A win market over an 8-16 runner field is not a two-outcome market, so the safety ladder — which the project defines as the only place odds may influence selection — has nothing to walk down; match bets, the one racing market where it could apply, are absent from the feed. The scanner's core signal is per-market overround, and a 16-runner win market has a structurally huge hold that is not comparable to a 1X2 hold, so per-type normalisation would rank races against races and surface nothing but the biggest fields. Trotting prices came back None on every selection, meaning racing is published unpriced until close to the off, and meetings that returned races one minute returned zero a few minutes later — racing churns on a minutes-to-hours cycle that the existing 48-hour pre-match scanner is not built for. RECOMMENDATION: exclude 44/132/68/151/92/133 from the scanner. If the category is ever revisited, the ONLY defensible entry point is UK greyhounds via GBGB — one regulator, one free and official feed carrying sectionals and a going allowance, six-runner fields, and a settlement surface simple enough to reason about — and that should be attempted only if and when Betwinner's book actually carries UK greyhound racing, which on this evidence it does not.",
+
+  "open_questions": [
+    "Is the sampled day representative? All coverage counts come from a single pull on 2026-07-25. If Betwinner's book carries UK/IRE horse racing and UK greyhounds on other days (weekend or European evening cards), the coverage verdict changes materially. Re-pull GetChampsZip for 44/68/92 at several times of day and on a Saturday before this is treated as settled.",
+    "Do the three AntePost sports (132/151/133) EVER populate? All three returned zero meetings. If they populate only around major festivals (Cheltenham, the Classics, Melbourne Cup), the ante-post rules work here is dormant rather than useless — but nothing can be modelled until a non-empty pull is seen.",
+    "Does Betwinner offer place / each-way / forecast / match-bet markets on racing anywhere OUTSIDE the pre-match LineFeed — in the site UI, or in the in-play feed the project does not currently touch? GE and AE were empty on every race sampled, but tools/fetch_window.py already notes that sub-games are separate game ids that must be fetched separately.",
+    "WHAT ARE BETWINNER'S ACTUAL RULES? Its Rule 4 table, dead-heat clause, each-way place terms, ante-post refund policy and forecast/tricast non-runner treatment are all UNREAD. Retrieve them manually from a browser and correct rules_critical. Nothing in that section should be relied on until this is done.",
+    "Are each-way place terms fixed at strike time or recalculated at the off when non-runners shrink the field? The source read was explicitly silent. This single answer changes the value of every each-way bet near a 8/12/16-runner boundary.",
+    "Is there any cumulative cap on stacked Rule 4 deductions? The source read says there is 'no real limit'; most books do publish a cap. Betwinner's figure is unknown.",
+    "Does ustrotting.com expose usable US harness form? It is reachable and robots-permitted and Betwinner's trotting book is majority-US, so it is the highest-value unverified target in this file. Only the homepage was read.",
+    "Can Racing Australia / harness.org.au / HRI data be obtained through a LICENSED route rather than scraping? They are blocked to us by robots and by name, not by paywall — a commercial or API agreement would be a compliance question, not a technical one.",
+    "What is in KBlueLeaf/jp-racing-horse? A 1.03 GB Apache-2.0 SQLite of Japanese racing 1990-2025 whose schema was never opened. If it carries times, going, draw and weights it is a legitimate free training set for building a speed figure from scratch.",
+    "Do the GBGB resultComment tokens have a documented vocabulary? 'EarlyPace', 'Rls', 'MidToRls', 'Led2', 'HeldOn' were observed. Running style is the core greyhound signal and it is locked inside an undocumented token string.",
+    "RETEST the sources that failed on OUR egress rather than on the site: thetattersallscommittee.co.uk (502 CONNECT) and api.github.com (session-gated). This project already runs pulls from GitHub Actions; both should be retried there, exactly as the tennis research recommended for the Sackmann repos."
+  ],
+
+  "key_findings": [
+    "COVERAGE MISMATCH IS THE HEADLINE, not the paywall. Betwinner's live racing book is Australia- and USA-led (horse: AU 13 / US 10 / JP 3 / KR 2 / UK 2 of 40 meetings; trot: US 8 / CA 3 / AU 2 / SE 1 of 14; greyhound: ONE meeting, Darwin). The verified free sources cover GB, IRE, FR, SE, HK and JP. The intersection is about two meetings.",
+    "THE BLOCKS ARE AIMED AT US SPECIFICALLY. Racing Australia sets 'User-agent: * / Disallow: /' and names /FreeFields/ and /FreeServices/ as barred; harness.org.au and Horse Racing Ireland both carry an explicit 'User-agent: ClaudeBot / Disallow: /'; horseracingnation.com blocks ClaudeBot and Claude-Web; thegreyhoundrecorder.com.au blanket-disallows. Racing data sites are, as warned, aggressive — and several of them block Claude by name rather than by paywall.",
+    "EVERY RACE IN BETWINNER'S PRE-MATCH FEED CARRIES EXACTLY ONE MARKET: the win market (horse T=2637/G=26, trot T=6414/G=7571), with GE and AE empty every time. No place, each-way, forecast, tricast or match-bet market was found, and sports 132/151/133 returned zero meetings. The safety ladder needs a two-outcome market and racing does not supply one.",
+    "RACING MARKETS ARE PUBLISHED UNPRICED AND EXPIRE IN MINUTES. Every trotting selection sampled had C = None, and champs that returned races at one moment returned zero a few minutes later. The 48-hour pre-match scanner assumes a horizon racing does not have.",
+    "GBGB IS THE BEST FREE DATA IN THE CATEGORY AND IT IS NOT CLOSE: an official regulator publishing, with no auth, per-dog sectional times, run time, a going allowance AND a pre-computed going-adjusted time, trap number and trap handicap, weight, SP, beaten distances, sire/dam, bitch season dates, running-style comments, and historical forecast/tricast dividends. Nothing in thoroughbred racing is this open.",
+    "ATG SOLVES TROTTING OUTRIGHT, INCLUDING THE HARD PART: it exposes galloped and disqualified as explicit per-start booleans (26 and 6 occurrences across 8 sampled races), plus shoes {front/back, changed}, sulky {type, changed}, startMethod, per-horse start distance, post position, km rates bucketed by start method and distance, and PRE-COMPUTED driver and trainer win percentages by year. The gait-break rate — the statistic that makes harness racing different — is free and structured.",
+    "SPORTING LIFE IS THE BEST FREE THOROUGHBRED SOURCE and its robots.txt has no Disallow rules at all. It carries draw, official rating, weight, headgear WITH AN OCCURRENCE COUNT (count == 1 identifies first-time headgear directly), days since last run, going, class, full narrative form lines, and the odds history — and it publishes live Rule 4 deductions and RUNNER/NONRUNNER/WITHDRAWN statuses, which is settlement data, not just form data.",
+    "THE INDUSTRY REALLY DOES SELL THIS DATA, and the clearest proof was a trap: the Hugging Face 'dataset' huggy-engine/horse-racing-database-fr advertises 356,000 French races with shoeing, blinkers and weather, but ships only a 1999-Q1 sample and prices the real thing at EUR 950 to EUR 4,500 in its own README. Equibase's 'Free Dataset Registration' is a storefront; The Racing API returns 401 on the endpoint named 'free'.",
+    "NO FREE SPEED FIGURE EXISTS. Timeform, RPR, Topspeed, Beyer, Thoro-Graph and Ragozin are all commercial, and they disagree with each other by construction (subjective vs time-based vs weight-and-trip 'sheets'), so there is no consensus number being withheld — only competing products. A figure would have to be built from raw times, which HKJC, GBGB, ATG and PMU all supply.",
+    "BETWINNER'S OWN RULES COULD NOT BE READ — every path tried returned an empty 302 or a 404, and every third-party bookmaker rules page returned 403/500. The Rule 4 table and each-way terms in this file come from secondary sources and are flagged as such throughout. This is the most important caveat in the file.",
+    "THE FOUR SETTLEMENT TRAPS ARE REAL AND WERE PARTLY OBSERVED IN LIVE DATA: Rule 4 cuts an already-struck bet by up to 90p in the pound of PROFIT (and Sporting Life showed a live 10p deduction with a WITHDRAWN runner); ante-post stakes are normally lost outright on a non-runner, making P(runs) the dominant term; a 2-way dead heat halves the return (£10 at 4/1 returns £25, not £50); and each-way place terms swing from 2 places at 1/4 to 4 places at 1/4 purely on field size — which non-runners can change after the bet is struck.",
+    "ONE USEFUL THING ARRIVES FREE WITH THE ODDS: Betwinner's own MIS block carries per-race track weather — temperature, cloud, wind speed and direction, pressure, humidity and precipitation probability — observed on both a horse race and a trotting race. It is the only rich per-race metadata in the feed, and it is a forward-looking proxy for going drift that the published racecard going does not capture."
+  ]
+}
