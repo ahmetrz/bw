@@ -1,0 +1,25 @@
+{
+  "generated": "2026-07-25T22:35:09.726887+00:00",
+  "min_odds": 1.1,
+  "min_model_survival": 0.75,
+  "windows": [
+    {
+      "hours": 24,
+      "matches": 58,
+      "skipped": {
+        "no_model": 58,
+        "no_confident_rung": 0
+      },
+      "picks": []
+    },
+    {
+      "hours": 48,
+      "matches": 58,
+      "skipped": {
+        "no_model": 58,
+        "no_confident_rung": 0
+      },
+      "picks": []
+    }
+  ]
+}
