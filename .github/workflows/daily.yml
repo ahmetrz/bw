@@ -43,6 +43,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Kimlik bilgilerini ONCE dogrula. Bozuk bir token'in 2 saatlik cekimden SONRA
+      # ortaya cikmasi, raporun gidecek yeri olmadigini en gec ogrenmek demektir.
+      # Token yoksa sorun degil (0 doner, tarama devam eder); token VARSA ve
+      # calismiyorsa is burada durur.
+      - name: Check Telegram credentials
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 tools/telegram_ping.py --quiet
+
       # 48 saatlik pencereyi bir kez cekiyoruz; 24 saatlik pencere onun alt kumesi,
       # ikinci bir cekim gereksiz yuk olur.
       - name: Fetch 48h window
