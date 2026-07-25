@@ -1,0 +1,206 @@
+name: probe-oddsapi-io
+
+# NE YAPAR:
+#   odds-api.io (OddsPapi DEGIL — ayri saglayici) uzerinde Betwinner kapsamini test eder.
+#   1. Hangi secret adinin dolu oldugunu bulur (DEGERI ASLA yazdirmaz, sadece ad + uzunluk).
+#   2. O anahtarla auth'u dogrular.
+#   3. Bookmaker listesini ceker ve Betwinner'in planda GERCEKTEN olup olmadigina bakar.
+#   4. Bir futbol etkinligi icin Betwinner oranlarini ister ve DONEN veride hangi
+#      kitabin oldugunu dogrular.
+#
+# NEDEN KIMLIK DOGRULAMASI:
+#   OddsPapi 'betwinner' slug'ini gecerli listesinde gosteriyor ama 22bet verisi
+#   donduruyor (bkz. PROBE_FINDINGS.md). Bir saglayicinin listesinde adin gecmesi
+#   hicbir sey kanitlamaz — donen veriye bakmak gerekir.
+#
+# GUVENLIK:
+#   ODDSPAPI_KEY baska bir saglayiciya ait; odds-api.io'ya ASLA gonderilmez, sadece
+#   varligi raporlanir. Istek URL'leri loglanirken anahtar maskelenir.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sport:
+        description: "Spor (odds-api.io taksonomisi)"
+        required: false
+        default: "football"
+      bookmaker:
+        description: "Test edilecek bookmaker adi"
+        required: false
+        default: "Betwinner"
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe odds-api.io
+        env:
+          ODDS_API_KEY:    ${{ secrets.ODDS_API_KEY }}
+          ODDSAPI_KEY:     ${{ secrets.ODDSAPI_KEY }}
+          ODDS_API_IO_KEY: ${{ secrets.ODDS_API_IO_KEY }}
+          ODDSAPIIO_KEY:   ${{ secrets.ODDSAPIIO_KEY }}
+          ODDSAPI_IO_KEY:  ${{ secrets.ODDSAPI_IO_KEY }}
+          ODDS_API_TOKEN:  ${{ secrets.ODDS_API_TOKEN }}
+          ODDSAPI_TOKEN:   ${{ secrets.ODDSAPI_TOKEN }}
+          ODDS_KEY:        ${{ secrets.ODDS_KEY }}
+          ODDSIO_KEY:      ${{ secrets.ODDSIO_KEY }}
+          # Sadece VARLIK bilgisi — deger degil. Bu anahtar odds-api.io'ya gonderilmez.
+          ODDSPAPI_KEY_PRESENT: ${{ secrets.ODDSPAPI_KEY != '' && 'evet' || 'hayir' }}
+          SPORT: ${{ inputs.sport || 'football' }}
+          BOOK:  ${{ inputs.bookmaker || 'Betwinner' }}
+        run: |
+          set -o pipefail
+          BASE="https://api.odds-api.io/v3"
+          mkdir -p data
+
+          cat > /tmp/summarize.py <<'PY'
+          import json, sys, re
+          path, mode, needle = sys.argv[1], sys.argv[2], (sys.argv[3] if len(sys.argv) > 3 else "")
+          try:
+              d = json.load(open(path))
+          except Exception as e:
+              print(f"  (JSON degil: {e}) ilk 200 bayt:")
+              print("  " + open(path, errors="replace").read()[:200].replace("\n", " "))
+              raise SystemExit(0)
+
+          def walk_strings(o):
+              if isinstance(o, str):
+                  yield o
+              elif isinstance(o, dict):
+                  for k, v in o.items():
+                      yield k
+                      yield from walk_strings(v)
+              elif isinstance(o, list):
+                  for v in o:
+                      yield from walk_strings(v)
+
+          if mode == "bookmakers":
+              names = sorted({s for s in walk_strings(d) if isinstance(s, str)})
+              hits = [n for n in names if needle.lower() in n.lower()]
+              print(f"  cevaptaki farkli string sayisi: {len(names)}")
+              print(f"  '{needle}' eslesmeleri: {hits if hits else 'YOK'}")
+              fam = [n for n in names if re.search(r'(?i)(22bet|1xbet|betwinner)', n)]
+              print(f"  1xBet ailesi adlari: {fam if fam else 'yok'}")
+          elif mode == "identity":
+              hay = json.dumps(d).lower()
+              for name in ("betwinner", "22bet", "1xbet"):
+                  print(f"  '{name}' gecis sayisi: {hay.count(name)}")
+              print(f"  ust seviye tip: {type(d).__name__}, "
+                    f"uzunluk: {len(d) if hasattr(d,'__len__') else '-'}")
+          else:
+              print("  " + json.dumps(d)[:400])
+          PY
+
+          # ---------- 1) Hangi secret adi dolu? ----------
+          echo "=================================================="
+          echo "1) Aday secret adlari (DEGER YAZDIRILMAZ)"
+          CANDIDATES="ODDS_API_KEY ODDSAPI_KEY ODDS_API_IO_KEY ODDSAPIIO_KEY ODDSAPI_IO_KEY ODDS_API_TOKEN ODDSAPI_TOKEN ODDS_KEY ODDSIO_KEY"
+          SET_NAMES=""
+          for n in $CANDIDATES; do
+            v="${!n}"
+            if [ -n "$v" ]; then
+              echo "   ${n} : DOLU (${#v} karakter)"
+              SET_NAMES="${SET_NAMES} ${n}"
+            fi
+          done
+          if [ -z "${SET_NAMES}" ]; then
+            echo "   Hicbir aday ad dolu degil."
+          fi
+          echo "   ODDSPAPI_KEY mevcut mu (baska saglayici, GONDERILMEZ): ${ODDSPAPI_KEY_PRESENT}"
+
+          if [ -z "${SET_NAMES}" ]; then
+            echo ""
+            echo "SONUÇ: odds-api.io anahtari denenen adlarin hicbirinde yok."
+            echo "       Denenen adlar: ${CANDIDATES}"
+            echo "       Secret'in gercek adini soyleyin, workflow'a ekleyeyim."
+            exit 1
+          fi
+
+          # ---------- 2) Auth dogrulama ----------
+          echo "=================================================="
+          echo "2) Auth dogrulama (${BASE}/sports)"
+          KEY=""
+          KEYNAME=""
+          for n in ${SET_NAMES}; do
+            v="${!n}"
+            CODE=$(curl -sS -m 30 -o /tmp/auth.json -w "%{http_code}" \
+                   -H "Accept: application/json" "${BASE}/sports?apiKey=${v}" || echo "000")
+            echo "   ${n} -> HTTP ${CODE}"
+            if [ "${CODE}" = "200" ]; then
+              KEY="$v"; KEYNAME="$n"
+              break
+            fi
+            head -c 200 /tmp/auth.json 2>/dev/null | sed 's/^/      /'; echo ""
+            sleep 1
+          done
+
+          if [ -z "${KEY}" ]; then
+            echo ""
+            echo "SONUÇ: Dolu secret(ler) var ama hicbiri odds-api.io'da auth gecmedi."
+            exit 1
+          fi
+          echo "   ✓ Kullanilan secret: ${KEYNAME}"
+          cp /tmp/auth.json data/oddsapiio_sports.json
+
+          # ---------- 3) Bookmaker listesi ----------
+          echo "=================================================="
+          echo "3) Bookmaker listesi — '${BOOK}' planda var mi?"
+          for path in bookmakers sportsbooks bookmaker; do
+            CODE=$(curl -sS -m 30 -o /tmp/bm.json -w "%{http_code}" \
+                   -H "Accept: application/json" "${BASE}/${path}?apiKey=${KEY}" || echo "000")
+            echo "   GET ${BASE}/${path}?apiKey=*** -> HTTP ${CODE}"
+            if [ "${CODE}" = "200" ]; then
+              cp /tmp/bm.json data/oddsapiio_bookmakers.json
+              python3 /tmp/summarize.py /tmp/bm.json bookmakers "${BOOK}"
+              break
+            fi
+            sleep 1
+          done
+
+          # ---------- 4) Etkinlik + Betwinner oranlari ----------
+          echo "=================================================="
+          echo "4) ${SPORT} etkinlikleri ve ${BOOK} oranlari"
+          CODE=$(curl -sS -m 30 -o /tmp/ev.json -w "%{http_code}" \
+                 -H "Accept: application/json" \
+                 "${BASE}/events?apiKey=${KEY}&sport=${SPORT}&limit=5" || echo "000")
+          echo "   GET ${BASE}/events?apiKey=***&sport=${SPORT}&limit=5 -> HTTP ${CODE}"
+          if [ "${CODE}" != "200" ]; then
+            head -c 300 /tmp/ev.json | sed 's/^/      /'; echo ""
+          else
+            cp /tmp/ev.json data/oddsapiio_events.json
+            EVID=$(python3 -c "
+          import json
+          d=json.load(open('/tmp/ev.json'))
+          rows = d if isinstance(d,list) else (d.get('data') or d.get('events') or [])
+          print((rows[0].get('id') or rows[0].get('eventId') or '') if rows else '')
+          " 2>/dev/null || echo "")
+            echo "   ilk eventId: ${EVID:-<bulunamadi>}"
+            if [ -n "${EVID}" ]; then
+              sleep 1
+              CODE=$(curl -sS -m 30 -o /tmp/odds.json -w "%{http_code}" \
+                     -H "Accept: application/json" \
+                     "${BASE}/odds?apiKey=${KEY}&eventId=${EVID}&bookmakers=${BOOK}" || echo "000")
+              echo "   GET ${BASE}/odds?apiKey=***&eventId=${EVID}&bookmakers=${BOOK} -> HTTP ${CODE}"
+              cp /tmp/odds.json data/oddsapiio_odds_${BOOK}.json
+              echo "   --- DONEN VERIDE HANGI KITAP VAR? ---"
+              python3 /tmp/summarize.py /tmp/odds.json identity
+            fi
+          fi
+
+          echo "=================================================="
+          ls -la data/
+
+      - name: Commit data
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ || true
+          git commit -m "probe: odds-api.io coverage for ${{ inputs.bookmaker || 'Betwinner' }}" || echo "degisiklik yok"
+          git push || echo "push atlandi"
