@@ -1,0 +1,422 @@
+{
+  "sport": "waterpolo_fieldhockey_lacrosse",
+  "betwinner_sport_ids": [17, 27, 48],
+  "researched": "2026-07-25",
+  "headline": "Three sports, three different data realities. FIELD HOCKEY is the best served: tms.fih.ch decomposes every goal into Penalty Corner / Field Goal / Penalty Stroke and publishes per-quarter penalty-corner COUNTS, which is precisely the one statistic field hockey cannot be modelled without. LACROSSE is well served for NCAA field (full team box + play-by-play) and NLL box (server-rendered player table with faceoffs), but the two variants are different sports and must never share a totals model. WATER POLO is the problem child: fixtures and scores are freely available, but exclusion rate, powerplay conversion and goalkeeper save % are NOT retrievable free anywhere verified - the sport must be modelled from scorelines alone until a stats source is found.",
+
+  "statistics": [
+    {
+      "sport": "waterpolo",
+      "id": "exclusion_rate",
+      "definition": "Major (exclusion) fouls conceded and drawn per match. Excluded player leaves for 20s, creating a 6-on-5.",
+      "why": "The single largest driver of water polo scoring. Elite 6-on-5 conversion runs far above even-strength efficiency, so a team's exclusions-drawn minus exclusions-conceded is the closest thing water polo has to an xG differential.",
+      "availability": "NOT FREELY AVAILABLE. Not in World Aquatics API, not in NCAA feed. See blocked."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "powerplay_conversion",
+      "definition": "Goals scored / 6-on-5 opportunities, and the mirror 5-on-6 kill rate.",
+      "why": "Splits the totals line more than shot volume does. A high-exclusion, low-conversion game and a low-exclusion, high-conversion game produce the same goal total by different routes - only the second is repeatable.",
+      "availability": "NOT FREELY AVAILABLE."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "goalkeeper_save_pct",
+      "definition": "Saves / shots faced, ideally split even-strength vs 5-on-6.",
+      "why": "Water polo goalkeepers swing match outcomes more than any field player; 5-on-6 save % is a genuinely separate skill from even-strength save %.",
+      "availability": "NOT FREELY AVAILABLE."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "counter_attack_goals",
+      "definition": "Goals scored in transition before the defence sets.",
+      "why": "Counter-attack share is a pace proxy: it raises the total without raising possessions symmetrically, because counters are short possessions with high conversion.",
+      "availability": "NOT FREELY AVAILABLE."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "shots_per_quarter",
+      "definition": "Shot volume by period, and its split into centre-forward, perimeter and extra-man attempts.",
+      "why": "Feeds quarter/period markets and the pace term of the totals model.",
+      "availability": "NOT FREELY AVAILABLE. Even quarter SCORES are absent from the World Aquatics API."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "penalty_rate",
+      "definition": "5-metre penalties awarded per match and their conversion (historically ~80%+).",
+      "why": "Low-variance goals bolted onto the total; a team that draws many penalties has a higher floor than its open-play numbers imply.",
+      "availability": "NOT FREELY AVAILABLE."
+    },
+    {
+      "sport": "waterpolo",
+      "id": "final_score_and_fixture",
+      "definition": "Result, opponent, phase, date, venue, ResultStatus.",
+      "why": "The only water polo input actually obtainable at scale. Supports Elo/Poisson from scorelines, nothing richer.",
+      "availability": "VERIFIED - api.worldaquatics.com (fixtures/phases) and data.ncaa.com (NCAA men's scores)."
+    },
+
+    {
+      "sport": "fieldhockey",
+      "id": "penalty_corners_earned",
+      "definition": "Short corners awarded to a team, available PER QUARTER.",
+      "why": "THE field hockey statistic. Penalty corners are a set-piece scoring route with a conversion rate several times open-play efficiency, so corner volume forecasts goals far better than shot volume does.",
+      "availability": "VERIFIED - tms.fih.ch match statistics PDF, per quarter and total, both teams."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "penalty_corners_converted",
+      "definition": "Goals scored from penalty corners; derivable as (PC goals from the match page) / (PC earned from the stats PDF).",
+      "why": "Separates a team that manufactures corners from one that scores them. A specialist drag-flicker is a step change in conversion and does not show up in any team rating.",
+      "availability": "VERIFIED - derivable. The match page tags every goal Penalty Corner / Field Goal / Penalty Stroke; the stats PDF supplies the denominator."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "goal_route_split",
+      "definition": "Share of goals from field goal vs penalty corner vs penalty stroke, per team and per player.",
+      "why": "Two teams with identical goals-per-game are different bets if one scores 60% from corners: corner-dependent scoring is streakier and umpire-dependent.",
+      "availability": "VERIFIED - tms.fih.ch competition /statistics page gives per-player FG/PC/PS columns; match pages give it per goal."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "circle_entries",
+      "definition": "Entries into the shooting circle - the territorial pressure metric.",
+      "why": "Upstream of both corners and shots; the cleanest available proxy for sustained attacking control.",
+      "availability": "TEMPLATE ONLY. The field exists in the TMS stats PDF but reads 0 in every competition sampled. Treat as unavailable."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "shots_and_shots_on_target",
+      "definition": "Total attempts and attempts on goal, per quarter.",
+      "why": "Standard finishing-regression input.",
+      "availability": "TEMPLATE ONLY - same zero-fill problem as circle entries."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "press_effectiveness",
+      "definition": "Turnovers forced in the attacking 23m and the resulting shot/corner yield.",
+      "why": "High-press sides generate corners from defensive-third turnovers, which is why their corner counts are not predictable from possession alone.",
+      "availability": "NOT AVAILABLE FREE. Requires event-level tracking data."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "cards_and_suspensions",
+      "definition": "Green (2 min), yellow (umpire-set duration, typically 5 or 10 min) and red cards, with minute and issuing umpire.",
+      "why": "Field hockey suspensions are long relative to a 60-minute game, and a 10-minute yellow is a sixth of the match played a player down. Card-prone teams leak corners.",
+      "availability": "VERIFIED - tms.fih.ch match page lists team, minute, shirt number, player, card type and the yellow's duration in minutes."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "quarter_scoring_split",
+      "definition": "Goals by quarter, plus running half-time and third-period scores.",
+      "why": "Directly prices quarter and half markets; field hockey is not uniform across quarters.",
+      "availability": "VERIFIED - tms.fih.ch match page timeline and the stats PDF's First Period / Half-time / Third Period / Full Time ladder."
+    },
+    {
+      "sport": "fieldhockey",
+      "id": "shootout_record",
+      "definition": "Team record in penalty shoot-outs (the 8-second one-on-one format) and stroke competitions.",
+      "why": "Decides knockout progression markets and any market Betwinner settles including shoot-outs. Goalkeeper-specific and close to independent of open-play strength.",
+      "availability": "PARTIAL - results recoverable from tms.fih.ch and Wikipedia; no per-attempt data."
+    },
+
+    {
+      "sport": "lacrosse",
+      "id": "faceoff_win_pct",
+      "definition": "Faceoffs won / faceoffs taken (field lacrosse). Box lacrosse uses the equivalent floor faceoff.",
+      "why": "The possession tap. A dominant FOGO (faceoff specialist) can hand his team 8-12 extra possessions, which moves the total AND the handicap in the same direction - one of the few stats that does both.",
+      "availability": "VERIFIED (box) - NLL all-player-stats table has FO and FO%. VERIFIED (NCAA field) - only via PLAY-BY-PLAY text parsing; the team-stats JSON has faceoffsWon/faceoffsLost fields that are zero-filled."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "shot_efficiency",
+      "definition": "Goals / shots and goals / shots-on-goal.",
+      "why": "Separates volume shooters from efficient ones; box lacrosse shot volume is far higher per minute than field, so efficiency must be normalised within variant.",
+      "availability": "VERIFIED - NCAA team-stats (shots, shotsOnGoal) and NLL player table (SOG)."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "clearing_pct",
+      "definition": "Successful clears / clear attempts - moving the ball from defensive to offensive half after a save or turnover.",
+      "why": "A failed clear is a possession handed to the opponent in their attacking half, the highest-value turnover in the sport.",
+      "availability": "PARTIAL - clears/clearAttempts exist in the NCAA team-stats schema but are zero-filled; clear events ARE present in the play-by-play text and must be counted from there."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "man_up_conversion",
+      "definition": "Extra-man offence goals / opportunities, and the man-down kill rate.",
+      "why": "Penalties in lacrosse are timed like ice hockey, and man-up conversion is high enough that penalty differential is a totals input, not just a win-probability input.",
+      "availability": "VERIFIED - NCAA team-stats powerPlay.goals / powerPlay.opportunities plus penalties.major/minor/match. NLL player table has PPG, PPA, SHG, PIM."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "goalie_saves_and_save_pct",
+      "definition": "Saves and saves / shots faced.",
+      "why": "Box goalies face far more shots at far shorter range than field goalies; save % baselines are not portable between variants.",
+      "availability": "VERIFIED - NCAA team-stats goalie.saves and player-level goalie object."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "possession_count",
+      "definition": "Possessions per game, reconstructable from faceoffs won + clears + caused turnovers + saves.",
+      "why": "The pace term. Two teams' goals-per-game are only comparable once divided by possessions, exactly as in basketball."
+      ,
+      "availability": "DERIVABLE from NCAA play-by-play; not published directly anywhere verified."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "ground_balls_and_caused_turnovers",
+      "definition": "Loose-ball recoveries (LB in the NLL) and defensively forced turnovers.",
+      "why": "The hustle possessions that faceoff % misses; strongly correlated with extra shot attempts.",
+      "availability": "VERIFIED - NCAA groundBalls/causedTurnovers, NLL LB/TO/CTO/BLK."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "shot_clock_regime",
+      "definition": "Which shot clock the fixture is played under: NCAA 80s (20s to cross midfield + 60s), PLL 52s on a defensive stop but 32s off a faceoff win or retained shot, NLL/box 30s.",
+      "why": "Pace is set by the RULE SET, not the league's reputation. A 30s box clock produces roughly double the possessions of an 80s NCAA clock, so totals baselines cannot cross regimes.",
+      "availability": "VERIFIED as a rule fact; must be applied as a model switch, not learned from data."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "two_point_goals",
+      "definition": "PLL only: goals from outside the two-point arc (15 yards top, 13 at the corners) count TWO.",
+      "why": "Breaks the assumption that scores move in units of one. Totals, handicaps and winning-margin markets all mis-settle if modelled as integer single-goal steps.",
+      "availability": "Rule verified. PLL's own site is robots-blocked to us, so the per-game counts must come from Wikipedia or another mirror."
+    },
+    {
+      "sport": "lacrosse",
+      "id": "draw_controls",
+      "definition": "Women's lacrosse equivalent of the faceoff, taken at centre after each goal.",
+      "why": "Same possession-tap role as the men's faceoff; women's lacrosse has no faceoff field at all.",
+      "availability": "VERIFIED - drawControls present in the NCAA team-stats and player schema."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "tms_fih",
+      "url": "https://tms.fih.ch/matches/{match_id} + /matches/{match_id}/reports/statistics",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "THE BEST SOURCE IN THIS FILE. FIH Tournament Management System (Altiusrt). Read a completed match body: quarter-by-quarter goal timeline, every GOAL tagged Penalty Corner / Field Goal / Penalty Stroke, full card list (team, minute, shirt no, player, G/Y/R, yellow duration in minutes, issuing umpire), lineups with minutes played, officials, head-to-head. The per-match statistics PDF adds PENALTY CORNERS PER QUARTER for both teams plus the First Period / Half-time / Third Period / Full Time score ladder. Covers World Cups (incl. Indoor), EuroHockey championships, Asian/Pan-Am events, AHF Cup, national test matches; browsable by sequential competition id back to at least 2022.",
+      "note": "robots.txt is 'User-agent: * / Disallow:' = fully permissive, no AI-bot clause. Competition tabs: /competitions/{id}/matches, /statistics, /pools, /teams. TRAP: the stats PDF also contains Circle Entries, Shots, Shots on Target and Possession % - ALL ZERO in every competition sampled (1550, 1650, 1700, 1770). The template is not the data. Penalty corners ARE populated. Extract PDFs with pypdf; the layout squashes adjacent per-quarter digits, so parse positionally, not by whitespace."
+    },
+    {
+      "id": "world_aquatics_api",
+      "url": "https://api.worldaquatics.com/fina/competitions?disciplines=WP + /fina/competitions/{id}/schedule",
+      "auth": "none",
+      "verified": true,
+      "coverage": "271-289 water polo competitions from 2009 to the 2028 Olympics. The schedule endpoint returns per-match rows: Name, Date, Time, UtcDateTime, Day, DisciplineName, PhaseName, ResultStatus (OFFICIAL/...), SportCode=WP, MatchNo, TeamHomeName/Code, TeamAwayName/Code, Venue, TimeZone. 96 WP units for the 2025 Singapore Worlds alone.",
+      "note": "CRITICAL LIMIT - fixtures and phases only. NO SCORES, no quarter scores, no team or player statistics. /results, /matches, /standings, /teams, /rankings all 404. www.worldaquatics.com robots.txt is 'Disallow:' = fully permissive. /competitions/{id}/medals works but is a 1.2 MB all-sport payload."
+    },
+    {
+      "id": "ncaa_casablanca",
+      "url": "https://data.ncaa.com/casablanca/scoreboard/{sport}/d1/{YYYY}/{MM}/{DD}/scoreboard.json",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Real JSON scoreboards. Confirmed working slugs: lacrosse-men, waterpolo-men. Each game gives gameID, url (/game/{contestId}), both teams' score, seed, record, conference, gameState, bracketRound, startTime.",
+      "note": "No robots.txt at all on data.ncaa.com (S3 NoSuchKey/404) so no crawl restrictions; www.ncaa.com robots.txt permits content paths. Slugs lacrosse-women, waterpolo-women, fieldhockey-women all 404 - only the two above were confirmed by body."
+    },
+    {
+      "id": "ncaa_api_mirror",
+      "url": "https://ncaa-api.henrygd.me/game/{contestId}/{boxscore|team-stats|play-by-play}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "NCAA MEN'S LACROSSE FULL BOX. team-stats returns TeamStatsLacrosse: shots, shotsOnGoal, groundBalls, drawControls, faceoffsWon, faceoffsLost, clears, clearAttempts, turnovers, goalie.saves, penalties{count,minutes,major,minor,match}, goalTypes{overtimeGoals,emptyNetGoals,gameTyingGoals,shootoutGoals,powerplayGoals,shortHandedGoals,freePositionGoals}, powerPlay{goals,opportunities}. Player rows add causedTurnovers, freePositionShots, shootoutShots, minutesPlayed. play-by-play gives 4 periods with a 15:00 clock and full play text.",
+      "note": "TWO TRAPS. (1) faceoffsWon/faceoffsLost/clears/clearAttempts are ZERO even in the 2025 D1 championship final - the fields exist and are never filled. Faceoffs and clears must be COUNTED FROM PLAY-BY-PLAY TEXT ('Faceoff X vs Y won by UMD', 38 Clear mentions in one game). (2) WATER POLO 502s from the NCAA origin on every boxscore/team-stats/play-by-play attempt (games 6343589, 6348834) while lacrosse 200s in the same session - NCAA publishes water polo SCORES ONLY. This is a community mirror of data.ncaa.com, not an official product; pin it and expect it to disappear."
+    },
+    {
+      "id": "nll_player_stats",
+      "url": "https://www.nll.com/stats/all-player-stats/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "BOX LACROSSE. One server-rendered HTML table, columns read from the body: Rank, Player, Team, P, GP, G, A, PTS, PIM, PPG, PPA, SHG, LB (loose balls), TO, CTO (caused turnovers), BLK, SOG, FO, FO%. Team-level figures must be aggregated from players.",
+      "note": "robots.txt permits all with Crawl-delay 10. /stats/leaders/ and /standings/ are JS-rendered WordPress shells with ZERO tables - only the all-player-stats page carries real markup. There is no /stats/team-stats/ page (404). The JS references https://nllstatsapp.aordev.com/ but every /api/ path there 404s and the root returns 0 bytes."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php (action=query, prop=extracts / list=search)",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Rules text and season results for all three sports. Verified live: 'Rules of water polo' (28.7k chars, shot clock and shootout detail), 'Field hockey' (61.6k), 'Box lacrosse' (22.5k), 'Field lacrosse' (31.7k), 'College lacrosse' (25.5k), 'Premier Lacrosse League' (13.2k), 'National Lacrosse League' (46.4k). Search confirms real season articles exist: \"2025-26 Men's FIH Pro League\", 'European Aquatics Champions League', \"2023-24 LEN Women's Champions League\".",
+      "note": "The legitimate route to PLL data given that premierlacrosseleague.com disallows us by name - we fetch Wikipedia, not PLL. The REST endpoint /api/rest_v1/page/html/ 404s on guessed titles; resolve titles through list=search first. Licence CC BY-SA: attribution required if content is republished."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Live SPARQL, returned real JSON bindings. Useful for entity reconciliation - mapping Betwinner team name strings to stable Q-ids across the three sports and their language variants.",
+      "note": "Public endpoint with rate limits; set a descriptive User-Agent. Not a match-stats source."
+    },
+    {
+      "id": "fih_hockey_site",
+      "url": "https://www.fih.hockey/events/fih-pro-league-2025-26/stats/{mens|womens}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Reachable and robots-permitted (only /scrapperlayout and loadmore params disallowed). Schedule/fixtures/results pages exist per event.",
+      "note": "VERIFIED AS NOT USEFUL AS-IS. Read the body: a 2.0 MB page whose only 'Penalty Corner'/'Goals' hits are navigation chrome - zero server-rendered statistics. The Pro League stat tables are client-rendered from an API not exposed in the HTML. FIH Pro League was also NOT found in the tms.fih.ch competition-id sweep, so the Pro League is the one major field hockey property with no verified free stats route."
+    },
+    {
+      "id": "eurohockey",
+      "url": "https://eurohockey.org",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Next.js app, buildId extracted from the body, /competitions, /competitions/rankings, /competitions-archive, /ehl-news routes present.",
+      "note": "No robots.txt (404) so no restrictions. Largely redundant: EuroHockey championships are administered THROUGH tms.fih.ch (confirmed - 'EuroHockey U21 Championship Men 2026' and multiple EuroHockey Indoor events appear there), so take EuroHockey data from TMS and use this site only for EHL club-competition metadata. /_next/data/{buildId}/*.json is the likely JSON route but was not exercised."
+    },
+    {
+      "id": "world_lacrosse",
+      "url": "https://worldlacrosse.sport",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Real WordPress site (204 KB body), disciplines split into Men's Field, Women's Field and Sixes.",
+      "note": "robots permits all but /wp-admin/, Crawl-delay 10. Homepage verified; per-match statistics NOT verified. Its main value is confirming the SIXES discipline as a third lacrosse variant Betwinner may list - 4x8 minute quarters, again a separate totals regime."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "premier_lacrosse_league",
+      "detail": "COMPLIANCE BLOCK, NOT A TECHNICAL ONE. robots.txt names us twice: a Cloudflare managed block with 'User-agent: ClaudeBot / Disallow: /', and a site-authored block listing 'User-Agent: anthropic-ai' and 'User-Agent: ClaudeBot' with 'Disallow: /'. Content-Signal is search=yes,ai-train=no,use=reference. NOT FETCHED. This removes the premier FIELD lacrosse league's own stats. Workaround: Wikipedia season articles (we fetch Wikipedia, not PLL)."
+    },
+    {
+      "id": "total_waterpolo",
+      "detail": "COMPLIANCE BLOCK. The richest independent water polo site. robots.txt Cloudflare managed block includes 'User-agent: ClaudeBot / Disallow: /' (also CCBot, GPTBot, Google-Extended, Bytespider, Amazonbot, Applebot-Extended, meta-externalagent). Content-Signal search=yes,ai-train=no,use=reference, with an explicit EU DSM Article 4 reservation of rights. NOT FETCHED."
+    },
+    {
+      "id": "stats_ncaa_org",
+      "detail": "Akamai 'Access Denied' 403 on BOTH robots.txt and /rankings/institution_trends. Read the body: an edgesuite.net error page, not a challenge we may work around. Use data.ncaa.com instead, which is unrestricted."
+    },
+    {
+      "id": "european_aquatics",
+      "detail": "COMPLIANCE BLOCK. europeanaquatics.com robots.txt (identical on www.) ends with 'User-agent: * / Disallow: /' after allowlisting only Googlebot, Slurp, MSNBot and ia_archiver. The site is live and real (27 KB body) but we are disallowed. This costs us the LEN/European Aquatics Champions League - the strongest club water polo competition in the world."
+    },
+    {
+      "id": "len_org",
+      "detail": "DEAD - AND A TEXTBOOK STATUS-CODE TRAP. robots.txt returns HTTP 200 with a friendly 'User-agent: * / Allow: / / LLM-Policy: /llms.txt'. Fetching the body shows the truth: the homepage is a 114-byte JS redirect to /lander and llms.txt states 'www.len.org is a domain name currently listed for sale on GoDaddy's aftermarket'. A permissive robots.txt on a parked domain. Never qualify a source on robots.txt alone."
+    },
+    {
+      "id": "len_eu",
+      "detail": "HTTP 202 with a meta-refresh to /.well-known/sgcaptcha/ - a Sucuri CAPTCHA wall, on both len.eu and www.len.eu. A 2xx that carries no content."
+    },
+    {
+      "id": "waterpolo_hu",
+      "detail": "COMPLIANCE BLOCK, precisely targeted. Hungary is the strongest domestic water polo league. robots.txt disallows exactly the pages we want: /meccsadatok (match data), /meccs/*/* (match pages), /jatekos/*/* (player pages), plus /bajnoksagok and /_nuxt. The front page is allowed; the data is not."
+    },
+    {
+      "id": "federnuoto_it",
+      "detail": "HTTP 503 'Service unavailable' (19 bytes) on robots.txt. Italian Serie A1 water polo unreachable and robots status unknown, so it cannot be crawled compliantly until robots.txt resolves."
+    },
+    {
+      "id": "waterpolo_gr_and_vaterpolo_rs",
+      "detail": "Greek federation: proxy CONNECT tunnel failed 502. Serbian federation: TCP connection reset by peer. Neither robots.txt nor content readable; both are top-4 water polo nations. Worth a retest from a GitHub Actions runner - the failure mode looks like our egress, not their policy."
+    },
+    {
+      "id": "ncaa_waterpolo_boxscore",
+      "detail": "Scores yes, stats no. data.ncaa.com serves the waterpolo-men scoreboard fine, but every /game/{id}/boxscore, /team-stats and /play-by-play call 502s from the NCAA ORIGIN (verified on two separate games) while lacrosse calls 200 in the same session. www.ncaa.com's own water polo game page contains zero occurrences of exclusion, saves, power play or steals."
+    },
+    {
+      "id": "unverified_not_fetched",
+      "detail": "Robots read and permissive, but CONTENT NOT FETCHED so verified=false by rule: www.usalacrosse.com (Drupal default, content paths allowed), www.englandhockey.co.uk ('Disallow:' fully permissive), www.rfen.es (blocks only Ahrefs/Semrush/MJ12/DotBot/BLEXBot), www.hockey.org.au and hockeyindia.org (no '*' restriction found). hvs.hr (Croatia) is robots-permissive and returned a 142 KB body, but the bytes were compressed and NOT decoded - recorded as unverified rather than claimed."
+    }
+  ],
+
+  "stat_to_bet": {
+    "draw_possible_in_regulation": {
+      "waterpolo": "YES in group/league play. International water polo has NO overtime and no ties - a knockout that needs a winner goes STRAIGHT TO A SHOOTOUT, but a pool-stage draw stands. Betwinner will therefore offer 1X2 on group fixtures. SAFETY LADDER STARTS AT DOUBLE CHANCE.",
+      "fieldhockey": "YES in pool play - a tied pool game simply stands in FIH tournaments and league competition. Knockouts go to a shoot-out (and in some formats extra time first). 1X2 applies. SAFETY LADDER STARTS AT DOUBLE CHANCE.",
+      "lacrosse": "NO - effectively never. Every code breaks ties with sudden-victory overtime: NCAA 4-minute periods, PLL/MLL 10-minute, NLL sudden death (15-minute OT), international two straight 5-minute periods then sudden victory, plus the Braveheart 1v1 tiebreak. The market is a TWO-WAY moneyline. SAFETY LADDER STARTS AT THE MONEYLINE ITSELF - there is no draw rung below it, so the only de-risking move is the handicap."
+    },
+    "moneyline_or_1x2": {
+      "waterpolo": ["exclusion_rate", "powerplay_conversion", "goalkeeper_save_pct", "final_score_and_fixture", "shootout_exposure_in_knockouts"],
+      "fieldhockey": ["penalty_corners_earned", "penalty_corners_converted", "goal_route_split", "cards_and_suspensions", "shootout_record"],
+      "lacrosse": ["faceoff_win_pct", "shot_efficiency", "goalie_saves_and_save_pct", "clearing_pct", "man_up_conversion", "shot_clock_regime"]
+    },
+    "handicap": {
+      "waterpolo": ["exclusion_rate", "powerplay_conversion", "goalkeeper_save_pct"],
+      "fieldhockey": ["penalty_corners_earned", "penalty_corners_converted", "cards_and_suspensions"],
+      "lacrosse": ["faceoff_win_pct", "possession_count", "shot_efficiency", "two_point_goals", "shot_clock_regime"],
+      "note": "Water polo and box lacrosse handicaps are wide (5.5-9.5 is routine) because scores are high; field hockey and field lacrosse handicaps are narrow. Never port a handicap prior across the three."
+    },
+    "total_goals": {
+      "waterpolo": ["exclusion_rate", "powerplay_conversion", "counter_attack_goals", "shots_per_quarter", "penalty_rate", "shot_clock_regime_28s"],
+      "fieldhockey": ["penalty_corners_earned", "penalty_corners_converted", "goal_route_split", "circle_entries", "cards_and_suspensions"],
+      "lacrosse": ["shot_clock_regime", "possession_count", "faceoff_win_pct", "shot_efficiency", "goalie_saves_and_save_pct", "two_point_goals"],
+      "note": "THE HEADLINE MAPPING RULE. In field hockey a team scoring rate WITHOUT corner-conversion data is close to uninformative, because the penalty corner supplies a dominant share of goals and its conversion is a specialist skill that team form does not capture. In lacrosse the total is set by the shot-clock regime first and team quality second."
+    },
+    "team_totals": {
+      "waterpolo": ["powerplay_conversion", "penalty_rate", "counter_attack_goals", "opponent_goalkeeper_save_pct"],
+      "fieldhockey": ["penalty_corners_earned", "penalty_corners_converted", "circle_entries", "opponent_cards_and_suspensions"],
+      "lacrosse": ["shot_efficiency", "man_up_conversion", "faceoff_win_pct", "opponent_goalie_saves_and_save_pct", "two_point_goals"]
+    },
+    "quarter_period_markets": {
+      "waterpolo": ["shots_per_quarter", "exclusion_rate", "period_structure_4x8"],
+      "fieldhockey": ["quarter_scoring_split", "penalty_corners_earned_per_quarter", "period_structure_varies"],
+      "lacrosse": ["shot_clock_regime", "faceoff_win_pct", "period_structure_varies_by_code"],
+      "note": "This is where the settlement traps bite hardest. Field hockey is NOT always four quarters (standard rules are still two 35-minute halves; quarters are a competition regulation) and box lacrosse is NOT always four quarters (CLA rules are three 20-minute periods; only the NLL plays 4x15). Confirm the period structure of the specific fixture before touching a quarter market."
+    },
+    "winning_margin": {
+      "waterpolo": ["powerplay_conversion", "goalkeeper_save_pct", "exclusion_rate"],
+      "fieldhockey": ["penalty_corners_converted", "goal_route_split", "cards_and_suspensions"],
+      "lacrosse": ["possession_count", "faceoff_win_pct", "two_point_goals", "shot_efficiency"],
+      "note": "PLL two-point goals make winning-margin bands non-integer-stepped - a 3-goal margin can arrive via one two-pointer plus one single. Do not model PLL margins on a unit-step distribution."
+    },
+    "race_to_x": {
+      "waterpolo": ["shots_per_quarter", "counter_attack_goals", "powerplay_conversion"],
+      "fieldhockey": ["penalty_corners_earned", "quarter_scoring_split"],
+      "lacrosse": ["faceoff_win_pct", "shot_clock_regime", "shot_efficiency"],
+      "note": "Race-to-X is a first-passage problem driven by SCORING RATE and its variance, not by match-win probability. It is the market most sensitive to the shot-clock regime in lacrosse, and in field hockey it is dominated by whichever team is winning corners early."
+    },
+    "btts_and_shutout": {
+      "note": "Only sensible in field hockey, where low totals make a nil plausible. Water polo and box lacrosse shutouts are near-impossible - both teams score in essentially every match, so BTTS is a near-certainty priced as one, and the only real question is the total."
+    }
+  },
+
+  "rules_critical": [
+    "FIELD versus BOX LACROSSE ARE DIFFERENT SPORTS AND ONE TOTALS MODEL CANNOT SERVE BOTH. Field is 10-a-side outdoors on a 100-110 yard field under an 80s (NCAA) or 52s/32s (PLL) shot clock; box is 6-a-side on a covered hockey rink under a 30s shot clock with 8-10 seconds to cross half. Box produces far more possessions and far more shots per minute. BEFORE PRICING ANY LACROSSE FIXTURE, ESTABLISH THE VARIANT - NLL is box, PLL and NCAA are field, and World Lacrosse Sixes is a third regime again (4x8 minute quarters).",
+    "IN FIELD HOCKEY THE PENALTY CORNER DRIVES SUCH A LARGE SHARE OF GOALS THAT TEAM SCORING RATE WITHOUT CORNER-CONVERSION DATA IS CLOSE TO UNINFORMATIVE. Corners are a set piece with specialist drag-flickers and rehearsed routines; a side can be outplayed territorially and still win on corner count. Model corners earned and corners converted as separate quantities - tms.fih.ch supplies both - and never infer goals from possession or shots.",
+    "BETWINNER'S SHOOTOUT-INCLUSION TERMS MUST BE READ BEFORE ANY KNOCKOUT FIXTURE IN WATER POLO OR FIELD HOCKEY. Both sports resolve knockout ties by shoot-out, and whether the shoot-out counts toward the match result, the total and the handicap changes settlement completely - a 1X2 that voids the draw at full time is a different bet from one that settles on the shoot-out winner. Pool fixtures in both sports can end drawn and the draw stands.",
+    "WATER POLO'S SHOT CLOCK CHANGED IN 2025: possession is now 28 SECONDS, not 30, and it resets to only 18 SECONDS after an offensive rebound is retained or after a major (exclusion) foul. Any pace or totals baseline fitted on pre-2025 data is stale, and the 18-second reset means a team that wins the rebound gets a short, high-urgency possession rather than a fresh one.",
+    "A WATER POLO EXCLUSION DOES NOT RELIABLY PRODUCE A FULL 20-SECOND POWERPLAY. The excluded player returns IMMEDIATELY if the attacking team scores or if the defence regains the ball, so the 6-on-5 is variable-length. Counting exclusions as fixed-length powerplays overstates extra-man opportunity for teams that concede exclusions to good defensive units.",
+    "THERE IS NO OVERTIME IN INTERNATIONAL WATER POLO - a knockout tie goes straight to a shootout with no extra period. NCAA is the exception and plays two straight 3-minute periods then repeated 3-minute golden-goal periods. Importing an ice-hockey-style '5 minutes then shootout' assumption is wrong for both.",
+    "THE WATER POLO GAME CLOCK STOPS ON EVERY DEAD BALL, so a nominal 4x8 = 32 minute match runs roughly 12 minutes of real time per quarter. Never convert water polo scoring rates using wall-clock or broadcast duration.",
+    "FIELD HOCKEY IS NOT UNIVERSALLY PLAYED IN QUARTERS. The standard rules still specify two 35-minute halves; four 15-minute quarters are a competition regulation adopted by many internationals since 2014 and are not guaranteed for club or national-league fixtures. A quarter market on a fixture actually played in halves has no defined settlement - confirm the format per competition.",
+    "A FIELD HOCKEY YELLOW CARD HAS NO FIXED DURATION - the umpire sets it, commonly 5 or 10 minutes. A 10-minute yellow is a sixth of a 60-minute match played a man down, which is a far larger swing than a football yellow and is the field hockey equivalent of a major penalty. Green cards are a 2-minute suspension at international level but may be only a warning under some national regulations.",
+    "FIELD HOCKEY SUBSTITUTION IS UNLIMITED AND ON-THE-FLY, BUT IS FORBIDDEN BETWEEN THE AWARD AND THE END OF A PENALTY CORNER. Fatigue models built on football-style limited substitutions do not transfer; corner defence personnel, by contrast, are locked in once the corner is awarded.",
+    "THE FIELD HOCKEY SHOOT-OUT IS AN 8-SECOND ONE-ON-ONE RUN FROM THE 23-METRE LINE, NOT A STROKE FROM THE SPOT. Best-of-five then sudden death. It replaced the old penalty-stroke competition at major tournaments in 2011, so historical shoot-out conversion rates from before 2011 describe a different skill and must not be pooled.",
+    "PLL SCORING IS NOT IN UNITS OF ONE - a goal from outside the two-point arc (15 yards at the top, 13 at the corners) counts TWO. Totals, handicaps, winning-margin bands and race-to-X all break if the score process is modelled as integer single steps. No other lacrosse code in scope has this.",
+    "LACROSSE OVERTIME LENGTH DIFFERS BY CODE AND ALL OF IT IS SUDDEN VICTORY: NCAA 4-minute periods, PLL/MLL 10-minute, NLL 15-minute sudden death, international two straight 5-minute periods before sudden victory applies, plus the Braveheart 1v1-plus-goalie tiebreak in some competitions. Full-game totals INCLUDE overtime; quarter markets do not. A sudden-victory OT adds exactly one goal, which skews the overtime total distribution hard to the left.",
+    "BOX LACROSSE IS NOT ALWAYS FOUR QUARTERS. Canadian Lacrosse Association rules are THREE 20-minute periods; the NLL is the outlier at four 15-minute quarters. A quarter market priced from NLL structure will mis-settle on a CLA-rules fixture.",
+    "THE NCAA LACROSSE 80-SECOND SHOT CLOCK IS TWO CLOCKS: 20 seconds to advance the ball across midfield, then 60 to shoot, and it only resets on a hit off the goalie or the post. Modelling it as a single 80-second possession cap overstates long possessions and understates forced turnovers at the midfield line.",
+    "PLL RUNS THREE DIFFERENT SHOT CLOCKS IN THE SAME GAME - 52 seconds on a possession won from a defensive stop or turnover, but only 32 seconds off a faceoff win or after a shot the offence retains. Possession value therefore depends on how the possession was won, which makes faceoff win % worth more in the PLL than its raw possession count implies.",
+    "WOMEN'S LACROSSE HAS NO FACEOFF - it uses the DRAW CONTROL, taken at centre after every goal. The NCAA schema carries drawControls and faceoffsWon as separate fields; routing a women's fixture through a faceoff model reads a permanently zero column.",
+    "WATER POLO BRUTALITY FOULS PRODUCE A FOUR-MINUTE EXCLUSION AND A PERMANENT PLAYER LOSS, an order of magnitude larger than an ordinary 20-second exclusion. Rare, but it is a live tail risk on in-play totals that a 20-second-exclusion model cannot represent.",
+    "SHORTENED OR ABANDONED MATCHES HAVE NO COMMON SETTLEMENT RULE ACROSS THESE THREE SPORTS - some books settle past a completion threshold, others void. Betwinner's threshold must be read per sport, and it matters more here than in football because water polo and box lacrosse concentrate scoring late."
+  ],
+
+  "open_questions": [
+    "WATER POLO STATISTICS ARE UNSOLVED. Exclusion rate, powerplay conversion, goalkeeper save %, counter-attack goals, shots per quarter and penalty rate are not retrievable from any source verified in this session. The World Aquatics API stops at fixtures, NCAA stops at scores, and the three richest routes (total-waterpolo.com, European Aquatics, waterpolo.hu match pages) are all robots-blocked. Water polo can currently be modelled ONLY from scorelines - materially weaker than the other two sports and weaker than every sport already in this repo.",
+    "Retest waterpolo.gr (proxy CONNECT 502), vaterpolo.rs (connection reset) and federnuoto.it (503) FROM A GITHUB ACTIONS RUNNER. All three failure modes look like our egress rather than site policy, and they cover Greece, Serbia and Italy - three of the strongest domestic leagues. This is the highest-value single retest in the file, exactly as dataproject was for volleyball.",
+    "The FIH PRO LEAGUE - field hockey's flagship property and the most likely Betwinner sport-27 market - has NO verified free stats route. Its stats pages are client-rendered and it was not found in the tms.fih.ch competition-id sweep. Find the API behind fih.hockey/events/fih-pro-league-*/stats/, or accept that Pro League fixtures are priced without corner data while tournament hockey is not.",
+    "TMS competition-id coverage was sampled, not enumerated. Sweep the full id range and build a competition index before relying on it, and check whether penalty-corner population correlates with competition tier - it was populated in EuroHockey and AHF Cup events but zero in the Hong Kong Quadrangular.",
+    "Whether the water polo exclusion is 20 seconds or 18 remains ambiguous: the long-standing rule is 20s, but sources describing the post-2025 ruleset give 18s, matching the new 18-second shot-clock reset. Confirm against the current World Aquatics rulebook before any powerplay-duration model is built.",
+    "Betwinner's actual market depth for sport ids 17, 27 and 48 is UNKNOWN - the catalogue confirms the sports exist, not that quarter, race-to-X or team-total markets are offered. Pull a live LineFeed for all three before building market-specific models.",
+    "ncaa-api.henrygd.me is a community mirror, not a contract. It is currently the only verified route to NCAA lacrosse box scores because stats.ncaa.org is WAF-blocked. Pin it, cache aggressively, and treat its disappearance as a live risk.",
+    "No source verified in this session provides water polo or field hockey QUARTER SCORES in machine-readable form at scale - TMS gives them per match in HTML/PDF, nothing gives them in bulk. Quarter markets in both sports are therefore priced on thin evidence."
+  ],
+
+  "key_findings": [
+    "tms.fih.ch is the single best source in this file and it is fully robots-permissive. It tags EVERY field hockey goal as Penalty Corner, Field Goal or Penalty Stroke, and its per-match statistics PDF carries penalty corners PER QUARTER for both teams - which is exactly the one statistic field hockey cannot be modelled without.",
+    "But read the payload, not the template: that same PDF also contains Circle Entries, Shots, Shots on Target and Possession % and they are ZERO in every competition sampled. The fields exist and are never filled. A parser that trusts the schema would silently model four phantom statistics.",
+    "The same trap repeats in lacrosse from a different vendor: the NCAA team-stats JSON exposes faceoffsWon, faceoffsLost, clears and clearAttempts and all four read zero even in the 2025 Division I championship final. Faceoff % and clear % must be COUNTED FROM PLAY-BY-PLAY TEXT instead - the events are there ('Faceoff X vs Y won by UMD'), just not the aggregates.",
+    "len.org is the cleanest status-code trap encountered: robots.txt returns 200 with 'Allow: /' and even advertises an LLM-Policy, but the body is a redirect to a GoDaddy lander and llms.txt states the domain is for sale. A permissive robots.txt on a dead domain. len.eu separately answers 202 behind a Sucuri CAPTCHA.",
+    "Water polo is the weakest sport in this repo by data availability. Fixtures yes, scores partly, statistics no. The World Aquatics API is genuinely good at what it does - 271 water polo competitions, full schedule with phases and result status - but it returns no scores and no stats, and /results, /matches and /standings all 404.",
+    "NCAA publishes water polo SCORES ONLY: the scoreboard JSON serves fine while every boxscore, team-stats and play-by-play call 502s from the NCAA origin, verified on two separate games in a session where lacrosse calls succeeded. That is an origin gap, not our block.",
+    "Two of the three sports' best independent sources are lost to robots policy, not to technology: total-waterpolo.com and premierlacrosseleague.com both name ClaudeBot (PLL also names anthropic-ai) with Disallow: /. Wikipedia is the compliant workaround for PLL because we fetch Wikipedia, not PLL.",
+    "The draw question splits the three cleanly and decides the safety ladder: water polo and field hockey can both end drawn in pool play, so their ladders start at double chance; lacrosse resolves every tie in sudden-victory overtime, so it is a two-way market whose only de-risking rung is the handicap.",
+    "Pace in all three sports is set by the RULE SET, not the league's reputation - water polo moved to a 28-second clock in 2025 with 18-second resets, NCAA lacrosse runs 20+60, PLL runs 52 or 32 depending on how possession was won, and box runs 30. Fit totals models per regime and refresh every water polo baseline built before 2025.",
+    "PLL two-point goals break the integer-step assumption that every totals, handicap and winning-margin model in this repo currently makes. It is the only code in scope where a single scoring event moves the scoreboard by two.",
+    "Field hockey card durations are umpire-set, not fixed: green is 2 minutes at international level (sometimes only a warning nationally) and yellow is whatever the umpire decides, commonly 5 or 10. The TMS match page records the actual minutes, so the real distribution is learnable rather than assumed."
+  ]
+}

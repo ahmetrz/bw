@@ -1,0 +1,367 @@
+{
+  "sport": "handball_futsal_beachsoccer",
+  "betwinner_sport_ids": [8, 14, 25],
+  "researched": "2026-07-25",
+  "headline": "Three sports that share market NAMES with football and share nothing else. Beach soccer cannot draw, so its 1X2 is a two-outcome market wearing three-outcome clothes. Futsal's clock stops, so its 40 minutes are real playing minutes and no football per-minute rate ports into it. Handball is the only one of the three where a regulation draw is a live outcome, and it is also the only one where the standard market settles BEFORE the extra time that the competition regulations may force.",
+
+  "verified_baselines": {
+    "_provenance": "Computed in-session from source bodies, not quoted from memory. Handball has NO computed baseline - see open_questions.",
+    "beach_soccer": {
+      "_source": "beachsoccer.com/wp-json/sportspress/v2/events, 595 played matches 2024-01-01..2026-01-01",
+      "sample_matches": 595,
+      "goals_per_match_mean": 8.05,
+      "goals_per_match_median": 8,
+      "period_share_of_goals": {"p1": 0.295, "p2": 0.326, "p3": 0.360, "extra_time": 0.008},
+      "level_after_three_periods_pct": 0.1261,
+      "decided_by_golden_goal_pct_of_all": 0.0487,
+      "decided_by_shootout_pct_of_all": 0.0521,
+      "margin_5_or_more_pct": 0.257,
+      "total_goals_over_rates": {"6.5": 0.650, "7.5": 0.529, "8.5": 0.429, "9.5": 0.294, "10.5": 0.222, "11.5": 0.161},
+      "total_goals_percentiles": {"p10": 3, "p25": 5, "p50": 8, "p75": 10, "p90": 13, "max": 22},
+      "note": "12.61% were level after the three periods but only 4.87%+5.21% show a populated aet/pso field - roughly 2.5pp of level matches have an unrecorded decider. Do NOT read the ET rate as exactly 10.1%; read 'level after regulation' as 12.6% and treat the split as approximate."
+    },
+    "beach_soccer_fifa_world_cup_2025": {
+      "_source": "api.fifa.com/api/v3/calendar/matches idCompetition=500 idSeason=288910",
+      "matches": 32,
+      "goals_per_match_mean": 9.0,
+      "result_types": {"regular": 30, "penalties": 1, "extra_time": 1},
+      "note": "Elite level scores HIGHER than the 8.05 all-events mean, and reaches ET/pens LESS often (6.25% vs 12.6%). Tournament tier is a real covariate for both totals and the no-draw ladder."
+    },
+    "futsal_uefa": {
+      "_source": "match.uefa.com/v5/matches, 742 FINISHED matches across Futsal EURO(5), Futsal Champions League(27), Women's Futsal EURO(2017), U19 Futsal EURO(2018)",
+      "sample_matches": 742,
+      "goals_per_regulation_match_mean": 6.42,
+      "goals_per_regulation_match_median": 6,
+      "phase_share_of_goals": {"first_half": 0.458, "second_half": 0.538, "extra_time": 0.004},
+      "goal_type_share": {"scored": 0.9353, "own_goal": 0.0370, "penalty": 0.0278},
+      "level_after_regulation_pct": 0.132,
+      "winner_reasons": {"WIN_REGULAR": 641, "DRAW": 87, "WIN_ON_PENALTIES": 7, "WIN_ON_EXTRA_TIME": 4},
+      "total_goals_over_rates": {"4.5": 0.710, "5.5": 0.549, "6.5": 0.406, "7.5": 0.309, "8.5": 0.220, "9.5": 0.142},
+      "note": "OWN GOALS ARE 3.7% OF ALL FUTSAL GOALS - roughly double the football rate. Deflections off a five-a-side defensive block and flying-goalkeeper turnovers both feed it. A totals model that ignores own goals is short ~0.24 goals a match."
+    }
+  },
+
+  "statistics": [
+    {"id": "hb_goals_for_against", "sport": "handball", "definition": "Goals scored / conceded per match, split home and away.", "why": "Base rate for totals and team totals. Handball totals are the highest-count market on the book (typical league line 55-62), so small per-match errors compound.", "source": ["ihf", "asobal", "lnh", "openligadb"]},
+    {"id": "hb_shot_efficiency_total", "sport": "handball", "definition": "Goals / shots taken, team level.", "why": "The single cleanest attacking-quality number. Separates a team that generates volume from one that converts.", "source": ["ihf", "asobal"]},
+    {"id": "hb_shot_efficiency_by_position", "sport": "handball", "definition": "Conversion split by shot origin: wing, 6m/line (pivot), 9m/backcourt, breakthrough, fast break, 7m. IHF match centre publishes exactly these buckets.", "why": "Shot MIX predicts totals better than shot volume. A team that lives on 9m shots converts ~35-45%; wing and 6m shots convert far higher. Two teams with identical shots-per-game can differ by 6+ goals on mix alone.", "source": ["ihf", "asobal"]},
+    {"id": "hb_shot_mix_share", "sport": "handball", "definition": "Share of total shots taken from each position bucket.", "why": "Feeds the efficiency weighting above and flags defensive style: a team forced into 9m shots is being beaten by a 6-0 wall.", "source": ["ihf"]},
+    {"id": "hb_seven_metre_rate", "sport": "handball", "definition": "7m throws awarded FOR and AGAINST per match, plus conversion %.", "why": "7m throws convert around 75-85%, far above any other shot type, so 7m rate is a direct totals input and a hidden favourite-cover input. Teams that attack the 6m line draw more of them.", "source": ["ihf", "asobal", "lnh"]},
+    {"id": "hb_two_minute_suspensions", "sport": "handball", "definition": "2-minute suspensions per team per match, and 2-min differential.", "why": "Two minutes short-handed in a 60-minute possession-dense game is worth roughly 1-1.5 net goals. The differential is a spread input, not just a discipline note.", "source": ["ihf", "asobal", "lnh"]},
+    {"id": "hb_progressive_punishment_state", "sport": "handball", "definition": "Count of yellow cards already used (max 3 per team) and of 2-min suspensions already served by each key player (3rd = disqualification).", "why": "A pivot on two 2-min suspensions is one call away from a red. Referees escalate; a team deep into progressive punishment defends softer for the rest of the match.", "source": ["ihf"]},
+    {"id": "hb_save_pct_overall", "sport": "handball", "definition": "Goalkeeper saves / shots faced.", "why": "Handball save% ranges ~25-40%; a 5pp swing is ~3 goals a match. It is the largest single-player lever in the sport and the direct analogue of the ice-hockey starting-goalie gate.", "source": ["ihf", "asobal", "lnh"]},
+    {"id": "hb_save_pct_by_zone", "sport": "handball", "definition": "Save% split by 7m, 9m, wing, 6m, fast break.", "why": "A keeper who is elite at 9m and poor on wings is matchup-dependent. Zone save% crossed with the opponent's shot mix is the best pre-match goalkeeping estimate available for free.", "source": ["ihf"]},
+    {"id": "hb_goalkeeper_rotation", "sport": "handball", "definition": "Minutes/shots split between first and second keeper; whether a specialist 7m keeper is used.", "why": "Unlike hockey there is no confirmed-starter feed for handball, and coaches swap keepers mid-match. Treat keeper identity as a distribution, not a point estimate.", "source": ["ihf", "asobal"]},
+    {"id": "hb_fast_break_goals", "sport": "handball", "definition": "Fast-break (counter-attack) goals and their share of team goals.", "why": "Fast-break goals convert near 80-90% and are almost pure pace. A high fast-break team raises the TOTAL far more than it raises its own win probability.", "source": ["ihf", "asobal"]},
+    {"id": "hb_empty_net_7v6", "sport": "handball", "definition": "Frequency of pulling the goalkeeper for a 7th field player, minutes played 7v6, goals scored in 7v6 and goals conceded into the empty net.", "why": "Since the 2016 removal of the distinguishing-bib requirement, 7v6 went from a trailing-team gimmick to a routine tactic used from the first minute by some teams. It fattens BOTH tails: more attacking goals and long-range empty-net concessions. It is the handball equivalent of the hockey empty-net adjustment and is invisible in a plain goals-per-game number.", "source": ["ihf"]},
+    {"id": "hb_possessions", "sport": "handball", "definition": "Attack count per team per match (possession count), and seconds per possession.", "why": "Pace normaliser. Everything else must be expressed per 100 attacks before it can be compared across the HBL, the LNH and the EHF Champions League.", "source": ["derived"]},
+    {"id": "hb_offensive_defensive_efficiency", "sport": "handball", "definition": "Goals scored / conceded per 100 attacks.", "why": "The only strength metric that survives a pace difference between leagues. Feeds handicap and 1X2 directly.", "source": ["derived"]},
+    {"id": "hb_technical_faults", "sport": "handball", "definition": "Turnovers: passing errors, steps, double-dribble, offensive fouls, passive-play turnovers.", "why": "Turnovers convert into fast breaks at a very high rate, so a turnover differential is a totals input as well as a possession input.", "source": ["ihf"]},
+    {"id": "hb_steals_blocks", "sport": "handball", "definition": "Steals and blocked shots per team.", "why": "Steals feed the fast break; blocks suppress 9m efficiency. Both are defensive-style fingerprints that survive small samples better than goals-against.", "source": ["ihf"]},
+    {"id": "hb_assists", "sport": "handball", "definition": "Assists per team.", "why": "Proxy for whether goals come from constructed play or isolation, which predicts robustness against a strong defensive block.", "source": ["ihf"]},
+    {"id": "hb_passive_play", "sport": "handball", "definition": "Passive-play forewarnings received and turnovers from the 4-pass limit.", "why": "The 4-pass rule after the passive warning caps how long a leading team can bleed clock, which is why handball leaders cannot kill a game the way a football leader can. Directly caps the under.", "source": ["derived"]},
+    {"id": "hb_halftime_split", "sport": "handball", "definition": "First-half share of total goals, per team and league.", "why": "Half markets need this, and the split is not 50/50 - second halves carry more because of tiring defences, keeper substitutions and 7v6 chasing.", "source": ["openligadb", "asobal", "lnh"]},
+    {"id": "hb_margin_distribution", "sport": "handball", "definition": "Distribution of the final winning margin; frequency of margins 1-2, 3-5, 6-10, 11+.", "why": "Handball handicaps are large (-4.5 to -8.5 in mismatches) and winning-margin markets are priced off this distribution, not off the mean.", "source": ["derived"]},
+    {"id": "hb_regulation_draw_rate", "sport": "handball", "definition": "Share of league matches level after 60 minutes.", "why": "The X in handball 1X2. Typically far lower than football because of the goal count, and it collapses further as the strength gap widens.", "source": ["derived"]},
+    {"id": "hb_home_advantage", "sport": "handball", "definition": "Home win% and home goal differential by league.", "why": "Handball home advantage is large - loud, small halls and referee proximity. It varies enormously by league and cannot be assumed constant.", "source": ["derived"]},
+    {"id": "hb_schedule_congestion", "sport": "handball", "definition": "Days of rest; whether the team played a midweek EHF Champions League match before a weekend league match; travel distance.", "why": "European handball clubs play a domestic league match and a continental match in the same week for most of the season. Rest is the most reliably mispriced situational variable in the sport.", "source": ["derived"]},
+    {"id": "hb_absences_by_position", "sport": "handball", "definition": "Missing goalkeeper, centre back/playmaker, line player, left back. Position-weighted, not headcount.", "why": "Losing the playmaker collapses the whole attacking structure; losing a wing does not. A headcount injury adjustment is worse than none.", "source": ["national_federations"]},
+    {"id": "hb_referee_pair", "sport": "handball", "definition": "2-minute suspensions and 7m throws awarded per match by referee pair.", "why": "Handball referees work as fixed pairs with measurable strictness. A strict pair adds 7m throws (high conversion) and suspensions (short-handed goals) - a totals push from officiating alone.", "source": ["ihf"]},
+    {"id": "hb_timeout_usage", "sport": "handball", "definition": "Team time-outs taken and when (the last-5-minutes constraint).", "why": "Affects endgame modelling for race-to-X and last-minute margin swings, and clock management in a stopped-clock endgame.", "source": ["derived"]},
+
+    {"id": "fs_goals_for_against", "sport": "futsal", "definition": "Goals scored / conceded per 40 minutes of PLAYING time.", "why": "Base rate. UEFA-level mean is 6.42 per match. Must never be expressed per wall-clock minute.", "source": ["uefa_match", "divisione_calcio_a5"]},
+    {"id": "fs_accumulated_fouls", "sport": "futsal", "definition": "Accumulated (direct-free-kick) fouls committed per half, and how often the team reaches 5 before the 30th minute.", "why": "The single most futsal-specific stat there is. From the 6th accumulated foul in a half, every further foul gives the opponent an unwalled direct free kick from the second penalty mark. A team that fouls early buys a half of free 10-metre shots against itself.", "source": ["uefa_match", "divisione_calcio_a5"]},
+    {"id": "fs_ten_metre_awarded_and_conversion", "sport": "futsal", "definition": "Second-penalty-mark (10 m) kicks awarded for/against and conversion rate.", "why": "Conversion is high (broadly comparable to a football penalty, well above open play) and each one is a near-certain shot on goal. It is a direct, chunky totals input that no football model has an analogue for.", "source": ["uefa_match"]},
+    {"id": "fs_penalty_rate", "sport": "futsal", "definition": "6-metre penalty kicks awarded and converted. UEFA's feed tags goalType=PENALTY.", "why": "2.78% of UEFA futsal goals are penalties. Small but a clean, directly countable component.", "source": ["uefa_match"]},
+    {"id": "fs_powerplay_usage", "sport": "futsal", "definition": "Minutes played with a flying goalkeeper (5 outfield + GK-kitted outfield player), goals scored and conceded during them, and the score state that triggers it.", "why": "Powerplay is futsal's defining endgame. It raises both teams' scoring rates simultaneously: the trailing team converts more, and the empty net concedes from anywhere on the court. It is the main reason futsal second halves carry 53.8% of goals against the first half's 45.8%, and the main reason a futsal under is dangerous when a favourite is behind.", "source": ["uefa_match"]},
+    {"id": "fs_powerplay_conceded", "sport": "futsal", "definition": "Goals conceded into the empty net while in powerplay, per powerplay minute.", "why": "The cost side of the same trade. Needed for correct late-game margin and race-to-X modelling, and it is why futsal comebacks are bimodal rather than smooth.", "source": ["uefa_match"]},
+    {"id": "fs_shots_per_playing_minute", "sport": "futsal", "definition": "Shots and shots on target per minute of stopped-clock playing time.", "why": "Futsal shot volume per playing minute is several times football's. Normalising by playing time (not elapsed time) is the only way to compare teams or port anything between competitions.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_shot_conversion", "sport": "futsal", "definition": "Goals / shots and goals / shots on target.", "why": "Small goal, close range, five defenders - conversion is high and variance is high. Feeds totals more than volume does.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_set_piece_conversion", "sport": "futsal", "definition": "Goals from kick-ins, corners and free kicks as a share of team goals, and conversion per set piece.", "why": "Futsal set pieces are rehearsed plays from a standing start with a 4-second clock, and they are a much larger share of goals than in football. A team with a strong kick-in routine beats its open-play numbers.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_kick_in_and_corner_count", "sport": "futsal", "definition": "Kick-ins and corners awarded per match.", "why": "The volume side of the set-piece conversion above, and the direct driver of any corner-count market.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_four_second_violations", "sport": "futsal", "definition": "Restarts lost to the 4-second rule and goalkeeper 4-second infringements in own half.", "why": "A pressure/discipline fingerprint. High-press teams force them; it converts directly into an indirect free kick in a dangerous area.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_goalkeeper_save_pct", "sport": "futsal", "definition": "Saves / shots on target, and save% split open play vs 10 m vs penalty.", "why": "A futsal keeper faces a shot roughly every 90 seconds of playing time. Save% is the highest-leverage single-player number after the powerplay decision.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_goalkeeper_distribution", "sport": "futsal", "definition": "Goalkeeper assists and attacking involvement; how often the GK acts as the fifth attacker.", "why": "In futsal the keeper is a genuine playmaker with a 4-second possession limit forcing quick distribution. Keeper assist rate is a proxy for how committed a team is to the flying-keeper style.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_own_goal_rate", "sport": "futsal", "definition": "Own goals as a share of goals.", "why": "VERIFIED at 3.7% of UEFA futsal goals - roughly double football. Deflections off a compressed defensive block plus empty-net powerplay turnovers. Any totals model that treats own goals as noise is systematically low.", "source": ["uefa_match"]},
+    {"id": "fs_half_split", "sport": "futsal", "definition": "Share of goals in the first vs second half; UEFA's feed tags each goal with phase=FIRST_HALF/SECOND_HALF.", "why": "VERIFIED 45.8 / 53.8. Half markets cannot be priced at half the match total, and the skew grows with the pre-match spread because powerplay chasing is score-state driven.", "source": ["uefa_match"]},
+    {"id": "fs_cards_and_short_handed", "sport": "futsal", "definition": "Yellow and red cards; minutes played short-handed after a sending-off.", "why": "A red card puts the team down to four for two minutes OR until it concedes. That is a bounded, quantifiable goal-expectancy spike, unlike a football red which lasts the match.", "source": ["uefa_match"]},
+    {"id": "fs_rotation_count", "sport": "futsal", "definition": "Substitutions made (rolling, unlimited) and average shift length.", "why": "Futsal is played in 60-90 second shifts. A thin rotation degrades in the second half exactly when powerplay decisions are made.", "source": ["divisione_calcio_a5"]},
+    {"id": "fs_timeout_usage", "sport": "futsal", "definition": "Whether each team used its one time-out per half, and when.", "why": "One minute per half, only callable in possession, does not carry over. A saved second-half timeout is a real endgame asset for a set-piece or powerplay setup.", "source": ["derived"]},
+    {"id": "fs_actual_match_duration", "sport": "futsal", "definition": "Wall-clock elapsed time for a 40-minute match, and stoppage count.", "why": "Confirms the stopped-clock inflation empirically and is required for any in-play or per-minute derivation. It also warns how far off a football-ported model is.", "source": ["derived"]},
+    {"id": "fs_lead_protection", "sport": "futsal", "definition": "Scoring rate and conceding rate in the final 5 minutes conditioned on lead size.", "why": "Because of powerplay, a two-goal futsal lead with 4 minutes left is far less safe than the same lead in football, and a three-goal lead is far more safe. Non-linear and the core of race-to-X and live-adjacent pricing.", "source": ["uefa_match"]},
+    {"id": "fs_home_advantage", "sport": "futsal", "definition": "Home win% and goal differential by competition.", "why": "Small halls, hostile crowds, and in national-team futsal a genuine home-court effect. Varies widely between the Futsal Champions League and national leagues.", "source": ["derived"]},
+    {"id": "fs_head_to_head_and_rest", "sport": "futsal", "definition": "Prior meetings, days of rest, and mini-tournament format (Futsal Champions League is played as compressed 3-4 team mini-tournaments).", "why": "In an elite round played over four days, fatigue and rotation dominate the third match. Season-long ratings misprice the last game of a mini-tournament.", "source": ["uefa_match"]},
+
+    {"id": "bs_goals_for_against", "sport": "beach_soccer", "definition": "Goals scored / conceded per match across the three periods.", "why": "VERIFIED mean 8.05 across 595 matches, 9.0 at the 2025 World Cup. Beach soccer is the highest-scoring of the three and the totals line sits around 8.5-9.5.", "source": ["bsww", "fifa_api"]},
+    {"id": "bs_period_goals", "sport": "beach_soccer", "definition": "Goals per each of the three 12-minute periods. BSWW's feed carries firsthalf/secondhalf/thirdhalf per team.", "why": "VERIFIED share 29.5 / 32.6 / 36.0. Never divide the match total by three for a period market - the third period carries 22% more than the first, from fatigue in sand plus chasing.", "source": ["bsww"]},
+    {"id": "bs_extra_time_and_shootout_rate", "sport": "beach_soccer", "definition": "Rate of matches level after three periods, and the split between golden-goal extra time and penalties. BSWW carries aet and pso as separate fields.", "why": "VERIFIED 12.61% level after regulation. This is the entire basis of the no-draw structure and of any moneyline safety ladder - it is the probability that the market's nominal 'regulation' result is not the settled result.", "source": ["bsww", "fifa_api"]},
+    {"id": "bs_margin_distribution", "sport": "beach_soccer", "definition": "Final margin distribution; VERIFIED 25.7% of matches finish 5+ goals apart.", "why": "Beach soccer handicaps run wide. A quarter of matches being blowouts means the margin distribution is fat-tailed and a normal approximation badly misprices the big handicap lines.", "source": ["bsww"]},
+    {"id": "bs_bicycle_kick_conversion", "sport": "beach_soccer", "definition": "Overhead/bicycle-kick attempts and goals as a share of team goals.", "why": "The signature beach soccer shot - the ball sits up off the sand, so bicycle kicks are a routine primary finishing option rather than a highlight. Teams differ enormously in how much of their scoring comes from it, and it is the least suppressible shot type against a deep block, so it partly decouples a team's scoring from the opponent's defensive quality.", "source": ["bsww"]},
+    {"id": "bs_shot_volume_and_conversion", "sport": "beach_soccer", "definition": "Shots, shots on target, conversion rate on a small pitch with no offside.", "why": "The pitch is ~37x28 m with 5 players a side and no offside, so almost every possession produces a shot. Conversion, not volume, separates teams.", "source": ["bsww"]},
+    {"id": "bs_goalkeeper_throw_assists", "sport": "beach_soccer", "definition": "Goalkeeper assists from hand distribution, and goalkeeper attacking involvement.", "why": "The beach soccer keeper launches attacks by hand from his own area straight into the opponent's half and is a primary creator. Keeper distribution quality is an attacking stat here, not a defensive one.", "source": ["bsww"]},
+    {"id": "bs_goalkeeper_save_pct", "sport": "beach_soccer", "definition": "Saves / shots on target.", "why": "In an 8-goal-a-game sport, a keeper is stopping a lot of shots. Save% is noisier than in handball but still the largest single-player lever.", "source": ["bsww"]},
+    {"id": "bs_direct_free_kick_conversion", "sport": "beach_soccer", "definition": "Direct free kicks awarded and converted. Every free kick is direct, no wall is permitted, and the fouled player must take it.", "why": "An unwalled direct free kick from anywhere in the attacking half is a genuine scoring chance and converts at a rate that has no football analogue. Foul count therefore feeds the OVER, not the under. It also creates a personnel quirk: the free kick must be taken by the player who was fouled, so drawing a foul with your best striker matters more than drawing one at all.", "source": ["bsww"]},
+    {"id": "bs_penalty_conversion", "sport": "beach_soccer", "definition": "9-metre penalty kicks awarded and converted, in regulation and in the shootout.", "why": "Shootout skill is a separate, directly relevant ability in a sport where 5% of matches are decided that way and where the shootout does NOT count for goals settlement.", "source": ["bsww", "fifa_api"]},
+    {"id": "bs_cards_and_two_minute_suspensions", "sport": "beach_soccer", "definition": "Yellow and red cards; time played a man down (2 minutes or until a goal is conceded).", "why": "Same bounded short-handed structure as futsal. In an 8-goal game, two minutes a man down concedes at a very high rate, so the suspension usually ends early via the goal condition.", "source": ["bsww"]},
+    {"id": "bs_own_goals", "sport": "beach_soccer", "definition": "Own goals per match; BSWW's per-player performance object carries owngoals.", "why": "Uneven sand and unpredictable bounce make deflections common. Non-trivial component of a totals model.", "source": ["bsww"]},
+    {"id": "bs_wind", "sport": "beach_soccer", "definition": "Wind speed and direction at the venue during the match.", "why": "Beach soccer is played outdoors on an open beach. Wind changes long-range shooting, goalkeeper throws and the flight of a lofted ball more than in any indoor sport here. WARNING: FIFA's API exposes a Weather object but every field was null across all 32 matches of the 2025 World Cup, so wind must come from an external weather source keyed on venue and kickoff time, not from the sport feed.", "source": ["external_weather"]},
+    {"id": "bs_sand_and_pitch_condition", "sport": "beach_soccer", "definition": "Sand depth and compaction, and whether the venue is a permanent arena or a temporary beach build.", "why": "Deep loose sand slows play and raises fatigue, compacting the third-period fade; firmer sand raises pace and scoring. It is the beach soccer analogue of a pitch-condition adjustment and differs between tournaments on the same circuit.", "source": ["unavailable"]},
+    {"id": "bs_temperature_and_session", "sport": "beach_soccer", "definition": "Air/sand temperature and whether the match is a day or an evening/floodlit session.", "why": "Hot sand in a midday session materially degrades third-period output; evening sessions run faster. Session times are in the BSWW schedule feed and are free.", "source": ["bsww", "external_weather"]},
+    {"id": "bs_barefoot_fatigue_profile", "sport": "beach_soccer", "definition": "Third-period scoring rate relative to a team's own first-period rate; and matches played in the preceding 48 hours.", "why": "Running barefoot in sand is brutally taxing and tournaments are played on consecutive days. The measured third-period lift (36.0% of goals) is partly defensive collapse - teams differ in how much they fade, and a team on its third match in three days fades more.", "source": ["bsww"]},
+    {"id": "bs_rolling_substitutions", "sport": "beach_soccer", "definition": "Substitution volume and squad depth used.", "why": "Unlimited flying substitutions mean depth converts directly into third-period output in a way it does not in an 11-a-side sport.", "source": ["bsww"]},
+    {"id": "bs_bsww_ranking_and_h2h", "sport": "beach_soccer", "definition": "BSWW national-team ranking, tournament tier, and head-to-head.", "why": "Beach soccer strength is extremely concentrated (Brazil, Portugal, Russia, Iran, Spain, Italy, Japan, Senegal). Tier is also a totals covariate: elite matches score 9.0 vs 8.05 overall.", "source": ["bsww"]},
+    {"id": "bs_tournament_format", "sport": "beach_soccer", "definition": "Whether the match is group stage (a draw is impossible but a shootout still resolves it) or knockout, and the points scheme in use.", "why": "BSWW competitions award 3 points for a regulation win, 2 for an extra-time/shootout win and 1 for a shootout loss. That standings incentive changes late-period risk-taking in exactly the way league bonus points do in volleyball.", "source": ["bsww"]}
+  ],
+
+  "verified": [
+    {
+      "id": "bsww_wp_json",
+      "url": "https://beachsoccer.com/wp-json/sportspress/v2/events",
+      "auth": "none",
+      "verified": true,
+      "coverage": "BEST BEACH SOCCER SOURCE. Open unauthenticated WordPress/SportsPress REST API. Per-team results object carries firsthalf, secondhalf, thirdhalf (the three 12-minute periods), aet, pso, goals, outcome, plus minutes=36 and a per-player performance object with goals, assists, fouls, yellowcards, redcards, penalties, owngoals, corner. Pulled 600 events across 2024-2025 and computed the beach-soccer baselines in this file from the bodies.",
+      "note": "VERIFIED SEMANTICS, read off 35 extra-time rows: the goals field INCLUDES aet (35/35 rows) and EXCLUDES pso (0 rows folded the shootout in). So BSWW's own goals number = regulation + extra time, shootout separate. Paginate with per_page/page/before/after. robots.txt is Allow:/ with Disallow /*.pdf$ - the JSON API is permitted, the PDF match sheets are NOT."
+    },
+    {
+      "id": "bsww_custom_api",
+      "url": "https://beachsoccer.com/wp-json/bsww/v1/competition",
+      "auth": "none",
+      "verified": true,
+      "coverage": "BSWW's own namespaced API alongside the SportsPress one: /bsww/v1/competition, /competition/{id}/teams, /competition/{id}/players, /teams, /players, /schedule/{id}, /matches/{id}, /match/{id}, /match/{id}/logs, /match/{id}/status. Confirmed unauthenticated: /competition and /teams both returned {\"success\":true,\"data\":[...]} with real 2026 competitions and club records.",
+      "note": "/bsww/v1/competition returns ONLY the currently active competitions (9 at pull time, all 2026) - it is not an archive. For history use /sportspress/v2/events. There is a /bsww/v1/auth/login route, so some write or detail routes may be gated; the read routes tested were not. /match/{id}/logs is the event-log route and is the most promising unexplored endpoint."
+    },
+    {
+      "id": "uefa_match_v5",
+      "url": "https://match.uefa.com/v5/matches?competitionId={id}&offset=0&limit=200",
+      "auth": "none",
+      "verified": true,
+      "coverage": "BEST FUTSAL SOURCE. Pulled 747 matches across Futsal EURO (5), Futsal Champions League (27), Women's Futsal EURO (2017) and U19 Futsal EURO (2018). Carries score.regular, score.total, score.penalty, score.aggregate, winner.match.reason, status, kickOffTime, stadium, attendance, referees, round metadata (including fieldPlayersCount=5), and playerEvents.scorers with phase and goalType per goal.",
+      "note": "SETTLEMENT-GRADE SEMANTICS, verified against real bodies: score.regular is the end of the 2x20; score.total includes extra time; score.penalty is the shootout and is kept OUT of total (a 3-3 won 5-4 on penalties reports total 3-3). winner.match.reason is an explicit enum WIN_REGULAR / DRAW / WIN_ON_EXTRA_TIME / WIN_ON_PENALTIES. goal phase enum is FIRST_HALF / SECOND_HALF / EXTRA_TIME_FIRST_HALF / EXTRA_TIME_SECOND_HALF; goalType enum is SCORED / OWN / PENALTY. Requires offset - omitting it returns a 404 'null is not valid for offset'."
+    },
+    {
+      "id": "uefa_comp_v2",
+      "url": "https://comp.uefa.com/v2/competitions",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Full UEFA competition registry, 306 entries, 61 of them sportsType=FUTSAL. Gives the competition IDs needed for the match feed: UEFA Futsal EURO=5, UEFA Futsal Champions League=27, FIFA Futsal World Cup=38, U-21 Futsal=108, Women's Futsal EURO=2017, U19 Futsal EURO=2018, Futsal Finalissima=2022, FIFA Futsal Women's World Cup=2026.",
+      "note": "Registry-only for domestic futsal. It LISTS Spanish Primera (2053), Portuguese (2048), Italian Serie A1 (2042), Russian Super League (2050), Turkish (2056) and ~50 more, but querying match.uefa.com for those IDs returned a literal empty array [] (2 bytes) - the registry entry exists, the match data does not. Do not mistake the listing for coverage. Also confirms UEFA has NO beach soccer: sportsType is only FOOTBALL (243) and FUTSAL (61)."
+    },
+    {
+      "id": "ihf",
+      "url": "https://www.ihf.info/competitions/{gender}/{catid}/{slug}/{compid}/match-center/{matchid}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "BEST HANDBALL STATISTICS SOURCE. The match-centre page is server-rendered (120 KB) and the body literally contains the full IHF stat vocabulary: Wing Shots, 6m Shots, 9m Shots, 7M, Fastbreak, Shot Efficiency, 2-Min, Yellow Card, Red Card. That is exactly the shooting-efficiency-by-position, 7m-rate and suspension set this project needs. Covers IHF World Championships (men, women, junior, youth), Olympic tournaments and IHF club events.",
+      "note": "robots.txt is a stock Drupal file - /competitions/ is permitted. INTERNATIONAL TOURNAMENTS ONLY, no domestic leagues. The competition-level /statistics page is client-rendered and yielded almost nothing (35 KB, only 'Top Scorer' in the body) - use the per-match route, not the aggregate route."
+    },
+    {
+      "id": "asobal",
+      "url": "https://asobal.es/estadisticas/{matchid}/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Liga ASOBAL (Spanish men's top flight). Per-match statistics pages verified by body: 7m/7M, EXTREMO (wing), paradas (saves), contraataque (fast break), Eficacia, Lanzamientos, goles. Match IDs are linked from the homepage and from /liga/resultados/{n}/.",
+      "note": "robots.txt permits everything except /admin/, /archivos/, /prensa/. Page is latin-1 encoded with a duplicated charset declaration - decode as latin-1, not utf-8, or team names mangle. The /liga/resultados/ index page (33 KB) yielded no parseable score pairs, so enumerate match IDs from the homepage links rather than the results index."
+    },
+    {
+      "id": "lnh",
+      "url": "https://www.lnh.fr/daikin-starligue/stats/joueurs",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "French Starligue and Proligue. Statistics page verified by body: buts, tirs, 7m, 2 min, efficacite, percentages. Match pages exist at /daikin-starligue/calendriers/{season}/lsl/j{round}/{home}/{away} and returned 200 with correct titles. There is also /matchs/historique-stats for history and an /ajax endpoint the site uses.",
+      "note": "No robots.txt at all (404) - unrestricted by default. The league is now the Daikin StarLigue; the old liqui-moly-starligue paths 404. The match page body did NOT contain the French stat labels, so per-match stats are behind the stats tab or the /ajax endpoint, not on the fixture page. Latin-1 encoded."
+    },
+    {
+      "id": "fifa_api_v3",
+      "url": "https://api.fifa.com/api/v3/calendar/matches?idCompetition=500&idSeason={id}&language=en&count=100",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Open FIFA data API, unauthenticated, JSON. FootballType 1 = futsal, 2 = beach soccer. Competition IDs: FIFA Beach Soccer World Cup=500 (13 seasons back to 2005 verified), FIFA Futsal World Cup=106, FIFA Futsal Women's World Cup=10007. Match objects carry HomeTeamScore, AwayTeamScore, HomeTeamPenaltyScore, AwayTeamPenaltyScore, ResultType, Winner, AggregateHome/AwayTeamScore, Attendance, Officials, Stadium.",
+      "note": "TWO TRAPS. (1) The schema is FOOTBALL-SHAPED: FirstHalfTime/SecondHalfTime/FirstHalfExtraTime fields, with NO three-period fields, so it CANNOT serve beach soccer period markets - use BSWW for those. (2) The Weather object exists but every subfield (WindSpeed, Temperature, Humidity, Type) was null across all 32 matches of the 2025 World Cup, so it is not a wind source despite looking like one. Verified semantics: a 4-4 won 7-6 on penalties reports score 4-4 with the shootout in the separate penalty fields, matching BSWW and UEFA. api.fifa.com serves no robots.txt (an Akamai error page); www.fifa.com's robots is effectively permissive."
+    },
+    {
+      "id": "openligadb",
+      "url": "https://api.openligadb.de/getmatchdata/{leagueShortcut}",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Open community API, no key, no robots.txt (404 = unrestricted). Contains 32 Handball leagues out of 812 total: Handball-Bundesliga 2010/11 through 2016/17, Handball WM 2011/2013/2015/2017/2025, Handball EM 2012/2014/2016, and 3. Liga Sued 2020. Match objects carry matchResults with an explicit Halbzeit (half-time) and Endergebnis (full-time) result type plus a goals array.",
+      "note": "LOW VALUE AS PULLED. The half-time/full-time SPLIT is exactly what half markets need, but coverage is stale and thin: the ihf2025 league returned only 4 matches and every matchResults entry was 0-0 with null matchMinute. Community-maintained, so completeness varies league by league - test each shortcut's body before trusting it. Does NOT cover the current Bundesliga season."
+    },
+    {
+      "id": "thesportsdb",
+      "url": "https://www.thesportsdb.com/api/v1/json/3/search_all_leagues.php?s=Handball",
+      "auth": "free_key",
+      "verified": true,
+      "coverage": "Exactly 5 handball leagues: Danish Herreligaen (5135), EHF Champions League (4980), EHF European League (5275), European Men's Handball Championship (4894), French LNH Division 1 (4536). ZERO futsal leagues and ZERO beach soccer leagues - search_all_leagues returned {\"countries\":null} for both.",
+      "note": "UNUSABLE FOR HALF MARKETS, same failure mode as the volleyball research found for per-set scores: event objects carry intHomeScore/intAwayScore and intHomeScoreExtra/intAwayScoreExtra but NO half-time fields. The free key '3' is also throttled to near-uselessness - all_leagues.php returned 10 leagues and eventspastleague.php for the EHF Champions League returned 1 event. LICENCE FLAG: robots.txt sets Content-Signal: ai-train=no, ai-input=no."
+    },
+    {
+      "id": "divisione_calcio_a5",
+      "url": "https://divisionecalcioa5.it/serie-a/?md={matchday}",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Italian futsal Serie A / Serie A2 / Coppa Italia, men's and women's. Homepage returned 200 with 143 KB of real content and per-matchday URLs. This is the best free DOMESTIC futsal source found, since UEFA covers only continental competitions.",
+      "note": "robots.txt is a Yoast block with an empty 'Disallow:' - fully permissive, no AI-agent restrictions. Per-match statistical DEPTH was not verified in this session (matchday index only) - confirm the box-score fields before relying on it for accumulated fouls or shots."
+    },
+    {
+      "id": "handball_net",
+      "url": "https://www.handball.net/ligen/{leagueSlug}/spielplan",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "The DHB's official platform and the site the Opel HBL links out to for fixtures. Next.js app; a real league page returned 200 with 302 KB of server-rendered HTML containing the schedule. League slugs are Sportradar-derived, e.g. sportradar.dhbdata.15984.",
+      "note": "PARTIAL. Slugs are opaque and undocumented - guessed slugs (sportradar.hbl.2025-26, hbl) both 404'd, and the men's Handball-Bundesliga slug was NOT resolved in this session. No robots.txt at all (the path renders a Next.js error page, so no file exists = unrestricted). The /a/sportdata/api/{1,2}/... paths returned {\"code\":404} JSON, so a clean JSON API exists on that host but the correct path was not found."
+    },
+    {
+      "id": "opel_hbl",
+      "url": "https://www.opel-hbl.de/de/hbl",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "The official Handball-Bundesliga site. Nuxt 3 app, 200 with a real German title and description for fixtures, results, tables and live tickers.",
+      "note": "DOMAIN MOVED - liquimoly-hbl.de and daikin-hbl.de both 301 to opel-hbl.de, and the old hbl.de presents a self-signed certificate. Any hard-coded HBL URL in older tooling is dead. No robots.txt (the path returns a Nuxt JSON 404), so unrestricted. The page data comes from a Nuxt payload, not a discoverable /api/ route - /api/ itself 404s."
+    },
+    {
+      "id": "eurohandball_pages",
+      "url": "https://ehfcl.eurohandball.com/men/2026-27/matches/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "EHF Champions League / European League / European Cup / EHF EURO / Beach Handball, all on eurohandball.com subdomains. The landing and matches pages return 200 with real titles.",
+      "note": "VERIFIED AS A DEAD END, see the blocked list. The pages are Vue shells - the matches page ships href=\"match.url\" as an unrendered template - and every match, live-score and statistics payload is fetched from /umbraco/api/..., which every eurohandball.com host's robots.txt disallows for User-agent: *. The sitemap advertises /matches/details/play-by-play/{slug}/ URLs that now 404. Reachable but not usable within compliance."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "fpf_pt",
+      "detail": "COMPLIANCE BLOCK - HARD. The Portuguese Football Federation (which runs the Liga Placard futsal championship, one of the two strongest domestic futsal leagues in Europe) names ClaudeBot in robots.txt with Disallow: / , alongside Amazonbot, Applebot-Extended, Bytespider, CCBot and Google-Extended. Its Content-Signal is search=yes, ai-train=no, use=reference. NOT FETCHED. Read only the robots.txt."
+    },
+    {
+      "id": "eurohandball_umbraco_api",
+      "detail": "COMPLIANCE BLOCK - the highest-value handball source we cannot take. Every eurohandball.com host (www, ehfcl, ehfel, ehfec, ehfeuro, beach) serves the same robots.txt with Disallow: /umbraco/ and Crawl-delay: 5. The site's own markup shows the match data lives at exactly /umbraco/api/competitionmatchesapi/GetMatches, /umbraco/api/competitionmatchesapi/GetLiveMatchStatistics, /umbraco/api/livescoreapi/GetLiveScoreMatches/{id} and /umbraco/api/homeofhandballapi/GetCompetitions. Those endpoints were NOT fetched. Consequence: the EHF Champions League - the most heavily traded handball competition on the book - has no compliant free statistics feed. IHF covers internationals, not the EHF club competitions."
+    },
+    {
+      "id": "lnfs_es",
+      "detail": "DEAD, AND A TEXTBOOK 200-THAT-IS-NOT-DATA. lnfs.es returns HTTP 200 with 4,118 bytes of an RFEF-branded placeholder headlined 'Estamos renovando nuestra casa'. A status-code check would have passed it. The Spanish LNFS site has been folded into the RFEF, and rfef.es itself returns 403 behind a Cloudflare interstitial ('Just a moment...', 5,512 bytes). Result: the Spanish Primera Division de Futsal - arguably the strongest futsal league in the world and a staple of Betwinner's futsal board - currently has NO working free official source. This is the biggest single gap in the three sports."
+    },
+    {
+      "id": "rfebm_competiciones",
+      "detail": "COMPLIANCE BLOCK. The Spanish handball federation's robots.txt is two lines: 'User-agent: *' / 'Disallow: /competiciones/' - which is precisely and only the competition data. NOT FETCHED. Liga ASOBAL is separately reachable at asobal.es, so the national-league need is covered, but federation-level and lower-division handball data is off limits."
+    },
+    {
+      "id": "sofascore",
+      "detail": "403 on robots.txt ITSELF - the body was {\"error\": {\"code\": 403, \"reason\": \"Forbidden\"}}. We cannot even read its crawl policy, so we cannot claim permission. Consistent with the ice_hockey and volleyball research. Do not retry."
+    },
+    {
+      "id": "flashscore",
+      "detail": "NOT FETCHED. robots.txt does not name any Claude agent (it names CCBot, AI2Bot, Bytespider, cohere-ai, Meta-ExternalAgent, DuckAssistBot and others) and Disallow for * is limited to /standings/, /draw/ and /newsfeed/. So it is not a robots block - but it is an aggressive anti-scraping site whose Terms forbid automated extraction, and it is the wrong kind of dependency for a settlement-critical feed. Recorded as a deliberate abstention, not a technical failure."
+    },
+    {
+      "id": "handball_net_de",
+      "detail": "www.handball-net.de (the hyphenated domain, distinct from the working handball.net) failed with 'CONNECT tunnel failed, response 502' from our egress proxy. OUR blocker, not theirs - same signature as the dataproject.com finding in the volleyball research. Worth a retest from a GitHub Actions runner, though handball.net without the hyphen is the live site and works."
+    },
+    {
+      "id": "figh_it",
+      "detail": "Italian handball federation - TLS failure, 'certificate has expired'. Not a policy block. Retest later; do not disable certificate verification to get at it."
+    },
+    {
+      "id": "hbl_de",
+      "detail": "The legacy hbl.de domain presents a self-signed certificate. Superseded anyway - the live Handball-Bundesliga site is www.opel-hbl.de."
+    },
+    {
+      "id": "futsalplanet",
+      "detail": "Reachable (200, 13 KB, no robots.txt) but THIN - the body exposed essentially one useful route, ranking.aspx, on an ageing ASP.NET site. Not a match-statistics source. Recorded so it is not re-investigated."
+    },
+    {
+      "id": "bsww_pdfs",
+      "detail": "PARTIAL COMPLIANCE BLOCK on an otherwise excellent source. beachsoccer.com robots.txt is 'Allow: /' plus 'Disallow: /ficheros_subidos/*' and 'Disallow: /*.pdf$'. The official PDF match sheets - which are where any deeper per-match detail would live - are therefore off limits. The JSON API is explicitly fine and carries enough. Do not fall back to the PDFs."
+    },
+    {
+      "id": "uefa_domestic_futsal",
+      "detail": "NOT A BLOCK, A COVERAGE CLIFF - recorded here because it looks like coverage. comp.uefa.com lists ~50 domestic futsal leagues with real competition IDs, but match.uefa.com/v5/matches returns a literal empty array (2 bytes) for Spanish (2053), Portuguese (2048) and Italian (2042). UEFA's futsal match feed is continental and FIFA competitions only."
+    }
+  ],
+
+  "stat_to_bet": {
+    "handball": {
+      "1x2_three_way": ["hb_offensive_defensive_efficiency", "hb_save_pct_overall", "hb_regulation_draw_rate", "hb_absences_by_position", "hb_home_advantage", "hb_schedule_congestion", "hb_two_minute_suspensions"],
+      "double_chance": ["hb_regulation_draw_rate", "hb_offensive_defensive_efficiency", "hb_margin_distribution", "hb_home_advantage"],
+      "handicap": ["hb_offensive_defensive_efficiency", "hb_margin_distribution", "hb_save_pct_by_zone", "hb_empty_net_7v6", "hb_two_minute_suspensions", "hb_fast_break_goals", "hb_absences_by_position"],
+      "total_goals": ["hb_possessions", "hb_shot_efficiency_by_position", "hb_shot_mix_share", "hb_seven_metre_rate", "hb_fast_break_goals", "hb_save_pct_overall", "hb_two_minute_suspensions", "hb_referee_pair", "hb_empty_net_7v6", "hb_technical_faults", "hb_passive_play"],
+      "team_totals": ["hb_shot_efficiency_by_position", "hb_possessions", "hb_seven_metre_rate", "hb_fast_break_goals", "hb_absences_by_position", "hb_empty_net_7v6"],
+      "half_markets": ["hb_halftime_split", "hb_possessions", "hb_goalkeeper_rotation", "hb_empty_net_7v6", "hb_two_minute_suspensions"],
+      "winning_margin": ["hb_margin_distribution", "hb_offensive_defensive_efficiency", "hb_empty_net_7v6", "hb_save_pct_by_zone", "hb_two_minute_suspensions"],
+      "race_to_x": ["hb_possessions", "hb_fast_break_goals", "hb_shot_efficiency_total", "hb_halftime_split", "hb_save_pct_overall"],
+      "note": "The 7m rate and the 2-minute differential are the two handball-specific inputs a football-trained model will simply not have. Both feed the OVER and both feed the favourite's cover."
+    },
+    "futsal": {
+      "1x2_three_way": ["fs_goals_for_against", "fs_goalkeeper_save_pct", "fs_powerplay_usage", "fs_home_advantage", "fs_head_to_head_and_rest", "fs_rotation_count"],
+      "double_chance": ["fs_goals_for_against", "fs_powerplay_usage", "fs_lead_protection"],
+      "handicap": ["fs_goals_for_against", "fs_powerplay_usage", "fs_powerplay_conceded", "fs_lead_protection", "fs_accumulated_fouls", "fs_cards_and_short_handed"],
+      "total_goals": ["fs_shots_per_playing_minute", "fs_shot_conversion", "fs_accumulated_fouls", "fs_ten_metre_awarded_and_conversion", "fs_set_piece_conversion", "fs_powerplay_usage", "fs_powerplay_conceded", "fs_goalkeeper_save_pct", "fs_own_goal_rate", "fs_penalty_rate", "fs_cards_and_short_handed"],
+      "team_totals": ["fs_shots_per_playing_minute", "fs_shot_conversion", "fs_set_piece_conversion", "fs_ten_metre_awarded_and_conversion", "fs_powerplay_usage", "fs_rotation_count"],
+      "half_markets": ["fs_half_split", "fs_accumulated_fouls", "fs_powerplay_usage", "fs_timeout_usage", "fs_lead_protection"],
+      "winning_margin": ["fs_powerplay_usage", "fs_powerplay_conceded", "fs_lead_protection", "fs_goalkeeper_save_pct"],
+      "race_to_x": ["fs_shots_per_playing_minute", "fs_half_split", "fs_shot_conversion", "fs_set_piece_conversion"],
+      "note": "Accumulated fouls are the input with no football counterpart: the 6th foul in a half converts every subsequent foul into an unwalled 10-metre shot. A team that reaches 5 accumulated fouls by the 12th minute of a half has effectively sold the opposition a series of near-penalties, and that is a live TOTALS and TEAM-TOTAL signal, not a discipline footnote. The second-half skew (53.8% of goals) means half markets must never be priced at half the match line."
+    },
+    "beach_soccer": {
+      "1x2_two_way": ["bs_goals_for_against", "bs_bsww_ranking_and_h2h", "bs_goalkeeper_save_pct", "bs_extra_time_and_shootout_rate", "bs_barefoot_fatigue_profile", "bs_tournament_format"],
+      "double_chance": ["bs_extra_time_and_shootout_rate", "bs_goals_for_against", "bs_bsww_ranking_and_h2h"],
+      "handicap": ["bs_margin_distribution", "bs_goals_for_against", "bs_bsww_ranking_and_h2h", "bs_goalkeeper_save_pct", "bs_barefoot_fatigue_profile"],
+      "total_goals": ["bs_shot_volume_and_conversion", "bs_bicycle_kick_conversion", "bs_direct_free_kick_conversion", "bs_goalkeeper_save_pct", "bs_goalkeeper_throw_assists", "bs_own_goals", "bs_wind", "bs_sand_and_pitch_condition", "bs_temperature_and_session", "bs_tournament_format"],
+      "team_totals": ["bs_shot_volume_and_conversion", "bs_bicycle_kick_conversion", "bs_direct_free_kick_conversion", "bs_goalkeeper_throw_assists", "bs_rolling_substitutions"],
+      "period_markets": ["bs_period_goals", "bs_barefoot_fatigue_profile", "bs_temperature_and_session", "bs_rolling_substitutions", "bs_cards_and_two_minute_suspensions"],
+      "winning_margin": ["bs_margin_distribution", "bs_goals_for_against", "bs_goalkeeper_save_pct", "bs_bsww_ranking_and_h2h"],
+      "race_to_x": ["bs_period_goals", "bs_shot_volume_and_conversion", "bs_goalkeeper_throw_assists"],
+      "note": "Double chance is close to meaningless on a two-outcome sport - if Betwinner offers it, read carefully which outcome set it covers before assuming it prices a draw. Free-kick and foul counts push the OVER here, the opposite of the football intuition, because every free kick is direct and no wall is permitted."
+    }
+  },
+
+  "rules_critical": [
+    "BEACH SOCCER CANNOT DRAW. Three 12-minute periods, then 3 minutes of golden-goal extra time, then penalties - the match always produces a winner. A three-way reading of a beach soccer market is simply wrong: there is no X to price, and any model that carries a draw probability is mis-allocating that mass. It is a TWO-OUTCOME sport, which is exactly the structure a moneyline safety ladder needs, and 12.61% of matches (verified, n=595) are level after regulation and get resolved by the ET/shootout mechanism rather than by play.",
+    "FUTSAL'S CLOCK STOPS. 2x20 minutes is 40 minutes of ACTUAL PLAYING TIME, stopped on every whistle, and takes roughly 75-85 minutes of wall clock. Football per-minute scoring rates cannot be ported in either direction: at 6.42 goals per 40 playing minutes, futsal scores about six times as fast as football per minute played. Any elapsed-time model, any 'goals after 30 minutes' derivation, and any in-play minute-based extrapolation built on football is wrong by a factor, not by a margin.",
+    "HANDBALL - the standard full-match market settles at the END OF REGULATION (2x30), but the COMPETITION REGULATIONS may force extra time in a knockout tie. These are two different questions and they diverge exactly in the fixtures that get the most action. A regulation draw is a live and priced outcome even in a match that cannot end level; do not fold the 1X2 into two-way probabilities and do not assume a knockout fixture's market includes the extra time the rules require.",
+    "FUTSAL - the same regulation-vs-extra-time split applies, and UEFA's own feed makes the settlement convention explicit and checkable: score.regular is the 2x20 result, score.total adds extra time, and score.penalty is held SEPARATE so a 3-3 won 5-4 on penalties still reports a total of 3-3. Verified across 742 matches: 13.2% were level after regulation, and winner.match.reason distinguishes WIN_REGULAR / DRAW / WIN_ON_EXTRA_TIME / WIN_ON_PENALTIES. Confirm which of regular and total Betwinner settles on before pricing a knockout futsal tie.",
+    "NO SHOOTOUT COUNTS AS A GOAL, in any of the three. Verified independently in three unrelated feeds: BSWW keeps pso in its own field, UEFA keeps score.penalty out of score.total, and FIFA keeps HomeTeamPenaltyScore out of HomeTeamScore. A shootout must never enter total goals, team totals, winning margin or handicap. In beach soccer this matters constantly because ~5% of all matches end that way.",
+    "BEACH SOCCER EXTRA-TIME GOALS DO COUNT toward the goals total in the source data - verified on all 35 extra-time rows in BSWW's feed, where the goals field equals the three periods PLUS aet. So the golden goal is a real goal for totals purposes while the shootout is not. Getting these two the same way round is the most likely single settlement error in the sport.",
+    "BEACH SOCCER'S THREE PERIODS ARE NOT THIRDS OF THE MATCH. Verified shares are 29.5 / 32.6 / 36.0 - the third period carries 22% more goals than the first, from sand fatigue and end-game chasing. Dividing a match total by three to price a period market systematically overprices period 1 and underprices period 3. Also note the sport has PERIODS, not halves: a 'half-time' market label on a beach soccer coupon is a category error that must be resolved against the book's own rules before use.",
+    "FUTSAL HALVES ARE NOT SYMMETRIC EITHER: 45.8% of goals in the first half, 53.8% in the second (verified, n=742). The skew is mechanical - the flying goalkeeper only appears when a team is chasing, which is disproportionately late - so it widens with the pre-match spread rather than being a fixed constant.",
+    "FUTSAL ACCUMULATED FOULS ARE A PER-HALF COUNTER THAT RESETS. From the 6th accumulated foul in a half, every subsequent foul by that team gives the opponent a direct free kick from the second penalty mark (10 m) with NO WALL - a near-penalty. The counter resets at half-time, so a team on 5 fouls at the 19th minute is in a completely different state than the same team at the 21st. Extra time is a continuation, not a new half, so the second-half count carries into it. This is a totals and team-totals input with no football analogue and it is state-dependent within the match.",
+    "FUTSAL'S FLYING GOALKEEPER IS A TWO-SIDED RISK, NOT A COMEBACK MECHANIC. Pulling the keeper for a fifth outfield player raises the trailing team's scoring rate AND opens an empty net that concedes from anywhere on the court. It fattens both tails simultaneously, so a trailing favourite raises the total, raises its own win chance and raises the chance of losing by more - all at once. Symmetric margin models break here.",
+    "FUTSAL AND BEACH SOCCER RED CARDS ARE TIME-BOUNDED, NOT MATCH-BOUNDED. The offending team plays a man short for 2 minutes OR until it concedes, whichever comes first - then returns to full strength. Importing football's 'down to ten for the rest of the match' produces a wildly overstated penalty, and the 'until a goal is conceded' clause means the suspension usually ends early precisely in the high-scoring sports where it is awarded.",
+    "BEACH SOCCER FREE KICKS ARE ALL DIRECT, NO WALL IS PERMITTED, AND THE FOULED PLAYER MUST TAKE THE KICK. Two consequences a football model gets backwards: fouls conceded push the OVER rather than the under, and drawing a foul with a weak finisher wastes the resulting near-chance because that specific player is obliged to take it. Foul counts are an attacking-output variable in this sport.",
+    "HANDBALL 7-METRE THROWS ARE FREQUENT AND CONVERT AROUND 75-85%. They are the highest-value shot type in the game by a wide margin, they are referee-dependent, and they are awarded several times a match rather than once every few matches like a football penalty. Referee-pair strictness is therefore a legitimate totals input, not trivia.",
+    "HANDBALL'S 7-vs-6 EMPTY NET IS ROUTINE, NOT DESPERATE. Since the 2016 rule change removed the distinguishing-bib requirement for the substituted goalkeeper, teams pull the keeper for a seventh field player as ordinary tactics, sometimes from the first minute, not only when trailing late. That means empty-net goals are a season-long feature of the totals distribution rather than a garbage-time correction - the opposite of how the ice-hockey empty-net adjustment is applied.",
+    "HANDBALL'S 2-MINUTE SUSPENSION AND PROGRESSIVE PUNISHMENT CHANGE THE SCORING RATE, NOT JUST THE DISCIPLINE LINE. Two minutes short-handed in a sport with a possession every ~30 seconds is worth roughly a net goal or more, a third 2-minute suspension for the same player is a disqualification, and a team is capped at three yellow cards before it must escalate straight to suspensions. The 2-minute DIFFERENTIAL is a spread input.",
+    "HANDBALL'S PASSIVE-PLAY RULE CAPS THE UNDER. After the referee's forewarning signal the attacking team has a limited number of passes to shoot, so a leading handball team physically cannot bleed the clock the way a leading football team can. Low-total game states are far rarer than a football-shaped model expects.",
+    "PERIOD AND HALF MARKETS EXCLUDE EXTRA TIME in all three sports, while the full-match market may or may not include it. Never derive a full-match number by summing the period markets in a knockout fixture, and never assume the two market families share a settlement basis.",
+    "AGGREGATE AND SINGLE-LEG ARE DIFFERENT MARKETS in two-legged handball and futsal ties. UEFA's feed exposes score.aggregate separately from score.regular for exactly this reason. A second-leg market normally settles on that leg alone even though the tie is decided on aggregate, and extra time in the second leg belongs to the tie, not necessarily to the leg's market.",
+    "SHORTENED, ABANDONED AND FORFEITED MATCHES HAVE NO STANDARD SETTLEMENT ACROSS BOOKS, and these three sports abandon more often than football - beach soccer for weather and light, futsal and handball for hall or safety issues. Betwinner's completion threshold and void policy must be read from its own rules; do not carry over the football convention.",
+    "TOURNAMENT TIER IS A SETTLEMENT-ADJACENT COVARIATE IN BEACH SOCCER. The 2025 FIFA World Cup ran 9.0 goals a match with 6.25% needing ET or penalties, against 8.05 goals and 12.61% level-after-regulation across the wider BSWW circuit. Elite matches score MORE and go the distance LESS. A single blended beach soccer prior misprices both ends of the calendar.",
+    "BSWW COMPETITIONS AWARD 3 POINTS FOR A REGULATION WIN, 2 FOR AN EXTRA-TIME OR SHOOTOUT WIN AND 1 FOR A SHOOTOUT LOSS. That is a live incentive to force a decision inside the three periods, and it shifts late-period risk-taking in group matches - the same standings-context effect that raises 3-2 volleyball finishes late in a season."
+  ],
+
+  "open_questions": [
+    "NO HANDBALL SCORING BASELINE WAS COMPUTED. Futsal and beach soccer both yielded clean machine-readable feeds and real baselines; handball did not. IHF is per-match HTML scraping (rich but slow), ASOBAL's results index would not parse, EHF is closed to us by robots, and openligadb's handball rows came back empty. Handball is the biggest of the three markets on the book and is the one this file supports with the weakest numbers. Building an IHF match-centre scraper is the single highest-value next task.",
+    "THE EHF CHAMPIONS LEAGUE HAS NO COMPLIANT FREE FEED. Its data sits behind /umbraco/api/ which its own robots.txt disallows. Either an alternative route is found, or EHF club handball is modelled from IHF international form plus domestic-league form, which is a real accuracy cost on the most-traded handball competition.",
+    "SPANISH FUTSAL - the strongest domestic futsal league in the world - has no working free source at all: lnfs.es is an RFEF placeholder and rfef.es is behind Cloudflare. Portugal is unavailable for a different reason (fpf.pt disallows ClaudeBot by name). That leaves Italy (divisionecalcioa5.it) as the only verified domestic futsal source, and its per-match statistical depth is still unconfirmed.",
+    "BSWW's /bsww/v1/match/{id}/logs endpoint was discovered but not exercised. If it carries timestamped match events it would give beach soccer minute-level goal timing, bicycle-kick tagging and card timing - none of which the SportsPress events route provides. Highest-value unexplored endpoint found in this session.",
+    "Whether Betwinner's handball and futsal full-match markets settle on regulation or on the full result including extra time is UNRESOLVED and cannot be resolved from the stats side - it must be read from Betwinner's own rules, per sport and per market. Every knockout-tie price depends on it.",
+    "No wind source was found for beach soccer. FIFA's Weather object is present but entirely null, and BSWW does not publish conditions. Wind would have to come from an external weather API keyed on venue coordinates and kickoff time, which is an extra dependency this project does not currently have.",
+    "Sand depth and compaction - plausibly the biggest environmental driver of beach soccer pace - appear to be published nowhere. Recorded as genuinely unavailable rather than merely unfound.",
+    "handball.net almost certainly has a clean JSON API (its /a/sportdata/api/ paths return structured JSON 404s rather than HTML), but the correct path and the men's Handball-Bundesliga league slug were not resolved. Worth 20 minutes with the site's own network traffic.",
+    "Both UEFA hosts (comp.uefa.com, match.uefa.com) serve UEFA's generic HTML 404 for /robots.txt, meaning no robots file governs them. These are undocumented backend endpoints, not contractual APIs - pin the exact query shapes and expect them to change without notice, exactly as the volleyball research concluded for league-site backends."
+  ],
+
+  "key_findings": [
+    "14 sources verified by reading the actual response body; 12 recorded as blocked or abstained, 4 of those for compliance rather than technical failure.",
+    "The verification rule earned its keep twice. lnfs.es returns HTTP 200 with a 4 KB 'we are renovating' placeholder, and UEFA's registry lists ~50 domestic futsal leagues whose match feed returns a literal empty array. Both would have passed a status-code check and both are worthless.",
+    "Three unrelated feeds independently confirm the same settlement convention: the shootout is stored OUTSIDE the goals total (BSWW pso, UEFA score.penalty, FIFA HomeTeamPenaltyScore) while extra-time goals are stored INSIDE it. That convergence is strong evidence the convention is the industry norm and not a quirk of one provider.",
+    "match.uefa.com/v5/matches is the best single source across all three sports - it is the only one that hands over an explicit settlement enum (WIN_REGULAR / DRAW / WIN_ON_EXTRA_TIME / WIN_ON_PENALTIES) alongside separated regular, total, penalty and aggregate scores. It covers futsal only.",
+    "beachsoccer.com's WordPress API is the sleeper find: an open, unauthenticated, paginated feed with the three period scores, extra time and shootout as separate fields, plus per-player fouls and cards. It made real beach soccer baselines computable in one session.",
+    "Own goals are 3.7% of all UEFA futsal goals, roughly double the football rate, driven by deflections off a five-a-side block and by flying-goalkeeper turnovers into an empty net. That is about a quarter of a goal per match that a football-derived totals model does not know exists.",
+    "Beach soccer's period split is 29.5 / 32.6 / 36.0 and futsal's half split is 45.8 / 53.8 - neither sport divides evenly, and in futsal the skew is score-state driven so it widens with the spread rather than staying constant.",
+    "The most valuable handball statistics on the open web are on IHF match-centre pages, server-rendered and robots-permitted, carrying Wing/6m/9m/7M shot splits, Fastbreak, Shot Efficiency and 2-Min counts. They cover international tournaments only - the club game is the gap.",
+    "Compliance cut deeper here than in any previous sport in this project: fpf.pt names ClaudeBot in robots.txt, rfebm.com disallows exactly /competiciones/, eurohandball.com disallows the /umbraco/ path where all its match data lives, and beachsoccer.com disallows the PDF match sheets. In each case the blocked path was the interesting one.",
+    "Two dead URL families to purge from any inherited config: the Handball-Bundesliga has moved liquimoly-hbl.de -> daikin-hbl.de -> opel-hbl.de (and hbl.de now serves a self-signed cert), and the French league is now the Daikin StarLigue with the liqui-moly-starligue paths returning 404.",
+    "TheSportsDB fails these sports the same way the volleyball research found it failing there: it has five handball leagues, zero futsal, zero beach soccer, and no half-time fields - so it cannot serve any half or period market."
+  ]
+}

@@ -79,6 +79,7 @@ G_SET_HANDICAP_TT = 7099
 # --- outcome ids within those groups ---
 O_DC_HOME_OR_DRAW = 4     # 1X
 O_DC_DRAW_OR_AWAY = 6     # X2
+O_DRAW = 2                # the X of a 1X2 — its presence is what makes a sport three-way
 O_ML2 = {"home": 401, "away": 402}
 O_WIN_2WAY = {"home": 1, "away": 3}       # group 1 in a sport with no draw
 O_HANDICAP = {"home": 7, "away": 8}
@@ -242,8 +243,11 @@ def build(rows, sport_id, direction):
     happens to be there.
     """
     if direction in ("over", "under"):
-        scope = _TOTALS_SCOPE.get(sport_id)
-        return _rungs_total(rows, direction, scope) if scope else []
+        # Group 17 is the match total in every sport checked — what it COUNTS differs
+        # (goals, points, games, sets), but the over/under structure and the direction of
+        # safety do not, so the ladder generalizes even where the settlement scope is not
+        # yet known.
+        return _rungs_total(rows, direction, _TOTALS_SCOPE.get(sport_id, "unknown"))
 
     if direction not in ("home", "away"):
         return []
@@ -260,7 +264,54 @@ def build(rows, sport_id, direction):
         # The moneyline includes OT and the shootout. The handicaps frequently do not on
         # this platform, so they are marked unknown rather than folded into the same scope.
         return _rungs_two_way_side(rows, direction, "includes_ot", "unknown")
-    return []
+    return _rungs_generic_side(rows, direction)
+
+
+def _rungs_generic_side(rows, side):
+    """Side ladder for a sport with no hand-verified wiring, driven by the payload itself.
+
+    The catalogue runs to 64 sports and the operator's instruction is that the long tail
+    matters, not only the majors. Hardcoding a list would leave most of them with no
+    ladder at all, and guessing each one's group ids is exactly what the rest of this
+    module refuses to do. So this asks the fixture instead: does its result market price
+    a DRAW?
+
+    That single question is what decides the top rung, and it is answerable from the feed
+    without knowing anything else about the sport. If the 1X2 carries an X, the sport
+    resolves three ways and backing the outright result loses to the draw on its own — so
+    the ladder starts at double chance and never offers the win, exactly as in football.
+    If there is no X, the result is already the safe base and may sit at the top.
+
+    Both readings were checked against live payloads before this was written, and one of
+    them corrected a claim made in research. Darts was reported as pricing a draw; it does
+    not — a PDC Matchplay fixture priced two ways at 1.104 and 5.70, so it takes the
+    two-way branch. Chess does price one, at 3.055 / 3.70 / 1.99 with double chance
+    alongside, and its draw is the modal outcome at elite level, so "does not lose" is a
+    genuinely strong rung there rather than a formality.
+
+    Plus handicaps are appended for both branches. They are the one safer form that is
+    published under the same group ids across every sport checked, and their scope is
+    marked unknown because we have not read the book's terms sport by sport.
+    """
+    three_way = any(
+        _group_line(r)[0] == G_1X2 and r.get("outcome_id") == O_DRAW for r in rows
+    )
+    if three_way:
+        want = O_DC_HOME_OR_DRAW if side == "home" else O_DC_DRAW_OR_AWAY
+        ladder = [
+            _rung(0.5, r, f"{side} does not lose", "unknown")
+            for r in rows
+            if _group_line(r)[0] == G_DOUBLE_CHANCE and r.get("outcome_id") == want
+        ]
+    else:
+        ladder = [
+            _rung(0.0, r, f"{side} wins", "unknown")
+            for r in rows
+            for grp, ids in ((G_1X2, O_WIN_2WAY), (G_MONEYLINE_2WAY, O_ML2))
+            if _group_line(r)[0] == grp and r.get("outcome_id") == ids[side]
+        ]
+    ladder += _plus_handicaps(rows, side, {G_HANDICAP, G_ASIAN_HANDICAP}, "unknown")
+    return sorted(ladder, key=lambda t: t["rank"])
 
 
 def safest(rows, sport_id, direction, min_odds=None):
