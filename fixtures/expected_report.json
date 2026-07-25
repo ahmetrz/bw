@@ -1,0 +1,1002 @@
+[
+  {
+    "fixture_id": 353890752,
+    "match": "Pyunik v Debreceni VSC",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.88,
+    "implied_prob": 0.5319,
+    "market_overround": 0.0638,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 1.0,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 1.0,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890752,
+    "match": "Pyunik v Debreceni VSC",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 1.88,
+    "implied_prob": 0.5319,
+    "market_overround": 0.0638,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 1.0,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 1.0,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890752,
+    "match": "Pyunik v Debreceni VSC",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 2.119,
+    "implied_prob": 0.4719,
+    "market_overround": 0.064,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9943,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9959,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890752,
+    "match": "Pyunik v Debreceni VSC",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.689,
+    "implied_prob": 0.5921,
+    "market_overround": 0.064,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9943,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9959,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353745356,
+    "match": "KF Drita v Floriana",
+    "start": "2026-07-28T18:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.83,
+    "implied_prob": 0.5464,
+    "market_overround": 0.0646,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9726,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9805,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353745356,
+    "match": "KF Drita v Floriana",
+    "start": "2026-07-28T18:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 1.93,
+    "implied_prob": 0.5181,
+    "market_overround": 0.0646,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9726,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9805,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353745356,
+    "match": "KF Drita v Floriana",
+    "start": "2026-07-28T18:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 2.044,
+    "implied_prob": 0.4892,
+    "market_overround": 0.0646,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9716,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9797,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353745356,
+    "match": "KF Drita v Floriana",
+    "start": "2026-07-28T18:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.738,
+    "implied_prob": 0.5754,
+    "market_overround": 0.0646,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9716,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9797,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890788,
+    "match": "Gyori ETO v Atert Bissen",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 3.25",
+    "odds": 1.843,
+    "implied_prob": 0.5426,
+    "market_overround": 0.0648,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9652,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9752,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890788,
+    "match": "Gyori ETO v Atert Bissen",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 3.25",
+    "odds": 1.915,
+    "implied_prob": 0.5222,
+    "market_overround": 0.0648,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9652,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9752,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890788,
+    "match": "Gyori ETO v Atert Bissen",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 3.5",
+    "odds": 2.04,
+    "implied_prob": 0.4902,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9608,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.972,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890788,
+    "match": "Gyori ETO v Atert Bissen",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 3.5",
+    "odds": 1.74,
+    "implied_prob": 0.5747,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9608,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.972,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906480,
+    "match": "Dukagjini v Lugano",
+    "start": "2026-07-29T14:30:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.82,
+    "implied_prob": 0.5495,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9606,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9719,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906480,
+    "match": "Dukagjini v Lugano",
+    "start": "2026-07-29T14:30:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 1.94,
+    "implied_prob": 0.5155,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9606,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9719,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906480,
+    "match": "Dukagjini v Lugano",
+    "start": "2026-07-29T14:30:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 2.044,
+    "implied_prob": 0.4892,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9596,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9711,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906480,
+    "match": "Dukagjini v Lugano",
+    "start": "2026-07-29T14:30:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.737,
+    "implied_prob": 0.5757,
+    "market_overround": 0.0649,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9596,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9711,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906502,
+    "match": "Dinamo Minsk v Neftchi Baku",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.828,
+    "implied_prob": 0.547,
+    "market_overround": 0.0652,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9509,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9649,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906502,
+    "match": "Dinamo Minsk v Neftchi Baku",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.93,
+    "implied_prob": 0.5181,
+    "market_overround": 0.0652,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9509,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9649,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890744,
+    "match": "Nomme Kalju v Shelbourne",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.666,
+    "implied_prob": 0.6002,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9445,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9604,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890744,
+    "match": "Nomme Kalju v Shelbourne",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.15,
+    "implied_prob": 0.4651,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9445,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9604,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890744,
+    "match": "Nomme Kalju v Shelbourne",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.842,
+    "implied_prob": 0.5429,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9446,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9604,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890744,
+    "match": "Nomme Kalju v Shelbourne",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.914,
+    "implied_prob": 0.5225,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9446,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9604,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906502,
+    "match": "Dinamo Minsk v Neftchi Baku",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.66,
+    "implied_prob": 0.6024,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.944,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.96,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906502,
+    "match": "Dinamo Minsk v Neftchi Baku",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.16,
+    "implied_prob": 0.463,
+    "market_overround": 0.0654,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.944,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.96,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.736,
+    "implied_prob": 0.576,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 2.043,
+    "implied_prob": 0.4895,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890708,
+    "match": "Copenhagen v Polissya Zhytomyr",
+    "start": "2026-07-29T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.736,
+    "implied_prob": 0.576,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890708,
+    "match": "Copenhagen v Polissya Zhytomyr",
+    "start": "2026-07-29T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 2.043,
+    "implied_prob": 0.4895,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890748,
+    "match": "Noah Yerevan v Zimbru Chisinau",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 3.25",
+    "odds": 2.043,
+    "implied_prob": 0.4895,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890748,
+    "match": "Noah Yerevan v Zimbru Chisinau",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 3.25",
+    "odds": 1.736,
+    "implied_prob": 0.576,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906496,
+    "match": "Tobol Kostanay v Panevezys",
+    "start": "2026-07-30T14:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.736,
+    "implied_prob": 0.576,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906496,
+    "match": "Tobol Kostanay v Panevezys",
+    "start": "2026-07-30T14:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 2.043,
+    "implied_prob": 0.4895,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9388,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9563,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.6,
+    "implied_prob": 0.625,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748558,
+    "match": "Riga FC v Vardar",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.27,
+    "implied_prob": 0.4405,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890708,
+    "match": "Copenhagen v Polissya Zhytomyr",
+    "start": "2026-07-29T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.6,
+    "implied_prob": 0.625,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890708,
+    "match": "Copenhagen v Polissya Zhytomyr",
+    "start": "2026-07-29T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.27,
+    "implied_prob": 0.4405,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890748,
+    "match": "Noah Yerevan v Zimbru Chisinau",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 3.5",
+    "odds": 2.27,
+    "implied_prob": 0.4405,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890748,
+    "match": "Noah Yerevan v Zimbru Chisinau",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 3.5",
+    "odds": 1.6,
+    "implied_prob": 0.625,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906496,
+    "match": "Tobol Kostanay v Panevezys",
+    "start": "2026-07-30T14:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.6,
+    "implied_prob": 0.625,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906496,
+    "match": "Tobol Kostanay v Panevezys",
+    "start": "2026-07-30T14:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.27,
+    "implied_prob": 0.4405,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9383,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9559,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906500,
+    "match": "Auda v FCSB",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.75",
+    "odds": 1.882,
+    "implied_prob": 0.5313,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.938,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9557,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906500,
+    "match": "Auda v FCSB",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.75",
+    "odds": 1.872,
+    "implied_prob": 0.5342,
+    "market_overround": 0.0655,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.938,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9557,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906500,
+    "match": "Auda v FCSB",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.71,
+    "implied_prob": 0.5848,
+    "market_overround": 0.0656,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.937,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.955,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353906500,
+    "match": "Auda v FCSB",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.08,
+    "implied_prob": 0.4808,
+    "market_overround": 0.0656,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.937,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.955,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890716,
+    "match": "Zira v Paide Linnameeskond",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.59,
+    "implied_prob": 0.6289,
+    "market_overround": 0.0656,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9353,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9538,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890716,
+    "match": "Zira v Paide Linnameeskond",
+    "start": "2026-07-30T16:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.29,
+    "implied_prob": 0.4367,
+    "market_overround": 0.0656,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9353,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9538,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748552,
+    "match": "Apollon Limassol v Dila Gori",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.62,
+    "implied_prob": 0.6173,
+    "market_overround": 0.0657,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9315,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9511,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353748552,
+    "match": "Apollon Limassol v Dila Gori",
+    "start": "2026-07-28T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 2.23,
+    "implied_prob": 0.4484,
+    "market_overround": 0.0657,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9315,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9511,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890794,
+    "match": "Havnar Boltfelag v Motherwell",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "over 2.5",
+    "odds": 1.8,
+    "implied_prob": 0.5556,
+    "market_overround": 0.0658,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9299,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9499,
+    "flags": [
+      "no_limit_data"
+    ]
+  },
+  {
+    "fixture_id": 353890794,
+    "match": "Havnar Boltfelag v Motherwell",
+    "start": "2026-07-30T17:00:00+00:00",
+    "market_type": "totals",
+    "main_line": true,
+    "selection": "under 2.5",
+    "odds": 1.96,
+    "implied_prob": 0.5102,
+    "market_overround": 0.0658,
+    "limit": null,
+    "staleness_seconds": null,
+    "margin_score": 0.9299,
+    "limit_score": null,
+    "range_score": 1.0,
+    "total_score": 0.9499,
+    "flags": [
+      "no_limit_data"
+    ]
+  }
+]

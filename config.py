@@ -9,6 +9,11 @@ BOOK = "betwinner"
 TOURNAMENTS = [34480]
 
 # --- Hard filters -----------------------------------------------------------
+# Drop markets whose hold exceeds this. The first real Betwinner pull carried holds up
+# to 233.9%, with 109 markets over 100% — correct-score and similar exotics. Those are
+# not selections worth ranking, and because each carries dozens of outcomes they also
+# dominate any distribution computed over rows. Set to None to keep everything.
+MAX_OVERROUND = 0.25
 STALENESS_MINUTES = 15          # drop selections whose line is older than this,
                                 # measured relative to the freshest line in the pull
 INCLUDE_ALT_LINES = False       # False = main line only; True = include alternative lines
@@ -25,6 +30,14 @@ WEIGHTS = {
 }
 ODDS_RANGE = (1.50, 2.50)       # plateau band for range_score
 RANGE_DECAY = 1.00              # decimal-odds distance over which range_score fades to 0
+
+# --- Diversity --------------------------------------------------------------
+# Under proportional de-vig the margin signal is per-MARKET, and every market inside one
+# fixture tends to share a similar hold. So without a cap a single low-hold fixture
+# sweeps the ranking — the first real Betwinner run filled its entire top 24 from one
+# match. This caps how many selections one fixture may contribute to the emitted top-N.
+# Set to 0 to disable and rank purely on score.
+MAX_PER_FIXTURE = 4
 
 # --- Output -----------------------------------------------------------------
 TOP_N = 50

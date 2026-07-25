@@ -1,0 +1,126 @@
+name: fetch-betwinner
+
+# Betwinner'in KENDI line feed'inden veri ceker. API anahtari GEREKMEZ.
+#
+# NEDEN BU YOL:
+#   OddsPapi 'betwinner' istegine 22bet anahtarli veri donduruyor. Fiyatlar olculdu ve
+#   ayni (12 fixture'da 119/132 birebir, bkz. PROBE_FINDINGS.md) — ama payload hicbir
+#   yerde kendini betwinner diye tanitmiyor. Dogrudan cekim bu belirsizligi kaldirir ve
+#   yaklasik iki kat market tasir (bir fixture'da 298'e karsi 147 fiyatli secim).
+#
+# PARTNER ID:
+#   partner=51 1xBet'in kimligi ve betwinner.com'da SIFIR spor dondurur — ilk denemelerde
+#   "geo-engel" sanilan bos cevaplarin sebebi buydu. Betwinner'in kendi id'leri (159, 169
+#   ve 71-300 araligindaki cogu deger) tam hatti dondurur.
+
+on:
+  workflow_dispatch:
+    inputs:
+      champ:
+        description: "Turnuva (champ) ID — 2252762 = UEFA Conference League"
+        required: true
+        default: "2252762"
+      partner:
+        description: "Betwinner partner ID (51 KULLANMA — o 1xBet'in)"
+        required: false
+        default: "159"
+      max_games:
+        description: "En fazla kac mac cekilsin"
+        required: false
+        default: "40"
+  # Bu dosya main'de kayitli olana kadar workflow_dispatch 404 verir; bu dalda kendi
+  # yoluna yapilan push ile tetiklenir. paths dar tutuldu ki isin data/ commit'i
+  # workflow'u yeniden tetiklemesin.
+  push:
+    branches: [claude/betwinner-scanner-data-flow-60bitm]
+    paths: ['.github/workflows/fetch-betwinner.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-betwinner
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Betwinner line feed
+        env:
+          CHAMP: ${{ inputs.champ || '2252762' }}
+          PARTNER: ${{ inputs.partner || '159' }}
+          MAXG: ${{ inputs.max_games || '40' }}
+        run: |
+          set -o pipefail
+          BASE="https://betwinner.com/service-api/LineFeed"
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36"
+          mkdir -p data games
+
+          echo "=================================================="
+          echo "1) champ=${CHAMP} icin mac listesi"
+          curl -sS -m 30 -H "Accept: application/json" -H "User-Agent: ${UA}" \
+            "${BASE}/Get1x2_VZip?sports=1&champs=${CHAMP}&count=200&lng=en&mode=4&partner=${PARTNER}&getEmpty=true" \
+            -o games/_list.json
+
+          IDS=$(python3 - <<PY
+          import json
+          try:
+              v = json.load(open("games/_list.json")).get("Value") or []
+          except Exception:
+              v = []
+          ids = [str(g.get("CI")) for g in v if g.get("CI")]
+          print(" ".join(ids[: int("${MAXG}")]))
+          PY
+          )
+          COUNT=$(echo "${IDS}" | wc -w)
+          echo "   listelenen mac: ${COUNT}"
+          if [ "${COUNT}" -eq 0 ]; then
+            echo "SONUÇ: mac donmedi. partner=${PARTNER} yanlis olabilir (51 => 0 spor)."
+            head -c 300 games/_list.json; echo ""
+            exit 1
+          fi
+
+          echo "2) her mac icin tum marketler"
+          for ci in ${IDS}; do
+            curl -sS -m 25 -H "Accept: application/json" -H "User-Agent: ${UA}" \
+              "${BASE}/GetGameZip?id=${ci}&lng=en&cfview=0&isSubGames=true&GroupEvents=true&countevents=250&partner=${PARTNER}&grMode=4&country=1&marketType=1" \
+              -o "games/${ci}.json" || true
+            sleep 0.6   # ardisik istekler rate limit yiyor
+          done
+
+          OUT="data/betwinner_${CHAMP}.json"
+          python3 - <<PY
+          import json, glob, os
+          out = []
+          for f in sorted(glob.glob("games/*.json")):
+              if os.path.basename(f) == "_list.json":
+                  continue
+              try:
+                  v = json.load(open(f)).get("Value")
+              except Exception:
+                  continue
+              if isinstance(v, dict) and v.get("GE"):
+                  out.append(v)
+          json.dump(out, open("${OUT}", "w"))
+          print(f"   yazilan mac: {len(out)}")
+          print(f"   market grubu: {sum(len(g['GE']) for g in out)}")
+          # Dogrudan cekimde kitap kimligi tartismasiz, yine de teyit et.
+          names = {(g.get("O1"), g.get("O2")) for g in out}
+          print(f"   farkli eslesme: {len(names)}")
+          PY
+
+          echo "3) tarayici ile dogrulama"
+          python3 scan.py --input "${OUT}" | head -12
+
+      - name: Commit data
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ || true
+          git commit -m "fetch: betwinner champ ${{ inputs.champ || '2252762' }}" || echo "degisiklik yok"
+          git push || echo "push atlandi"
