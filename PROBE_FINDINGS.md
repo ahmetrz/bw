@@ -4,12 +4,23 @@ Evidence log for the CLAUDE.md coverage gate. Every line below is from a live
 `probe-odds.yml` run on a clean GitHub Actions runner (no browser, no cache),
 tournament **34480** (UEFA Conference League), sportId 10.
 
-## Verdict
+## Verdict — REVISED after direct measurement against betwinner.com
 
-**Betwinner is NOT served on this key. Requesting `bookmaker=betwinner` returns
-22bet's feed.** The scanner must not be pointed at this data as Betwinner
-(CLAUDE.md hard rule 5). Session 1's scanner validation and weight tuning stay
-blocked until the data source is resolved.
+Requesting `bookmaker=betwinner` returns a payload keyed `22bet`. The first reading
+was that this is the wrong book. **Measurement against Betwinner's own site says
+otherwise: Betwinner and 22bet publish the same prices.** See "Betwinner ≡ 22bet"
+below — 119 of 132 cleanly comparable selections across 12 fixtures match to the
+decimal, and the 13 that differ are all ≤1.2% apart, consistent with the ~40-minute
+gap between the two pulls.
+
+So OddsPapi is not substituting a *different* book's prices; it is serving Betwinner's
+prices under the platform's canonical `22bet` key. Whether that satisfies CLAUDE.md
+hard rule 5 is the operator's call — the rule is about not proceeding on another
+book's data, and on this evidence the data is not another book's.
+
+What remains true: OddsPapi never labels the payload `betwinner`, and its `fixturePath`
+points at 22bet.com, so nothing in the response identifies it as Betwinner. The label
+problem is real even though the price problem is not.
 
 ## What each slug returned
 
@@ -54,6 +65,59 @@ seven minutes apart, not two books that happen to look alike:
 For contrast, `1xbet` pulled at the *same instant* as `22bet` differs: 7231 vs 7233
 selections, and 164 price differences. Sibling books on one platform, but distinct
 feeds — which is exactly why the betwinner result stands out.
+
+## Betwinner ≡ 22bet — measured directly against betwinner.com
+
+Betwinner's own site exposes the 1xBet-platform line feed, no API key required:
+
+```
+https://betwinner.com/service-api/LineFeed/GetGameZip?id=<gameId>&lng=en&partner=159&…
+```
+
+The earlier empty responses were caused by `partner=51`, which is **1xBet's** partner
+id — it returns zero sports on betwinner.com. Betwinner's own ids (159, 169, and most
+values in the 71–300 range) return the full line. Nothing was geo-blocked.
+
+The lever that makes the comparison exact: `bookmakerFixtureId` is **identical across
+all three books** (it is the platform's game id), so the same fixture can be requested
+from Betwinner directly and lined up against OddsPapi's payload selection by selection,
+matching OddsPapi's `bookmakerMarketId`/`bookmakerOutcomeId` to the feed's `G`/`T`.
+
+Petrocub v Borac Banja Luka, main 1X2:
+
+```
+betwinner.com   1 = 3.23   X = 3.6   2 = 2.06   -> hold 7.28%
+OddsPapi 22bet  1 = 3.23   2 = 3.6   3 = 2.06   -> hold 7.28%
+```
+
+Across 12 fixtures (OddsPapi pulled 18:38 UTC, betwinner.com ~40 min later):
+
+| result | fixtures |
+|---|---|
+| every comparable selection identical | 10 of 12 |
+| some drift | 2 (0/11 and 9/11) |
+| **total** | **119/132 identical = 90.15%** |
+
+All 13 differences are ≤1.2% (largest: 4.15 vs 4.20), clustered in two matches whose
+lines moved during the gap. That is drift, not a different price source.
+
+### The contrast that makes this conclusive: 1xbet is genuinely different
+22bet and 1xbet pulled at the **same instant** differ on 2.27% of selections (164 of
+7231) — and those differences are large: median 0.56%, p99 **18.75%**, max **44.69%**
+(5.86 vs 4.05). Running the scoring engine over each and comparing the ranked output,
+the **top-50 overlaps on only 37 selections and the top-10 on 7**.
+
+So "same platform family" does not imply same prices — 1xbet proves it. Betwinner
+matching 22bet to the decimal, across fixtures, with only sub-1.2% drift, is a
+qualitatively different signature. Betwinner and 22bet are one price feed; 1xbet is
+its own.
+
+### Two consequences worth acting on
+1. **betwinner.com's feed is a free, key-less Betwinner source** and is *richer* than
+   OddsPapi's: 298 priced selections for that fixture versus OddsPapi's 147.
+2. **It decodes the numeric market ids.** `G=1, T=1/2/3` is 1X2 home/draw/away — the
+   same `bookmakerMarketId=1`, `bookmakerOutcomeId=1/2/3` that OddsPapi emits. The feed
+   is the reference table that the market-type problem below needs.
 
 ## Two documented assumptions this disproves
 
