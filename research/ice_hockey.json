@@ -1,0 +1,236 @@
+{
+  "sport": "ice_hockey",
+  "researched": "2026-07-25",
+  "headline": "Confirmed starting goalie is the largest single pre-match input. Median within-team starter-vs-backup gap is 0.36 GSAx/60 against a 6.03 goals/game baseline = 4-7% win probability, more than any skater input. Treat an unconfirmed goalie as a hard gate.",
+  "verified_baselines_nhl_2024_25": {
+    "goals_per_game": 6.03,
+    "period_share": {
+      "p1": 0.287,
+      "p2": 0.331,
+      "p3": 0.357,
+      "ot": 0.025
+    },
+    "empty_net_goals_per_game": 0.41,
+    "empty_net_share_of_all_goals": 0.067,
+    "btts_rate": 0.902,
+    "ot_so_rate": 0.183,
+    "one_goal_margin_rate": 0.366,
+    "b2b_win_pct": 0.436,
+    "one_day_rest_win_pct": 0.542,
+    "special_teams_share_of_goals": 0.192
+  },
+  "verified_free_sources": [
+    {
+      "id": "nhl_api_web",
+      "url": "https://api-web.nhle.com/v1",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "NHL schedule, boxscore, play-by-play, pre-game matchup+goalieComparison, roster, standings, betting odds"
+    },
+    {
+      "id": "nhl_stats_rest",
+      "url": "https://api.nhle.com/stats/rest/en",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "satPct(Corsi), usatPct(Fenwick), zoneStartPct5v5, shootingPlusSavePct5v5(PDO), goalsbyperiod, goalsforbystrength, daysbetweengames, PP/PK/faceoff, startedVsRelieved"
+    },
+    {
+      "id": "espn_hidden",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/hockey/nhl",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "boxscore, INJURIES (29 teams), odds, pickcenter, onIce. NO European pro leagues."
+    },
+    {
+      "id": "dailyfaceoff",
+      "url": "https://www.dailyfaceoff.com/starting-goalies",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "NHL confirmed/projected starters + line combos",
+      "note": "robots bans /api/ - scrape the rendered page"
+    },
+    {
+      "id": "rotowire",
+      "url": "https://www.rotowire.com/hockey/nhl-lineups.php",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "NHL lineups + goalies with explicit Confirmed/Projected labels; robots permits"
+    },
+    {
+      "id": "leftwinglock",
+      "url": "https://www.leftwinglock.com/starting-goalies/",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "starters, line combos, back-to-back tracker, injury tracker"
+    },
+    {
+      "id": "shl_se",
+      "url": "https://www.shl.se/api/",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "SHL back to 1975/76 (50 seasons) + CHL 2014/15+; no robots restrictions"
+    },
+    {
+      "id": "liiga_fi",
+      "url": "https://liiga.fi/api/v2/",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "Finland 2000-2027; goal/penalty/goalkeeper events, PP/SH, xG PER TEAM, periods, rosters with role=GOALIE + line number"
+    },
+    {
+      "id": "sihf_ch",
+      "url": "https://data.sihf.ch/Statistic/api/cms/",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "Swiss NL, 19 seasons to 2008/09; goalkeeper GP/GPI/GAA/SV%/SO, period-by-period scores"
+    },
+    {
+      "id": "hokej_cz",
+      "url": "https://www.hokej.cz/tipsport-extraliga",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "Czech Extraliga; robots.txt is Allow: / (fully permissive). telh.cz is DEAD."
+    },
+    {
+      "id": "penny_del",
+      "url": "https://www.penny-del.org",
+      "auth": "scraping",
+      "verified": true,
+      "coverage": "German DEL 2022-23 to 2025-26 + archive, 19 stat tables, per-goalie pages"
+    },
+    {
+      "id": "stats_iihf",
+      "url": "https://stats.iihf.com",
+      "auth": "none",
+      "verified": true,
+      "coverage": "international tournaments only; www.iihf.com 403s but stats.iihf.com does not"
+    },
+    {
+      "id": "hockeytech",
+      "url": "https://lscluster.hockeytech.com/feed/",
+      "auth": "free_key",
+      "api": true,
+      "verified": true,
+      "coverage": "NORTH AMERICAN minor/junior only: AHL, OHL/WHL, PWHL, ECHL. Serves NO European league."
+    }
+  ],
+  "COMPLIANCE_BLOCKERS": [
+    {
+      "id": "natural_stat_trick",
+      "rule": "robots.txt EXPLICITLY disallows ClaudeBot, Claude-User, Claude-SearchBot, GPTBot, CCBot; Crawl-delay 240s for everyone else",
+      "action": "DO NOT ingest programmatically. Its content was not fetched."
+    },
+    {
+      "id": "moneypuck",
+      "rule": "licensed free for NON-COMMERCIAL use and journalists only; commercial use needs written permission",
+      "action": "A real-money betting engine is not obviously non-commercial. Get permission or drop it. Richest free xG/GSAx source otherwise."
+    },
+    {
+      "id": "hockey_reference",
+      "rule": "Sports-Reference Terms clause 5 forbids automated access without express written permission, despite Crawl-delay 3 in robots",
+      "action": "Legally the riskiest of the working scrapes."
+    }
+  ],
+  "clean_path": "Everything needed from NST and Hockey-Reference (Corsi, Fenwick, PDO, zone starts, GSAA-equivalent) is available from api.nhle.com + api-web.nhle.com instead. Use the NHL APIs as primary.",
+  "blocked": [
+    {
+      "id": "khl_ru",
+      "detail": "307->403 from datacenter IP. robots.txt PERMITS /stat/ and has no AI rules - our IP is the blocker, not policy. Needs residential egress."
+    },
+    {
+      "id": "sofascore",
+      "detail": "403 on every attempt incl. full browser headers"
+    },
+    {
+      "id": "elite_prospects",
+      "detail": "401 - key issuance is a PAID partner product, not free"
+    },
+    {
+      "id": "statsapi_web_nhl",
+      "detail": "RETIRED - DNS fails. Any tutorial referencing it is dead."
+    }
+  ],
+  "stat_to_bet": {
+    "moneyline": [
+      "starting_goalie",
+      "gsax",
+      "xgf_pct",
+      "corsi_pct",
+      "pp_pct",
+      "pk_pct",
+      "rest_days",
+      "home_away_split",
+      "pdo",
+      "injuries"
+    ],
+    "puck_line": [
+      "xgf_per60",
+      "xga_per60",
+      "empty_net_rate",
+      "goalie_quality_starts",
+      "score_state_effects"
+    ],
+    "over_under_goals": [
+      "xgf_per60",
+      "xga_per60",
+      "gsax",
+      "pp_pct",
+      "pk_pct",
+      "penalties_drawn_taken",
+      "high_danger_chances",
+      "empty_net_rate",
+      "pace"
+    ],
+    "team_totals": [
+      "xgf_per60",
+      "high_danger_chances",
+      "gsax",
+      "pp_pct",
+      "line_combinations",
+      "injuries"
+    ],
+    "btts": [
+      "gsax",
+      "xgf_per60",
+      "high_danger_chances",
+      "pace",
+      "shutout_rate"
+    ],
+    "period_markets": [
+      "period_scoring_split",
+      "faceoff_pct",
+      "empty_net_rate",
+      "score_state_effects"
+    ],
+    "three_way_60": [
+      "ot_so_rate",
+      "gsax",
+      "xga_per60",
+      "xgf_pct"
+    ],
+    "winning_margin": [
+      "xgf_per60",
+      "empty_net_rate",
+      "goalie_quality_starts",
+      "score_state_effects"
+    ]
+  },
+  "open_questions": [
+    "European confirmed starting goalies are UNSOLVED. No aggregator verified, untestable in the July offseason. Given that starter identity is the headline input, European pre-match models are structurally weaker than NHL ones until this is revisited in September.",
+    "All European endpoints are league-site backends, not contractual APIs. Pin fixtures; they can change without notice."
+  ],
+  "key_findings": [
+    "Rest is measured, not folklore: 0 days rest = 43.6% win rate, 1 day = 54.2%.",
+    "Empty-net goals are 6.7% of all goals and almost all land in P3 - strip them for strength estimation, add back for totals and margin.",
+    "BTTS baseline is 90.2%, so the real bet is 'will either be shut out'.",
+    "Never quarter the 60-minute total for period markets: the split is P1 28.7 / P2 33.1 / P3 35.7.",
+    "PDO is not a predictor, it is the regression flag: above 102 over fewer than 30 games is a fade.",
+    "Goal-based form is mostly PDO noise - use xG-based form windows."
+  ]
+}
