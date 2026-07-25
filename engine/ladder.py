@@ -12,8 +12,20 @@ requires, and reading it as a probability just relaunders the book's own opinion
 it. Selecting on short prices would build a slip out of the book's margin, not out of
 anything we know.
 
+THE OUTRIGHT WIN IS NOT A RUNG IN FOOTBALL
+Football resolves three ways, so backing a team to win is backing one of three outcomes
+and the draw beats you on its own. The ladder therefore starts at double chance — "does
+not lose" — and never offers the outright result. If no rung from double chance down
+clears the gate, that direction simply yields nothing for that match; falling back to
+the outright win would be picking the riskiest form precisely when the safe forms are
+too short, which is backwards.
+
+Two-outcome sports have no draw to lose to, so their moneyline IS the safe base and is
+allowed as the top rung: basketball, tennis, and ice hockey's moneyline (which includes
+overtime and the shootout, unlike its three-way regulation market).
+
 LADDERS (each rung strictly safer than the one above, same directional view)
-  football, side      1 / 2            -> double chance (1X, X2) -> +1, +2, +3 handicap
+  football, side      double chance (1X, X2) -> +1, +2, +3 handicap   [NO outright win]
   football, over      over 2.5         -> over 1.5 -> over 0.5
   football, under     under 2.5        -> under 3.5 -> under 4.5
   tennis, side        match winner     -> +1.5 set handicap ("wins a set")
@@ -52,24 +64,20 @@ def _sel(row):
 
 
 def _rungs_football_side(rows, side):
-    """Safest-last ladder for 'home wins' or 'away wins'.
+    """Safest-last ladder for a directional view on the result.
 
-    Each rung wins in strictly more states of the world than the one before it: the
-    outright result, then result-or-draw, then result-or-lose-by-less-than-N.
+    Starts at double chance. The outright win is deliberately absent: football has three
+    outcomes, so backing the result loses to the draw as well as to defeat, and the
+    operator's rule is not to take it. Each rung then wins in strictly more states than
+    the one above — result-or-draw, then result-or-lose-by-less-than-N.
     """
-    want_win = "1" if side == "home" else "2"
     want_dc = DC_HOME_OR_DRAW if side == "home" else DC_DRAW_OR_AWAY
     ladder = []
 
     for r in rows:
         g, _ = _group_line(r)
-        if g == FOOTBALL_1X2 and _sel(r) == want_win:
-            ladder.append((0, r, f"{side} win"))
-
-    for r in rows:
-        g, _ = _group_line(r)
         if g == FOOTBALL_DOUBLE_CHANCE and _sel(r) == f"T{want_dc}":
-            ladder.append((1, r, f"{side} or draw (does not lose)"))
+            ladder.append((1, r, f"{side} does not lose"))
 
     # Plus handicaps: our side may lose by up to |line| and the bet still stands.
     # Bigger handicap = safer, so order ascending by line then reverse at the end.
@@ -98,16 +106,34 @@ def _rungs_total(rows, group, direction):
     return sorted(out, key=lambda t: t[0])
 
 
+# Sports whose result market has no draw, so the moneyline is already the safe base and
+# may sit at the top of a side ladder. Football is absent by construction; ice hockey is
+# here for its moneyline, which includes overtime and the shootout — its three-way
+# regulation market does have a draw and must not be treated the same way.
+TWO_OUTCOME_SPORTS = {
+    2: "ice_hockey",   # moneyline only, NOT the 60-minute three-way
+    3: "basketball",
+    4: "tennis",
+}
+
+
 def build(rows, sport_id, direction):
     """All rungs for a direction, most aggressive first.
 
-    `direction` is one of: home, away, over, under.
+    `direction` is one of: home, away, over, under. An empty list means this sport and
+    direction has no ladder wired yet — callers must treat that as "no selection", never
+    as licence to fall back to whatever market happens to be there.
     """
     if sport_id == 1:
         if direction in ("home", "away"):
             return _rungs_football_side(rows, direction)
         if direction in ("over", "under"):
             return _rungs_total(rows, FOOTBALL_TOTAL, direction)
+
+    # Tennis ("wins a set"), basketball (+handicap at the largest line, totals at the
+    # extreme line) and ice hockey moneyline are specified but not wired: their Betwinner
+    # group ids have not been read off a real payload yet, and guessing an id would
+    # attach a ladder to the wrong market. The 48h sweep supplies those payloads.
     return []
 
 
