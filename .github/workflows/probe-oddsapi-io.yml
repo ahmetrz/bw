@@ -47,6 +47,9 @@ jobs:
 
       - name: Probe odds-api.io
         env:
+          # ODD_API_KEY: operatorun odds-api.io icin ekledigi anahtar (ODDS degil, ODD).
+          # ODDS_API_KEY ise the-odds-api.com'a ait — ayri sirket, once o denenmemeli.
+          ODD_API_KEY:     ${{ secrets.ODD_API_KEY }}
           ODDS_API_KEY:    ${{ secrets.ODDS_API_KEY }}
           ODDSAPI_KEY:     ${{ secrets.ODDSAPI_KEY }}
           ODDS_API_IO_KEY: ${{ secrets.ODDS_API_IO_KEY }}
@@ -106,7 +109,8 @@ jobs:
           # ---------- 1) Hangi secret adi dolu? ----------
           echo "=================================================="
           echo "1) Aday secret adlari (DEGER YAZDIRILMAZ)"
-          CANDIDATES="ODDS_API_KEY ODDSAPI_KEY ODDS_API_IO_KEY ODDSAPIIO_KEY ODDSAPI_IO_KEY ODDS_API_TOKEN ODDSAPI_TOKEN ODDS_KEY ODDSIO_KEY"
+          # ODD_API_KEY once denenir: odds-api.io icin eklenen anahtar bu.
+          CANDIDATES="ODD_API_KEY ODDS_API_KEY ODDSAPI_KEY ODDS_API_IO_KEY ODDSAPIIO_KEY ODDSAPI_IO_KEY ODDS_API_TOKEN ODDSAPI_TOKEN ODDS_KEY ODDSIO_KEY"
           SET_NAMES=""
           for n in $CANDIDATES; do
             v="${!n}"
