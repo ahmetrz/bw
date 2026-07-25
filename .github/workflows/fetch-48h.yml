@@ -1,0 +1,80 @@
+name: fetch-48h
+
+# Onumuzdeki N saat icinde baslayan TUM mac-oncesi Betwinner marketlerini ceker:
+# her spor, her turnuva, her karsilasma, her bahis secenegi.
+#
+# API anahtari GEREKMEZ — Betwinner'in kendi line feed'i.
+# CANLI (in-play) bahisler KAPSAM DISI: LineFeed mac-oncesi beslemedir.
+#
+# Cikti gzip'li: ham JSON on binlerce secim tasiyor (mac basi ~31 KB), sikistirilmamis
+# hali repoya sigmaz.
+#
+# Zamanlama YOK — kota/yuk yaratan bir cron operator onayi ister (CLAUDE.md HITL 5).
+
+on:
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "Kac saatlik pencere"
+        required: false
+        default: "48"
+      sports:
+        description: "Spor id'leri (virgullu). Bos = TUM sporlar"
+        required: false
+        default: ""
+      max_fixtures:
+        description: "Mac ust siniri (0 = sinirsiz)"
+        required: false
+        default: "0"
+      partner:
+        description: "Betwinner partner ID (51 KULLANMA — o 1xBet'in)"
+        required: false
+        default: "159"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-48h
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch window
+        env:
+          H: ${{ inputs.hours || '48' }}
+          S: ${{ inputs.sports || '' }}
+          MF: ${{ inputs.max_fixtures || '0' }}
+          P: ${{ inputs.partner || '159' }}
+        run: |
+          set -o pipefail
+          mkdir -p data
+          python3 tools/fetch_window.py \
+            --hours "${H}" \
+            --partner "${P}" \
+            --sports "${S}" \
+            --max-fixtures "${MF}" \
+            --workers 8 \
+            --out "data/betwinner_${H}h.json.gz"
+          ls -la data/
+
+      - name: Scan
+        env:
+          H: ${{ inputs.hours || '48' }}
+        run: |
+          python3 scan.py --input "data/betwinner_${H}h.json.gz" --top 50 | head -60
+
+      - name: Commit
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ report.json || true
+          git commit -m "fetch: betwinner ${{ inputs.hours || '48' }}h window" || echo "degisiklik yok"
+          git push || echo "push atlandi"

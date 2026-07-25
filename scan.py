@@ -10,6 +10,7 @@ Runs fully offline on a saved JSON pull. Fetching is done by GitHub Actions
 (the operator's machine blocks the site). See README.md.
 """
 import argparse
+import gzip
 import json
 import sys
 
@@ -30,7 +31,9 @@ def main():
         config.INCLUDE_ALT_LINES = True
 
     try:
-        with open(args.input) as f:
+        # A full 48h sweep is tens of MB of JSON, so those pulls are stored gzipped.
+        opener = gzip.open if args.input.endswith(".gz") else open
+        with opener(args.input, "rt") as f:
             data = json.load(f)
     except (OSError, json.JSONDecodeError) as e:
         print(f"Could not read {args.input}: {e}", file=sys.stderr)
