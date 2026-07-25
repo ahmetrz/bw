@@ -76,8 +76,22 @@ jobs:
             echo "=================================================="
             echo "İstek: ${SAFE_URL}"
             TMP="$(mktemp)"
-            CODE=$(curl -sS -o "$TMP" -w "%{http_code}" \
-                   -H "Accept: application/json" "${URL}")
+            # Endpoint arka arkaya isteklerde rate limit uyguluyor (~0.7 sn).
+            # Bekleme olmadan ardisik probe'lar RATE_LIMITED alir ve bu, kapsam
+            # yokmus gibi okunur — yani sessiz bir YANLIS NEGATIF. Bekle + tekrar dene.
+            ATTEMPT=1
+            while : ; do
+              CODE=$(curl -sS -o "$TMP" -w "%{http_code}" \
+                     -H "Accept: application/json" "${URL}")
+              grep -q 'RATE_LIMITED' "$TMP" 2>/dev/null || break
+              if [ "${ATTEMPT}" -ge 4 ]; then
+                echo "  (rate limit ${ATTEMPT} denemede asilamadi)"
+                break
+              fi
+              echo "  (rate limited — ${ATTEMPT}. deneme, 2 sn bekleniyor)"
+              sleep 2
+              ATTEMPT=$((ATTEMPT + 1))
+            done
             echo "HTTP kodu: ${CODE}"
             if [ "${CODE}" != "200" ]; then
               # Hata govdesi kitap verisi degil; adinda ISTENEN slug'i tasir ve
@@ -110,7 +124,10 @@ jobs:
             fi
           }
 
+          FIRST=1
           for b in $(echo "${BOOKS}" | tr ',' ' '); do
+            [ "${FIRST}" -eq 1 ] || sleep 2   # endpoint rate limiti (~0.7 sn) icin pay birak
+            FIRST=0
             probe "$b"
           done
 
