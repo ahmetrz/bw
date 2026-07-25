@@ -1,0 +1,754 @@
+{
+  "sport": "olympic_individual",
+  "betwinner_sport_ids": [37, 112, 64, 63, 138],
+  "researched": "2026-07-25",
+  "_scope_note": "FIVE UNRELATED SPORTS IN ONE FILE, GROUPED ONLY BY 'INDIVIDUAL OLYMPIC-STYLE'. Swimming (37), Weightlifting (112), Shooting (64), Sailing (63), Surfing (138). They share almost nothing: two are measured-performance sports (swimming, weightlifting), one is a points-elimination sport (shooting), one is a series-points sport (sailing), one is a subjectively-judged condition-dependent sport (surfing). NEVER route a fixture from one into another's model. The only structural thing they share is that all five are FIELD markets by default (many outcomes), not two-sided ones - see stat_to_bet._ladder_note.",
+
+  "statistics": [
+    {
+      "id": "swim_pb_by_event_and_course",
+      "name": "Personal best, keyed by (event, course)",
+      "definition": "Fastest legal time an athlete has recorded in a specific event, stored SEPARATELY for long course (50m pool, LCM) and short course (25m pool, SCM). The composite key is (athlete, distance, stroke, course) - never (athlete, distance, stroke).",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "/fina/rankings/swimming?poolConfiguration=LCM|SCM, field time + pool (0=LCM, 1=SCM)",
+      "bet_relevance": "The base rate for every swimming market. Everything else is a modifier on top of it.",
+      "caveat": "VERIFIED BY BODY, AND IT IS THE HEADLINE TRAP: the same query for Men's 100 Free 2026 returned LCM leader 46.96 and SCM leader 45.68. The short-course time is 1.28s FASTER in raw seconds while being a WORSE swim (964 vs 945 World Aquatics points). Any store that keys PBs on event alone will rank short-course swimmers above long-course swimmers by construction. Same query also returned 50,321 LCM rows vs 3,884 SCM rows for one event-year, so a naive merge is also ~93% LCM and silently course-biased."
+    },
+    {
+      "id": "swim_world_aquatics_points",
+      "name": "World Aquatics Points (finaPoints)",
+      "definition": "A cross-event, cross-course normalisation: 1000 points is roughly the base time (a world-record-class swim) for that event and course. Computed as 1000 x (base_time / swum_time)^3.",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "field finaPoints on every ranking row",
+      "bet_relevance": "THE CORRECT COMPARABILITY LAYER. It is the only field in the feed that lets you compare a 100 Free to a 400 IM, or an LCM swim to an SCM swim, on one axis. Use it, not raw seconds, whenever the comparison crosses event or course.",
+      "caveat": "It normalises DIFFICULTY, not FORM: a 964-point swim from January and a 964-point swim from July are equal in points but not equal as a predictor of next week. Always pair with resultDate. The base times are re-set periodically, so historical point values are not perfectly stable across base-time revisions."
+    },
+    {
+      "id": "swim_season_best",
+      "name": "Season best (current-season best, same course)",
+      "definition": "Best time in the current calendar year for the (event, course) pair.",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "year= filter on the rankings query",
+      "bet_relevance": "Better short-horizon predictor than career PB, especially for athletes past 26 or returning from injury. The PB/SB gap is itself a signal: a large gap means the swimmer is either untapered or declining.",
+      "caveat": "Early-season rankings are thin and dominated by whichever national championships happened first, which imports a country bias (the 2026 LCM top-5 read Russian Nationals, Sette Colli, TYR Pro Swim - three different meets at three different points of three different national tapers)."
+    },
+    {
+      "id": "swim_heat_to_final_progression",
+      "name": "Heat-to-final progression (drop-off / step-up per phase)",
+      "definition": "For an athlete, the systematic delta between their heat time, semifinal time and final time at the same meet. Some swimmers 'cruise' heats by 1.5-2%, others must go near-flat-out to qualify.",
+      "sport": "swimming",
+      "source": "worldaquatics_competitions",
+      "source_ref": "/fina/competitions/{id}/events -> Sports -> DisciplineList -> HeatList[].Phase (Heats | Semifinals | Finals), each with ResultStatus",
+      "bet_relevance": "This is the single most exploitable swimming stat for in-meet markets. A heat leader who was at 99% effort is a fade in the final; a heat qualifier who cruised at 96% is live. It also drives 'to qualify for the final' markets directly.",
+      "caveat": "The phase STRUCTURE is exposed and verified (Tokyo 2020 swimming returned 35 disciplines each with a HeatList carrying Phase and ResultStatus). The per-heat, per-lane TIMES were NOT located - see open_questions. Until that endpoint is found, progression must be reconstructed from the rankings feed's heatId, which is present on every ranking row but not resolvable to a heat result document."
+    },
+    {
+      "id": "swim_splits",
+      "name": "Split times (per 50m) and back-half ratio",
+      "definition": "Per-50 splits within a race, and the derived back-half/front-half ratio. A 100 Free swum 22.6/24.4 is a different athlete profile from 23.2/23.8 at the same total.",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "splitId field present on ranking rows; split= accepted as a query parameter",
+      "bet_relevance": "Drives head-to-head markets more than final time does: a front-half swimmer beats a back-half swimmer over 50m and loses over 200m even at identical 100m PBs. Also the main lever for 'will the record be broken' and in-running.",
+      "caveat": "PARTIALLY VERIFIED ONLY. splitId exists on every ranking row and the API accepts a split parameter, but every attempt to resolve a split or heat document 404'd. Treat splits as AVAILABLE-IN-PRINCIPLE, NOT YET RETRIEVED. Do not build a model that assumes splits until the endpoint is confirmed."
+    },
+    {
+      "id": "swim_taper_timing",
+      "name": "Taper timing across a season",
+      "definition": "Where in the season an athlete's fastest swims cluster. Elite programmes taper for one or two target meets a year and race through everything else at 95-98%.",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "derived: group finaPoints by resultDate and eventName per personId",
+      "bet_relevance": "Explains most 'form collapses' that are not collapses at all. A swimmer 1.5% off their PB at a World Cup stop in November is on plan; the same gap at the World Championships is a genuine signal.",
+      "caveat": "DERIVED, NOT PUBLISHED. No source states a taper plan; you infer it from the shape of resultDate vs finaPoints. Needs 2-3 seasons per athlete before the pattern is trustworthy, and it breaks for athletes who switch coach or programme."
+    },
+    {
+      "id": "swim_altitude",
+      "name": "Venue altitude",
+      "definition": "Elevation of the competition pool. Affects the aerobic component of a race, not the mechanical one.",
+      "sport": "swimming",
+      "source": "unsourced_domain_knowledge",
+      "source_ref": "no verified free feed found for pool elevation; would need to join eventCity to an external elevation dataset",
+      "bet_relevance": "Directionally: sprints (50/100) are close to unaffected because they are largely alactic/anaerobic, while 400m and longer degrade at altitude because oxygen availability, not water, is the binding constraint. Swimming has no altitude-legality rule and no altitude-adjusted record list, unlike athletics' wind rule - so altitude-aided and sea-level times sit in the SAME ranking with no marker.",
+      "caveat": "NOT VERIFIED FROM ANY SOURCE IN THIS PASS. The direction of the effect is standard physiology, but no magnitude is asserted here and none should be coded until it is measured against the World Aquatics feed. The feed gives eventCity but no elevation field."
+    },
+    {
+      "id": "swim_age_curve",
+      "name": "Age at result",
+      "definition": "Athlete age on the day of the swim.",
+      "sport": "swimming",
+      "source": "worldaquatics_api",
+      "source_ref": "athleteResultAge, dateOfBirth, yearOfBirth on every ranking row",
+      "bet_relevance": "Sprint peak is later than distance peak; a 19-year-old's PB is a floor and a 31-year-old's PB is a ceiling. Directly available, no join needed.",
+      "caveat": "Handed to you on the row - one of the few stats here with zero assembly cost."
+    },
+    {
+      "id": "swim_dq_rate",
+      "name": "Disqualification propensity",
+      "definition": "Historical rate at which an athlete is disqualified, split by cause: false start, illegal turn/touch, stroke infringement, relay changeover.",
+      "sport": "swimming",
+      "source": "unsourced_domain_knowledge",
+      "source_ref": "not exposed as a field in any verified feed",
+      "bet_relevance": "The tail risk that head-to-head and outright markets both ignore. Breaststroke and butterfly (two-hand touch, kick legality) carry structurally higher DQ risk than freestyle; medley relay changeovers higher again.",
+      "caveat": "NOT AVAILABLE from the verified sources - the rankings feed only carries swims that COUNTED, so it is survivorship-filtered and cannot show you DQs at all. This is a known blind spot, not a modelled quantity."
+    },
+    {
+      "id": "wl_snatch_best",
+      "name": "Best snatch",
+      "definition": "Heaviest snatch successfully completed in competition, in the athlete's current bodyweight category.",
+      "sport": "weightlifting",
+      "source": "iwf_results",
+      "source_ref": "Snatch column on /results/results-by-events/?event_id={id}",
+      "bet_relevance": "One of the two components of the total, and the one with higher technical variance - snatch is the lift that gets missed.",
+      "caveat": "MUST be read as 'best SUCCESSFUL competition snatch'. Training numbers, gym videos and social-media lifts are not competition results and do not settle anything."
+    },
+    {
+      "id": "wl_cj_best",
+      "name": "Best clean and jerk",
+      "definition": "Heaviest clean and jerk successfully completed in competition.",
+      "sport": "weightlifting",
+      "source": "iwf_results",
+      "source_ref": "CI&Jerk column on the IWF event results page",
+      "bet_relevance": "The second component and typically the more strength-dominant, less technique-dominant of the two; also the lift that decides most competitions because it is contested second.",
+      "caveat": "A lifter can hold the best C&J in the field and still finish unranked if the snatch was bombed - verified case below in wl_bomb_out_rate."
+    },
+    {
+      "id": "wl_total",
+      "name": "Total (snatch + clean and jerk)",
+      "definition": "Sum of best successful snatch and best successful C&J. THE ONLY NUMBER THAT DECIDES THE COMPETITION.",
+      "sport": "weightlifting",
+      "source": "iwf_results",
+      "source_ref": "Total column",
+      "bet_relevance": "Every outright, podium and head-to-head in weightlifting settles on total unless the market says otherwise.",
+      "caveat": "A total EXISTS only if the lifter made at least one snatch AND at least one C&J. Otherwise the field is literally '---' and the lifter is unranked. This is not a low score, it is no score - see rules_critical."
+    },
+    {
+      "id": "wl_bomb_out_rate",
+      "name": "Bomb-out / no-total rate",
+      "definition": "Rate at which an athlete (or the field) fails to register a total, by failing all three attempts in either lift.",
+      "sport": "weightlifting",
+      "source": "iwf_results",
+      "source_ref": "rows where Total = '---' and Rank = '---'",
+      "bet_relevance": "THE most under-priced quantity in weightlifting. It is the reason a 'strongest lifter in the field' model overstates win probability, and the reason weightlifting head-to-heads are not a clean strength comparison.",
+      "caveat": "VERIFIED BY BODY on the 2026 European Championships page (event_id=692, 4.06 MB): 311 distinct athletes, 31 with no total = 10.0%. Split: 44 snatch-bomb records and 40 C&J-bomb records. The standout case is decisive - BERDELIDZE Goderdzi (GEO, 60 kg) snatched 125 kg, MORE than the gold medallist's 120 kg and more than any other lifter in the category, then failed all three C&J attempts and finished with Total '---' and Rank '---', i.e. unranked and beaten by every lifter who made a total. A model keyed on best lifts would have made him favourite."
+    },
+    {
+      "id": "wl_bodyweight_category",
+      "name": "Bodyweight category (and which era it belongs to)",
+      "definition": "The weight class contested. The IWF has reorganised categories THREE times in the modern era and the current (2025-) set is different again from the set used at Paris 2024.",
+      "sport": "weightlifting",
+      "source": "iwf_archives",
+      "source_ref": "the IWF site itself splits Results by Events, Ranking List and World Records into three separate archives: current, 'Old Bodyweight Categories / 2018-2025', and 'Old Bodyweight Categories / Up to 2018'",
+      "bet_relevance": "Determines who the athlete is even competing against. Category changes redistribute the entire competitive landscape overnight.",
+      "caveat": "VERIFIED BY BODY, TWICE OVER. (1) The 2026 European Championships page returned current categories: MEN 60/65/71/79/88/94/110/110+, WOMEN 48/53/58/63/69/77/86/86+. (2) The IWF's own navigation exposes three era-separated result sets with three separate world-record lists. A scraper that pools all three archives is comparing three incompatible category systems and will silently mis-assign athletes."
+    },
+    {
+      "id": "wl_bodyweight_exact",
+      "name": "Exact weigh-in bodyweight (2 decimal places)",
+      "definition": "The athlete's weight at the official weigh-in, e.g. 59.49 kg in a 60 kg category.",
+      "sport": "weightlifting",
+      "source": "iwf_results",
+      "source_ref": "B.weight column, verified populated to 2dp on every row",
+      "bet_relevance": "It is a TIEBREAK INPUT, not just a description. When totals tie, the lighter athlete places higher. It also tells you how much of the class the lifter is actually using - a lifter weighing 55.59 in a 60 kg class (verified on the same page) is giving away 4.4 kg of leverage.",
+      "caveat": "Available for completed competitions only; entry bodyweight before a meet is not published, so pre-match you are working from the last weigh-in, which may be a different category."
+    },
+    {
+      "id": "wl_attempt_strategy",
+      "name": "Attempt selection and progression strategy",
+      "definition": "The declared opening attempt and the size of the jumps between attempts 1, 2 and 3, plus whether the lifter attacks or protects.",
+      "sport": "weightlifting",
+      "source": "unsourced_domain_knowledge",
+      "source_ref": "IWF event pages publish only best snatch, best C&J and total - the per-attempt sequence was NOT found in the scraped HTML",
+      "bet_relevance": "Attempt strategy is how a weaker lifter beats a stronger one: open conservatively to bank a total, then chase. A lifter who opens at 98% of PB is buying a chance of gold at the price of a real chance of nothing.",
+      "caveat": "NOT AVAILABLE FREE in structured form from the IWF results pages checked. Attempt-by-attempt data appears in live competition feeds and start lists but was not located as a scrapable archive. Treat attempt strategy as an OBSERVED narrative, not a modelled feature, unless a per-attempt source is found."
+    },
+    {
+      "id": "wl_robi_points",
+      "name": "Robi points",
+      "definition": "The IWF's cross-category normalisation, analogous to World Aquatics points - it scores a total relative to the world record in that category so a 60 kg lifter can be compared to a 110 kg lifter.",
+      "sport": "weightlifting",
+      "source": "iwf_records",
+      "source_ref": "https://iwf.sport/results/robi-points/ (page reachable; body is a nav shell, table loads client-side)",
+      "bet_relevance": "The correct axis for any cross-category market (best lifter of the meet, nation markets).",
+      "caveat": "Robi is anchored to the WORLD RECORD in the category - and in the new categories most world records are synthetic 'World Standard' values, not human performances (see wl_world_record_standard). So Robi in the current category set is anchored to a committee decision, not to a lift. Handle with care."
+    },
+    {
+      "id": "wl_world_record_standard",
+      "name": "World record vs 'World Standard' placeholder",
+      "definition": "After the 2025 category reorganisation the IWF seeded the new categories with minimum qualifying standards rather than carrying records across.",
+      "sport": "weightlifting",
+      "source": "iwf_records",
+      "source_ref": "https://iwf.sport/results/world-records/",
+      "bet_relevance": "Directly settles 'will a world record be set' markets and corrupts any 'distance from the record' feature.",
+      "caveat": "VERIFIED BY BODY: the 60 kg snatch record reads 'Record: 141 kg / World Standard / Born: Jun 01, 2025 / --- / Event Place & Date: Jun 01, 2025 - World Standard'. There is no athlete and no meet - it is a threshold with a date. Real names appear only where someone has already beaten the standard (e.g. PANG Un Chol 174 kg C&J, HE Yueji 329 kg total). Consequence: 'world record broken' is near-trivial early in a category cycle and the base rate is nothing like the historical one."
+    },
+    {
+      "id": "sh_qualification_score",
+      "name": "Qualification score",
+      "definition": "Score over the qualification course of fire - e.g. 60 shots in 6 series of 10 for 10m Air Rifle, scored decimal or full-ring depending on event and championship level.",
+      "sport": "shooting",
+      "source": "issf_resultpdf",
+      "source_ref": "Q-prefixed result PDF, e.g. Q100000IA1801261405.1.ARM.0.001.pdf",
+      "bet_relevance": "The best available measure of raw shooting quality and the input to 'to qualify for the final'.",
+      "caveat": "VERIFIED BY BODY and it is on a COMPLETELY DIFFERENT SCALE from the final. Verified qualification: winner 635.7 over six series (105.9/106.3/106.5/104.9/105.6/106.5). Verified final at the same match: winner 252.7. Any store that puts both in one 'score' column is unusable."
+    },
+    {
+      "id": "sh_series_consistency",
+      "name": "Series-to-series standard deviation in qualification",
+      "definition": "Dispersion across the six 10-shot series of a qualification, not just the total.",
+      "sport": "shooting",
+      "source": "issf_resultpdf",
+      "source_ref": "the six per-series columns on the Q PDF",
+      "bet_relevance": "Consistency predicts finals performance better than the total does, because the final is a short 24-shot sprint where one 9.4 ends you. Verified example of the difference: the qualification winner Ulbrich ranged 104.9-106.5 (1.6 spread) while KNESPL ranged 92.1-99.5 (7.4 spread) - two entirely different risk profiles.",
+      "caveat": "Requires parsing the PDF; the ISSF publishes per-series columns but not a dispersion statistic."
+    },
+    {
+      "id": "sh_final_score",
+      "name": "Final score (start-from-zero, elimination format)",
+      "definition": "Score accumulated in the 8-athlete final, which begins at zero and runs to a maximum of 24 shots for the last two athletes.",
+      "sport": "shooting",
+      "source": "issf_resultpdf",
+      "source_ref": "F-prefixed result PDF, e.g. F100000IA1801261645.1.ARM.0.001.pdf",
+      "bet_relevance": "This is what medals settle on. Nothing carries over from qualification.",
+      "caveat": "VERIFIED BY BODY, and the elimination structure is visible in the shot counts: 8th place stopped at 121.6 (12 shots), 7th 144.9 (14), 6th 165.8 (16), 5th 187.0 (18), 4th 208.1 (20), 3rd 230.0 (22), and only 1st and 2nd reached 24 shots (252.7 and 251.5). Lower-placed finalists are not 'losing', they are being switched off - their totals are mechanically incomparable to the leaders'."
+    },
+    {
+      "id": "sh_qual_to_final_conversion",
+      "name": "Qualification-to-final conversion rate",
+      "definition": "How often an athlete who reaches a final converts it into a medal, relative to their qualification seed.",
+      "sport": "shooting",
+      "source": "issf_resultpdf",
+      "source_ref": "join Q and F PDFs by athlete across a season",
+      "bet_relevance": "The highest-value derived stat in shooting. Because the final restarts at zero, qualification seed carries almost no mechanical advantage - it only buys entry. Some athletes are systematically better in the 50-second single-shot format than in the 75-minute qualification.",
+      "caveat": "Verified as constructible (both PDFs exist per event, with consistent naming), but it is a build, not a feed."
+    },
+    {
+      "id": "sh_rpo_status",
+      "name": "RPO (results/rank-position-only) entry status",
+      "definition": "An entry status under which an athlete shoots and is scored but is NOT eligible to advance to the final.",
+      "sport": "shooting",
+      "source": "issf_resultpdf",
+      "source_ref": "Remarks column on the Q PDF: values observed are 'Q' and 'RPO'",
+      "bet_relevance": "It breaks the assumption that the top 8 in qualification make the final. Get this wrong and every 'to reach the final' price is wrong.",
+      "caveat": "VERIFIED BY BODY at the 2026 Ruse Grand Prix 10m Air Rifle Men: qualification ranks 4 (OHLENBURGER 632.1) and 8 (MIKULJAN 630.2) were marked RPO and did NOT appear in the final, while ranks 9 (ROSSITER) and 10 (OVIEDO) were marked Q and DID. The eight names in the final PDF are exactly the eight 'Q' rows, not the top eight rows. The precise eligibility rule behind RPO was not confirmed - see open_questions."
+    },
+    {
+      "id": "sh_world_ranking_points",
+      "name": "ISSF world ranking points",
+      "definition": "Rolling ranking points per athlete per event, published monthly.",
+      "sport": "shooting",
+      "source": "issf_worldranking",
+      "source_ref": "https://www.issf-sports.org/competitions/worldranking - 1.05 MB SSR page plus downloadable monthly XLSX",
+      "bet_relevance": "The cleanest single strength prior for outright and head-to-head pricing, and it is per-EVENT (an air rifle ranking and a 3-position ranking are separate), which matches how markets are framed.",
+      "caveat": "VERIFIED BY BODY (Version 01.07.2026; e.g. LINDGREN Victor SWE #1 with 6775 points in 10m Air Rifle Men; DUESTAD Jeanette Hegg NOR #1 with 7440 in 50m Rifle 3 Positions Women). The site also publishes 'ISSF Ranking System Version 2026-2028.pdf' and per-month XLSX back to 2025 - so the ranking FORMULA changes between quads and historical points are not on the same scale as current ones."
+    },
+    {
+      "id": "sh_record_proximity",
+      "name": "Distance from world record - by stage",
+      "definition": "How close an athlete's scores sit to the world record, where WR (final) and QWR (qualification) are separate records.",
+      "sport": "shooting",
+      "source": "issf_records",
+      "source_ref": "https://www.issf-sports.org/competitions/records",
+      "bet_relevance": "Feeds record markets and gives a ceiling estimate for a field.",
+      "caveat": "VERIFIED BY BODY that the ISSF maintains FIVE parallel record types per event: WR (final), QWR (qualification), OR (Olympic final), QOR (Olympic qualification), WR T (team). Example 10m Air Rifle Men: WR 255.0 (SOLLAZZO, 2025) vs QWR 637.9 (SHENG Lihao, 2023). Comparing a score to the wrong record type is a guaranteed error."
+    },
+    {
+      "id": "sh_discipline_specialism",
+      "name": "Discipline (rifle / pistol / shotgun) and event specialism",
+      "definition": "Which of the ~15 ISSF events an athlete actually contests. Rifle, pistol and shotgun are effectively different sports.",
+      "sport": "shooting",
+      "source": "issf_worldranking",
+      "source_ref": "rankings are published per event, per gender",
+      "bet_relevance": "Prevents the classic error of treating 'a shooter' as a single rating. A 10m Air Rifle specialist and a 50m 3-Position specialist overlap; a Trap shooter and either of them do not.",
+      "caveat": "Trap and Skeet finals use hit/miss scoring on a completely different scale again (25m Rapid Fire Pistol final is also hit/miss, max 40) - so 'final score' is not one column across shooting either."
+    },
+    {
+      "id": "sail_series_points",
+      "name": "Fleet-race series points (Low Point)",
+      "definition": "Points per race equal to finishing position (1st = 1 point), summed across the series; lowest total wins.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/raceResult - fields placing, averagePoints, crewPoints, awardPlacing",
+      "bet_relevance": "The core of every sailing market. Sailing is not won by winning races, it is won by never finishing deep.",
+      "caveat": "VERIFIED BY BODY: ~1,792,000 raceResult rows are reachable (17,920 pages at 100/page). Note the scoring is INVERTED relative to every other sport in this file - low is good - so any generic 'higher score wins' ranking code must be special-cased."
+    },
+    {
+      "id": "sail_discards",
+      "name": "Discards (drop-worst)",
+      "definition": "A regatta's sailing instructions allow the worst N race scores to be excluded once a threshold number of races is completed.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/raceResult field discarded, values 'Yes' / 'No' / 'N' / null",
+      "bet_relevance": "Discards are why a sailor can post a 20th and lose nothing, and why leaderboards can INVERT the moment a discard activates. Pricing a regatta without modelling the discard threshold is modelling a different sport.",
+      "caveat": "VERIFIED BY BODY: sampled 400 raceResult rows across four pages - 255 'No', 53 'Yes', 7 'N', 85 null; i.e. roughly 13% of scored races carry a discard flag, consistent with one drop per ~8-race series. The 'N' vs 'No' vs null inconsistency is a real data-cleaning hazard: three encodings for what is probably two states."
+    },
+    {
+      "id": "sail_medal_race",
+      "name": "Medal race flag and points multiplier",
+      "definition": "A final race for the top boats, scored at a multiple of a normal race and typically not discardable.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/race - fields medalRace (0/1), multiplier, name",
+      "bet_relevance": "Compresses a whole regatta into one race and is the main source of late leaderboard inversions. Any 'to win the regatta' price must be conditioned on whether the medal race has run.",
+      "caveat": "VERIFIED BY BODY that the flag exists and is populated: a Tokyo 2020 record returned name 'Medal Race', number 13, medalRace 1, area 'Enoshima'. The multiplier field was null on that record, so the DOUBLE-POINTS value itself was NOT verified from this feed - the flag is trustworthy, the multiplier is not yet."
+    },
+    {
+      "id": "sail_finish_codes",
+      "name": "Finish codes (DNS, DNF, DNC, OCS, UFD, BFD, DSQ, DNE, RET, RDG)",
+      "definition": "Non-finish and penalty codes, each with its own scoring consequence; some are discardable and some (notably DNE) are not.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/raceResult field finishCode",
+      "bet_relevance": "A penalty score is typically worse than last place, so one OCS can be worth more damage than three bad races - and if it is non-discardable it cannot be repaired.",
+      "caveat": "FIELD EXISTS BUT WAS EMPTY IN EVERY ROW SAMPLED (400/400 blank). This is a verify-by-body catch: the schema promises finish codes, the payload does not deliver them in the sampled range. Do not build settlement logic on this field without re-sampling recent regattas."
+    },
+    {
+      "id": "sail_wind_specialism",
+      "name": "Wind-condition specialism (light-air vs heavy-air sailor)",
+      "definition": "Systematic difference in a sailor's finishing positions between light and strong breeze - largely a crew-weight and technique effect, and one of the most real edges in the sport.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/race fields windSpeed, windDirection, temperature, humidity",
+      "bet_relevance": "Would be the highest-value sailing feature if it were populated: join per-race wind to per-race placing and you get a conditional strength curve instead of a single rating.",
+      "caveat": "NOT MODELLABLE FROM THIS FEED. VERIFIED BY BODY: sampled 461 races sorted by start date across the whole range - windSpeed populated in 0 (0%), temperature in 6 (1%), area in 88 (19%). The wind fields are declared in the schema and empty in practice. This is exactly the failure mode the project's verification rule exists to catch: a 200, a valid schema, a real field name, and no data. Wind specialism must come from an external marine-weather join keyed on venue and date, or not at all."
+    },
+    {
+      "id": "sail_world_ranking",
+      "name": "World Sailing world ranking (points, events counted, previous rank)",
+      "definition": "Per-class ranking with points, number of counting events and previous position.",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/ranking - fields rankPosition, rankPoints, rankPrevious, rankEventsNumber, rankEventsS3Key",
+      "bet_relevance": "The strength prior for outrights and head-to-heads, per boat class.",
+      "caveat": "VERIFIED BY BODY: ~950,000 ranking rows (190,594 pages at 5/page), each joinable to sailor, primaryCountry and rankingReference.boatClass, filtered by rankingReference.status='final' and a rankDate. rankEventsS3Key resolves to a CloudFront JSON that itemises the contributing regattas with position, points, a used:true/false flag and a human-readable 'calculation' string - verified on Xavier Rohart (FRAXR1), Star class."
+    },
+    {
+      "id": "sail_boat_class",
+      "name": "Boat class / equipment",
+      "definition": "The one-design class sailed (ILCA 6/7, 470, 49er, 49erFX, Nacra 17, iQFoil, Formula Kite).",
+      "sport": "sailing",
+      "source": "sailing_datafeed",
+      "source_ref": "/stats/api/boatClass - carries numberOfCrew, hullLength, optimalCrewWeight, yearDesigned",
+      "bet_relevance": "Ratings do not port across classes. optimalCrewWeight in particular is the bridge to wind specialism: heavy crews in light air is the classic mismatch.",
+      "caveat": "The Olympic class list is CHANGED between Games (RS:X replaced by iQFoil, Finn dropped, Formula Kite added) - the sitemap still exposes finnrankings, rsxmrankings, tornadorankings and ynglingrankings, all dead classes. Filter to the current Olympic set or you will rank athletes in events that no longer exist."
+    },
+    {
+      "id": "surf_heat_score",
+      "name": "Heat score (best two waves)",
+      "definition": "Each wave is scored 0.1-10.0 by a judging panel; a surfer's heat score is the sum of their best TWO waves, maximum 20.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "Surfing at the 2024 Summer Olympics - Men's shortboard, 'Competition format'",
+      "bet_relevance": "The unit of every surfing market. Two-wave scoring means a surfer can catch fifteen waves and be beaten by someone who caught two.",
+      "caveat": "VERIFIED BY BODY at Olympic level: wave scores 0.1-10, best two count, heat length 25-40 minutes and a maximum of 25 waves per surfer, both set by the technical director ON THE DAY. The judging criteria are difficulty of manoeuvres, innovation and progression, variety, combination, speed, power and flow - i.e. entirely subjective, with no objective anchor anywhere in the scoring."
+    },
+    {
+      "id": "surf_judging_panel",
+      "name": "Judging panel composition",
+      "definition": "Who scores the heat and how scores are trimmed.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "same page, 'Judges' section",
+      "bet_relevance": "Panel composition is a real source of variance and of controversy; judge nationality effects are a live issue in the sport.",
+      "caveat": "VERIFIED: Paris 2024 used two head judges, two PRIORITY judges and seven regular judges. The same page records that judge Benjamin Lowe was REMOVED from the panel on 1 August 2024 after posting a photo with an Australian competitor - so panel composition is not even stable within a single event."
+    },
+    {
+      "id": "surf_priority",
+      "name": "Priority",
+      "definition": "The rule set governing who has the right to the next wave; the surfer with priority may take any wave they want and a non-priority surfer who interferes is penalised.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "priority judges confirmed as a distinct role on the Olympic panel; the full priority rule text was NOT retrieved (WSL rulebook is on a robots-disallowed domain)",
+      "bet_relevance": "Priority is the tactical core of a head-to-head heat and the main mechanism by which a leading surfer closes out a heat - a surfer needing a big score with no priority and five minutes left is in far worse shape than the raw score gap suggests.",
+      "caveat": "PARTIALLY VERIFIED ONLY. The existence of dedicated priority judges is verified; the detailed rules (how priority is gained, lost, and what an interference costs) come from the WSL rulebook, which sits on worldsurfleague.com and is ROBOTS-DISALLOWED TO US BY NAME. Do not code interference penalties from memory."
+    },
+    {
+      "id": "surf_break_specialism",
+      "name": "Break and wave-type specialism",
+      "definition": "Whether a surfer performs at heavy barrelling reef breaks (Pipeline, Teahupo'o, Cloudbreak) or at high-performance beach/point breaks (Lower Trestles, Snapper Rocks), plus goofy vs regular footing against left- and right-breaking waves.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "2026 World Surf League - schedule and venue list",
+      "bet_relevance": "The largest single edge in surfing and the one the market prices least well. Barrel riders and aerial surfers are close to non-overlapping populations.",
+      "caveat": "The 2026 CT venue list is verified (Bells Beach, Snapper Rocks, Margaret River, Portugal, Saquarema, Cloudbreak, Teahupo'o, Lower Trestles, Punta Roca, Abu Dhabi wave pool, Pipeline) and it deliberately spans 'barrelling reef breaks' and 'performance-oriented locations'. But the PER-SURFER, PER-BREAK RESULT HISTORY needed to quantify specialism lives on worldsurfleague.com, which we may not fetch. This is the binding constraint on modelling surfing."
+    },
+    {
+      "id": "surf_season_points",
+      "name": "Season championship points (best N of M)",
+      "definition": "Points accumulated across the tour; the title is decided on a subset of best results, not the raw sum.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "2026 World Surf League",
+      "bet_relevance": "Directly settles the outright world title market - and the 2026 rules changed what that market even means.",
+      "caveat": "VERIFIED BY BODY and this is a 2026-specific trap: the WSL Finals playoff has been ABOLISHED for 2026; the title returns to a season-long points system. Surfers carry their best 7 of 9 regular-season results forward, and the FINAL SEASON RANKING IS BEST 9 OF 12. The Pipe Masters is the 12th event and awards 15,000 points, 1.5x a standard CT event. Any model or prior trained on 2021-2025 assumes a one-day 5-surfer playoff decides the title; for 2026 that is simply wrong."
+    },
+    {
+      "id": "surf_seeding_and_field",
+      "name": "Seeding, field size and qualifying-round structure",
+      "definition": "Who is in the draw, at what seed, and which round they enter.",
+      "sport": "surfing",
+      "source": "wikipedia_api",
+      "source_ref": "2026 World Surf League",
+      "bet_relevance": "Determines the number of heats a surfer must win, which is the whole of an outright price.",
+      "caveat": "VERIFIED for 2026: 36 men and 24 women for the first nine events, cut to 24 men (top 22 + 2 wildcards) and 16 women (top 14 + 2 wildcards) for three postseason events, then the FULL original field rejoins for the final Pipe Masters. Men seeded 29-36 and women seeded 9-24 go through a qualifying round; the rest enter at round two. There is NO mid-season cut in 2026 for the first time in five years."
+    },
+    {
+      "id": "surf_condition_dependence",
+      "name": "Wave and weather conditions at the venue",
+      "definition": "Swell size, direction, period, tide and wind at the break during the competition window.",
+      "sport": "surfing",
+      "source": "unsourced_domain_knowledge",
+      "source_ref": "Surfline is the standard free-ish forecast source but its /api path is robots-disallowed to all agents",
+      "bet_relevance": "Conditions decide WHETHER the event runs at all, and they decide WHICH surfer the break rewards - big Teahupo'o rewards a completely different skill set from small Teahupo'o.",
+      "caveat": "NOT AVAILABLE from a verified free feed. surfline.com/robots.txt disallows /api for User-agent: * (we are not named individually, but the API path is closed to everyone). Marine forecast would have to come from an open meteorological source and joined by venue coordinates."
+    },
+    {
+      "id": "xs_olympic_history",
+      "name": "Historical Olympic results (all five sports)",
+      "definition": "Complete Olympic result archive with athletes, nations, marks and placings.",
+      "sport": "all",
+      "source": "olympedia",
+      "source_ref": "http://www.olympedia.org/results/{id}",
+      "bet_relevance": "The only single source covering all five sports on one schema; the right backstop for nation/medal-count markets and for base rates that federation feeds do not go back far enough to support.",
+      "caveat": "VERIFIED BY BODY (a 2000 Sydney judo result page returned real structured content). robots.txt sets Crawl-delay: 10 with no Disallow, so it is permitted but SLOW - budget one request per 10 seconds and cache aggressively. Quadrennial only, so it is a prior, not a form guide."
+    },
+    {
+      "id": "xs_nation_strength",
+      "name": "Nation strength and quota structure",
+      "definition": "How many athletes a nation can enter, and its historical medal share, per sport.",
+      "sport": "all",
+      "source": "issf_competitions",
+      "source_ref": "ISSF publishes an Olympic Qualification Tracker with quota places by nation; World Aquatics and IWF publish qualification systems per Games",
+      "bet_relevance": "The direct driver of nation and medal-count markets, and a hard constraint that caps them: a nation that holds two quota places cannot win three medals in an event.",
+      "caveat": "Quota rules also cap FINALS entry in some formats and are the likeliest explanation for the RPO status observed in shooting. The ISSF tracker path was seen in the site's link graph (/competitions/olympic-qualification-tracker/quota-place-by-nation-and-number) but its body was NOT fetched in this pass."
+    },
+    {
+      "id": "xs_schedule_stability",
+      "name": "Schedule stability / completion risk",
+      "definition": "Probability that an event runs on its scheduled day at all, as opposed to being postponed, moved, shortened or abandoned.",
+      "sport": "all",
+      "source": "wikipedia_api",
+      "source_ref": "Surfing at the 2024 Summer Olympics - Men's shortboard, 'Schedule'; 2026 World Surf League",
+      "bet_relevance": "It is not a nuisance parameter, it is a first-class risk in surfing and sailing and it determines whether a market voids or settles.",
+      "caveat": "VERIFIED WITH THREE CONCRETE CASES. (1) Paris 2024 surfing was scheduled 27-30 July with a 5-day contingency to 5 August; weather cancelled the women's round 3 on 29 July, competition was called off again on 3 and 4 August, and the finals eventually ran on 5 August - six days past the original end date, using the entire contingency window. (2) In July 2026 the WSL added an EXTRA tour event specifically to guarantee 12 events could be delivered in case the Surf Abu Dhabi Pro could not run because of the 2026 Iran war. (3) On 25 May 2026 the final day of the WSL New Zealand event was halted after a photographer was attacked by an unidentified sea creature. Sailing carries the same class of risk from insufficient or excessive wind."
+    }
+  ],
+
+  "verified": [
+    {
+      "id": "worldaquatics_api",
+      "url": "https://api.worldaquatics.com/fina/rankings/swimming?gender=M&distance=100&stroke=FREESTYLE&poolConfiguration=LCM&year=2026&pageSize=5",
+      "auth": "none",
+      "verified": true,
+      "coverage": "THE swimming source. Undocumented but fully open JSON. Every ranking row carries: rank, time, finaPoints, pool (0=LCM/1=SCM), disciplineName, fullName/firstName/lastName, personId, resultId, resultRef, eventId, eventName, eventCity, eventCountryCode, resultDate, athleteResultAge, dateOfBirth, yearOfBirth, participantCountryCode/Name, clubName, medalTag, standard, tags, heatId, splitId, disciplineGroupId. Query echo confirms filters for year, poolConfiguration, gender, countryId, personId, eventTypeIds, timesMode, startDate/endDate, topN, split, standard.",
+      "note": "VERIFIED BY BODY - parsed the JSON and read athlete names and times, not the status code. LCM query returned totalRowCount 50321 with leader KORNEV Egor 46.96 (964 pts); the identical SCM query returned totalRowCount 3884 with leader D'AMBROSIO Carlos 45.68 (945 pts) - i.e. the faster raw time scores fewer points, which is the LCM/SCM trap in one line. Two further traps found by reading the payload: (1) the rankings list ALL qualifying swims, not one per athlete - KORNEV occupies ranks 1, 2 and 5 of the LCM top five - so 'top N rows' is not 'top N athletes'; (2) sibling endpoints exist and are healthy: /fina/competitions returns 4301 competitions paged, /fina/competitions/{id}/events returns the full phase tree (Tokyo 2020 swimming: 35 disciplines, each with a HeatList of Phase=Heats/Semifinals/Finals plus ResultStatus and a free-text Comment - one of which documents the 50 Fly semifinal tie being resolved by the two swimmers agreeing between themselves rather than by swim-off). robots.txt at www.worldaquatics.com is 'User-agent: * / Disallow:' i.e. fully permissive - read and confirmed."
+    },
+    {
+      "id": "worldaquatics_rulebook",
+      "url": "https://resources.fina.org/fina/document/2026/02/18/e6815ecc-06d9-4f0b-98e9-4c441cf5e6a3/2026-02-18_World-Aquatics_CR-Final.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "World Aquatics Competition Regulations, in force from February 2026. 558 pages, 40 MB, 1,547,185 characters of extracted text. Part Two is the pool swimming rulebook.",
+      "note": "VERIFIED BY BODY - downloaded, text-extracted with pypdf and rules read verbatim. Key articles captured: 4.4 ('Any Athlete who initiates a start before the signal may be disqualified') and 4.4.1 ('If the starting signal is given before the disqualification is declared, the race will continue and the Athlete will be disqualified at the completion of the race'); 2.3.6 (referee DQs for initiating the start early when observed and confirmed by both Starter and Referee, reviewing Automatic Officiating Equipment footage); 11.1.4-11.1.5 (times recorded AND displayed to 1/100 second only); Article 12 (separate 50m-pool and 25m-pool world record lists, with events such as 100m IM and 4x50 relays existing ONLY in the 25m list); 12.3.4 (a relay lead-off leg can set an individual world record, and it survives the relay team being disqualified afterwards); 3.4.2-3.4.4 (swim-offs, and withdrawal from a final promoting the fastest non-qualifier with a full re-seed). Reached via www.worldaquatics.com/rules -> /rules/competition-regulations, both permitted by robots."
+    },
+    {
+      "id": "iwf_results",
+      "url": "https://iwf.sport/results/results-by-events/?event_id=692",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "IWF event results by event_id. Columns: Rank, Name, Nation, Born, B.weight (2dp), Group (A/B session), Snatch, CI&Jerk, Total. The index page /results/results-by-events/ enumerates event_id values and offers filters by year (2015-2027), event type (Olympic Games, World Championships, World Cup, Continental Championships, Grand Prix, Universiade, ...) and age group (Youth/Junior/Senior).",
+      "note": "VERIFIED BY BODY - fetched the 2026 European Championships page (4,057,210 bytes) and parsed it: 622 result records, 311 distinct athletes, 32 category headers. Current categories confirmed as MEN 60/65/71/79/88/94/110/110+ and WOMEN 48/53/58/63/69/77/86/86+. 31 athletes (10.0%) finished with Total '---' and Rank '---'; 44 records show Snatch '---' and 40 show CI&Jerk '---'. Decisive verified case: BERDELIDZE Goderdzi (GEO, B.weight 59.47, Group A) snatched 125 kg - more than the gold medallist RUSEV (120) and more than any other lifter in the 60 kg category - then failed all three clean and jerks and finished UNRANKED with no total. robots.txt at iwf.sport disallows only /wp-admin/ - read and confirmed."
+    },
+    {
+      "id": "iwf_records",
+      "url": "https://iwf.sport/results/world-records/",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "Current-category world records for snatch, C&J and total, per bodyweight category, with athlete, nation, birth date and the meet where it was set.",
+      "note": "VERIFIED BY BODY and it produced the sharpest weightlifting finding in this file: most records in the NEW categories are not performances at all. The 60 kg snatch record reads 'Record: 141 kg / World Standard / Born: Jun 01, 2025 / --- / Jun 01, 2025 - World Standard', and the 65 kg snatch and 60 kg total are the same. Real athletes appear only where the standard has already been beaten (PANG Un Chol PRK 174 kg C&J at Gandhinagar 11 May 2026; HE Yueji CHN 183 kg C&J and 329 kg total 13 May 2026; HE Yueji 160 kg snatch at Forde 5 Oct 2025). Consequence: 'world record to be broken' has an artificially high base rate in this category cycle, and Robi points are anchored to committee-set thresholds rather than human performances."
+    },
+    {
+      "id": "iwf_archives",
+      "url": "https://iwf.sport/results/results-by-events/results-by-events-2018-2025/ and .../results-by-events-upto2018/",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "Two additional, era-separated result archives, each with its own Results-by-Events, Ranking List and World Records sections: 'Old Bodyweight Categories / 2018-2025' and 'Old Bodyweight Categories / Up to 2018'. Parallel paths exist for /results/ranking-list/ranking-list-2018-2025/, /ranking-list-upto2018/, /results/world-records/world-records-2018-2025/ and /world-records-upto2018/.",
+      "note": "VERIFIED BY BODY from the IWF's own navigation, extracted from the results page link graph. This is the primary-source proof of the category reorganisations: the federation itself refuses to pool the three eras, maintaining THREE separate world-record lists. Any scraper that unions these archives is mixing three incompatible category systems and will mis-assign athletes to classes that did not exist when they lifted."
+    },
+    {
+      "id": "issf_resultpdf",
+      "url": "https://backoffice.issf-sports.org/media/resultspdf/2026/3277/{Q|F}{code}.{DISCIPLINE}.0.001.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Per-event official result PDFs, one for Qualification (Q prefix) and one for the Final (F prefix), plus a per-competition 'Results Book' PDF at /media/calendar/{year}/{compId}/completeresult/. Discipline suffixes observed: ARM, ARW, ARMT, APM, APW, APMT. Qualification PDFs carry per-series scores; Final PDFs carry per-shot scores and running totals.",
+      "note": "VERIFIED BY BODY - downloaded and text-extracted two PDFs from the 2026 ISSF Grand Prix 10m in Ruse. QUALIFICATION (10m Air Rifle Men, 29 shooters): six 10-shot series in decimal scoring, winner ULBRICH 105.9/106.3/106.5/104.9/105.6/106.5 = 635.7, Remarks column carrying 'Q' or 'RPO'. FINAL (same event, 8 shooters): winner ULBRICH 252.7 over 24 shots, with the elimination ladder plainly visible in the shot counts (8th 121.6 at 12 shots, 7th 144.9 at 14, 6th 165.8 at 16, 5th 187.0 at 18, 4th 208.1 at 20, 3rd 230.0 at 22, 1st/2nd 252.7/251.5 at 24). Crucially the eight finalists are exactly the eight 'Q' rows and NOT the top eight qualifiers: ranks 4 (OHLENBURGER 632.1) and 8 (MIKULJAN 630.2) were RPO and absent, while ranks 9 and 10 were Q and present. backoffice.issf-sports.org/robots.txt explicitly allows /media/ (it disallows only /bin/, /App_Themes/, /documents/, /flash/) - read and confirmed. www.issf-sports.org has NO robots.txt at all (the path returns a Next.js 404 error page), so no directives restrict us there."
+    },
+    {
+      "id": "issf_rulebook",
+      "url": "https://backoffice.issf-sports.org/getfile.aspx?mod=docf&pane=1&inst=455&file=ISSF-Rule-Book-2026-Edition-2025-Second-Print-07-2026-Effective-1-July-2026.pdf",
+      "auth": "none",
+      "verified": true,
+      "coverage": "ISSF Rule Book, Edition 2025 (Second Print 07/2026), effective 1 July 2026. 504 pages, 8.4 MB, 1,115,519 characters of extracted text. Covers general technical rules, per-discipline rules and the full Finals procedures.",
+      "note": "VERIFIED BY BODY - text-extracted and rules read verbatim. Rule 6.17.1.5: 'Qualification scores entitle an athlete to a place in a Final, but do not carry forward. Scoring in Finals starts from zero (0) in accordance with these rules.' The glossary independently defines Final as 'the best eight athletes in the Qualification have a new (start-from-zero) competition to decide their final ranking and medals'. Also captured: the 10m final ladder (two 5-shot series then 14 single shots, eliminations after 14/16/18/20/22 shots with gold and silver decided at 24); the 50m 3-Position final eliminating TWO athletes at once after the second standing series (30 shots, 8th and 7th together); tie-breaking by additional single shot(s) fired until the tie breaks; a non-reporting finalist recorded as DNS with the first elimination then starting at seventh place; 25m Rapid Fire Pistol finals scored hit/miss with ties broken by additional series; and rule 6.3.3.2, under which qualification is scored in FULL RING values except for a named list of events scored in decimals at ISSF Championships."
+    },
+    {
+      "id": "issf_worldranking",
+      "url": "https://www.issf-sports.org/competitions/worldranking",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "Current world ranking per event and gender, plus a downloadable archive: 'World Ranking 2025.zip' and monthly XLSX files (World Ranking 20260101 through 20260601), plus 'ISSF Ranking System Version 2026 2028.pdf' describing the formula.",
+      "note": "VERIFIED BY BODY - 1,050,204-byte SSR page read, Version 01.07.2026. Sample values: LINDGREN Victor SWE #1 with 6775 points (10m Air Rifle Men); HEGG Jon-Hermann NOR #1 with 6625 (50m Rifle 3 Positions Men); HANCOCK Vincent USA #1 with 5000 (Skeet Men); DUESTAD Jeanette Hegg NOR #1 with 7440 (50m Rifle 3P Women). The monthly XLSX archive makes a point-in-time ranking reconstructible, which matters because the ranking formula is versioned per quad and pre-2026 points are not on the same scale."
+    },
+    {
+      "id": "issf_records",
+      "url": "https://www.issf-sports.org/competitions/records",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "World, Olympic, Junior and Team records per event, Version 12.07.2026.",
+      "note": "VERIFIED BY BODY - 498,329-byte page read. It maintains FIVE parallel record types per event: WR (final), QWR (qualification), OR (Olympic final), QOR (Olympic qualification) and WR T (team), plus junior equivalents. Verified 10m Air Rifle Men: WR 255.0 SOLLAZZO ITA 11.09.2025 vs QWR 637.9 SHENG Lihao CHN 12.05.2023 vs OR 252.2 vs QOR 632.7. This is independent primary-source confirmation that qualification and final are separate scoring universes - the federation keeps separate record books for them."
+    },
+    {
+      "id": "issf_competitions",
+      "url": "https://www.issf-sports.org/competitions and https://www.issf-sports.org/competitions/{id}/results",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "Full calendar filterable by year 2015-2028, per-competition Overview / Schedule / Results / Information tabs, medal standings, and a results tab that links every per-event Qualification and Final PDF. Also exposes /competitions/olympic-qualification-tracker/quota-place-by-nation-and-number.",
+      "note": "VERIFIED BY BODY - competition 3277 (ISSF Grand Prix 10m, Ruse, 14-19 Jan 2026) returned SSR'd medal standings (GER 2-2-1, ESP 1-1, FRA 1-3, ...) and its results tab listed every event with separate Qualification and Final entries and start times. Next.js app; result-document URLs are recoverable from the RSC flight payload with \\u002F unescaping."
+    },
+    {
+      "id": "sailing_datafeed",
+      "url": "https://datafeed.sailing.org/stats/api",
+      "auth": "none",
+      "verified": true,
+      "coverage": "THE sailing source, and the single richest feed found in this research. Open JSON:API-style endpoints with filter/sort/include/paginate: /ranking (~950,000 rows), /raceResult (~1,792,000 rows), /race (~23,600 rows), /sailor, /regatta, /event, /boatClass, /discipline, /organisationType. /ranking rows carry rankPosition, rankPoints, rankPrevious, rankEventsNumber and rankEventsS3Key, and include sailor, sailor.primaryCountry and rankingReference.boatClass. /raceResult rows carry placing, averagePoints, awardPlacing, crewPoints, crewPosition, correctedTime, handicap, carriedWins, defaultWin, finishCode and discarded. /race rows carry medalRace, multiplier, number, flight, stage, area, areaCode, rsc, startDate, localStartTime, protestTimeLimit, windSpeed, windDirection, temperature, humidity.",
+      "note": "VERIFIED BY BODY - discovered by grepping the Nuxt bundle /_nuxt/d3a90cb.js on www.sailing.org for the $axios base URL, then queried directly. datafeed.sailing.org/robots.txt is 'User-agent: * / Disallow:' i.e. fully permissive - read and confirmed. Two honest caveats found only by reading payloads: (1) windSpeed and windDirection are DECLARED AND EMPTY - 0 of 461 races sampled across the whole date range had windSpeed, temperature 1%, area 19% - so wind-condition specialism is NOT modellable from this feed despite the schema promising it; (2) finishCode was blank in all 400 raceResult rows sampled, while discarded WAS populated (255 No / 53 Yes / 7 'N' / 85 null). rankEventsS3Key resolves to an open CloudFront JSON (verified on Xavier Rohart, Star class) itemising each contributing regatta with date, position, points, a used:true/false flag and a human-readable calculation string."
+    },
+    {
+      "id": "wikipedia_api",
+      "url": "https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&format=json&titles=...",
+      "auth": "none",
+      "verified": true,
+      "coverage": "The ONLY usable free source for competitive surfing, and a serviceable cross-check for competition formats in all five sports. Used here to read '2026 World Surf League' (6,889 chars) and 'Surfing at the 2024 Summer Olympics - Men's shortboard' (8,419 chars) in full.",
+      "note": "VERIFIED BY BODY, WITH A UA TRAP WORTH RECORDING. Requesting the API with a ClaudeBot user-agent returned HTTP 200 whose body was the plain-text string 'Too many requests. Please contact bot-traffic@wikimedia.org to discuss unblocking.' - not JSON, not an error status. A descriptive non-ClaudeBot UA returned valid JSON immediately. This is a textbook case for this project's verify-by-body rule: status code 200, payload a block notice. en.wikipedia.org/robots.txt does NOT name Claude, anthropic-ai, CCBot or GPTBot - read and confirmed. LICENCE: Wikipedia text is CC BY-SA 4.0, which is an attribution-and-sharealike obligation if any of it is redistributed."
+    },
+    {
+      "id": "wikidata_sparql",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "verified": true,
+      "coverage": "Structured athlete entities across all five sports - identifiers, nationality, date of birth, occupation, participation, cross-links to federation IDs and Olympedia IDs. Useful as the join table between federation feeds that share no athlete key.",
+      "note": "VERIFIED BY BODY - ran a live SPARQL query (occupation = sport sailor) with Accept: application/sparql-results+json and read the returned bindings (Jaroslav Volf, Ondrej Stepanek, ...). Content type application/sparql-results+json confirmed. LICENCE: Wikidata is CC0, so no attribution obligation, unlike Wikipedia prose."
+    },
+    {
+      "id": "olympedia",
+      "url": "http://www.olympedia.org/results/{id}",
+      "auth": "none (scraping)",
+      "verified": true,
+      "coverage": "Comprehensive historical Olympic results across every sport and every Games, with athlete pages, country pages, medal tables, Olympic records and a built-in head-to-head comparison tool.",
+      "note": "VERIFIED BY BODY - fetched a 2000 Sydney judo result page and read real structured content (event name, Games, discipline, sibling-event navigation). robots.txt is 'User-agent: * / Crawl-delay: 10' with NO Disallow - read and confirmed. Permitted but deliberately slow: honour the 10-second crawl delay and cache. Best single backstop for the two sports whose federation feeds are weakest (surfing and, historically, weightlifting across the category eras)."
+    }
+  ],
+
+  "blocked": [
+    {
+      "id": "swimrankings",
+      "detail": "ROBOTS-DISALLOWED BY NAME - NOT FETCHED. www.swimrankings.net/robots.txt contains an explicit 'User-agent: ClaudeBot' followed by 'Disallow: /' inside a Cloudflare-managed block (alongside Amazonbot, Applebot-Extended, Bytespider, CCBot, Google-Extended, GPTBot, meta-externalagent), AND the file ends with a second bare 'User-agent: * / Disallow: /'. It also sets 'Content-Signal: search=yes, ai-train=no, use=reference' and expressly reserves rights under Article 4 of EU Directive 2019/790. This is a real loss: Swimrankings is the deepest free swimming database for athlete-level historical times, split archives and meet results, and it is exactly what would have filled the split-times and heat-progression gaps in the World Aquatics feed. Confirmed by reading the robots.txt body."
+    },
+    {
+      "id": "worldsurfleague",
+      "detail": "ROBOTS-DISALLOWED BY NAME - NOT FETCHED. www.worldsurfleague.com/robots.txt lists FIVE of our agent names in one grouped block - 'User-agent: anthropic-ai', 'User-agent: Claude-SearchBot', 'User-agent: Claude-User', 'User-agent: Claude-Web', 'User-agent: ClaudeBot' - among ~70 agents, all terminated by a single 'Disallow: /'. Their own athlete, event and tour sitemaps (rss/sitemap_athletes.xml, sitemap_events.xml, sitemap_tours.xml) are advertised in the same file but sit behind that blanket disallow, so they were not fetched either. THIS IS THE DECISIVE CONSTRAINT ON SURFING: heat-by-heat scores, per-wave scores, priority and interference records, per-break result history and the official rulebook all live here and are all off-limits. Everything this file says about surfing therefore comes from Wikipedia, not from the governing body."
+    },
+    {
+      "id": "isasurf",
+      "detail": "CLOUDFLARE INTERSTITIAL - NO USABLE CONTENT. isasurf.org/robots.txt returned HTTP 200 and is permissive (Yoast block with 'User-agent: * / Disallow:'), so robots does NOT block us - but both https://isasurf.org/ and https://isasurf.org/sitemap_index.xml returned HTTP 403 with a 5.4-5.5 KB body whose text is 'Just a moment... Enable JavaScript and cookies to continue', i.e. a Cloudflare proof-of-work challenge. Verified by reading the body, not the status. The International Surfing Association is the Olympic governing body for surfing and would have been the natural substitute for the robots-blocked WSL; it is not available."
+    },
+    {
+      "id": "manage2sail",
+      "detail": "EDGE-BLOCKED. www.manage2sail.com/robots.txt itself returned HTTP 403 with a Microsoft-Azure-Application-Gateway/v2 error page - we could not even read the policy file, let alone regatta results. Since robots could not be read, nothing on the host was fetched. manage2sail is one of the two main regatta-management platforms and hosts entry lists and live series scoring for a large share of European sailing."
+    },
+    {
+      "id": "olympics_com",
+      "detail": "ROBOTS UNREADABLE - NOT FETCHED, ON PRINCIPLE. Four separate attempts to read robots.txt failed: https://www.olympics.com/robots.txt gave 'HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR', and --http1.1 against www.olympics.com, olympics.com and /en/robots.txt all timed out at 20-40s with 0 bytes. Because we could not confirm whether Claude agents are named, the site was not fetched at all. The official Olympic results archive is therefore UNAVAILABLE to this research pass - which matters most for surfing and for cross-sport medal-count markets. Retest from a GitHub Actions runner; the failure looks like a network/edge issue from this environment rather than a policy decision."
+    },
+    {
+      "id": "surfline",
+      "detail": "API PATH DISALLOWED TO EVERYONE. www.surfline.com/robots.txt does NOT name Claude or anthropic-ai (read and confirmed - our agents are absent from a long named-agent list), but the 'User-agent: *' block contains 'Disallow: /api' along with /admin, /account_shared and many others. Surfline is the de facto standard surf-forecast source and its /api is precisely what a wave-condition feature would need. Off-limits under the wildcard rule. Their forecast data is also a paid commercial product, so a licence question would arise even if the path were open."
+    },
+    {
+      "id": "worldsailing_rrs_document",
+      "detail": "NOT RETRIEVED - CLIENT-RENDERED, NO SSR PAYLOAD. The Racing Rules of Sailing is the primary authority for sailing scoring (Low Point system, discard thresholds, non-excludable penalties such as DNE, redress). www.sailing.org robots.txt is permissive (disallows only /wp/wp-admin/), and three candidate pages returned HTTP 200 - /inside-world-sailing/rules-regulations/racing-rules-of-sailing/ (which says only 'The Racing Rules of Sailing has moved page location'), /racing-rules-of-sailing/documents/ and /rules-regulations/racingrules/ - but all three are Nuxt shells whose only PDF links are three dead http://www.olympic.org/common/asp/download_report.asp URLs. The WordPress REST API at /wp-json/ is reachable and exposes a 'sotic-wp-api' namespace, but that namespace has no rules or documents route. CONSEQUENCE: every sailing scoring rule in rules_critical below is marked as inferred from the datafeed's own field semantics rather than read from the RRS, and must be confirmed before it drives settlement logic."
+    },
+    {
+      "id": "omegatiming",
+      "detail": "NOT EXPLORED - NO ROBOTS POLICY TO READ. https://www.omegatiming.com/robots.txt 302-redirects to the site homepage, so no policy file exists; nothing names us, but equally there is nothing to comply with. Omega is the official Olympic timekeeper and publishes the full result documents that contain SWIMMING SPLITS AND REACTION TIMES - the exact data the World Aquatics API did not yield. It was not explored in this pass and is the single highest-value retest for swimming."
+    },
+    {
+      "id": "sapsailing",
+      "detail": "NOT EXPLORED. www.sapsailing.com has no robots.txt (Jetty returns a plain HTTP 404 for /robots.txt - body read and confirmed as a Jetty error page, not a block page). SAP Sailing Analytics carries per-leg tracking, wind data and competitor GPS for many regattas, which would directly fill the empty windSpeed gap in the World Sailing datafeed. Not probed for lack of budget; flagged as a high-value follow-up."
+    },
+    {
+      "id": "espn_and_named_blockers",
+      "detail": "NOT FETCHED, CARRIED FORWARD FROM PRIOR RESEARCH IN THIS REPO. ESPN disallows 'anthropic-ai' by name and was not approached for any of these five sports. Recorded here so a later pass does not waste a fetch rediscovering it."
+    }
+  ],
+
+  "stat_to_bet": {
+    "_ladder_note": "ALL FIVE OF THESE SPORTS ARE FIELD SPORTS BY DEFAULT, NOT TWO-SIDED ONES. A swimming final is 8 outcomes, a weightlifting category is 10-15, a shooting final is 8, an Olympic sailing fleet is 20-40 boats over a multi-day series, and a surfing event is a 24-36 surfer draw. HEAD-TO-HEAD MATCHUPS ARE THE ONLY TWO-OUTCOME MARKET IN THIS FILE AND THEREFORE THE ONLY PLACE A SAFETY LADDER CAN APPLY - the engine/ladder.py idea of walking a fixed direction from aggressive to safe needs a market with a monotone risk axis, and only a head-to-head has one. Everything else (outright, podium/top-3, medal counts, nation markets) is a many-outcome market where 'safer' means only 'more places', which is a different guarantee and is exactly where dead-heat reduction eats the payout. TWO FURTHER WARNINGS SPECIFIC TO THIS FILE: (1) a head-to-head here is only genuinely two-outcome if the book has defined what happens when NEITHER athlete records a result - two weightlifters who both bomb out, two swimmers who are both disqualified, two surfers whose heat is abandoned - and that is a void condition, not a third price, so confirm it before laddering. (2) SURFING IS THE ONE SPORT HERE WITH A NATIVE HEAD-TO-HEAD STRUCTURE: from round two onward every Olympic and WSL heat is two surfers, winner advances, loser out. That makes surfing the most ladder-friendly sport of the five in market STRUCTURE and simultaneously the least modellable in DATA, which is an uncomfortable combination and should be treated as a reason for caution rather than an invitation.",
+    "outright_winner": {
+      "swimming": ["swim_pb_by_event_and_course", "swim_season_best", "swim_world_aquatics_points", "swim_taper_timing", "swim_heat_to_final_progression", "swim_age_curve"],
+      "weightlifting": ["wl_total", "wl_bomb_out_rate", "wl_snatch_best", "wl_cj_best", "wl_bodyweight_category", "wl_attempt_strategy"],
+      "shooting": ["sh_world_ranking_points", "sh_final_score", "sh_qual_to_final_conversion", "sh_series_consistency", "sh_qualification_score"],
+      "sailing": ["sail_world_ranking", "sail_series_points", "sail_discards", "sail_medal_race", "sail_boat_class"],
+      "surfing": ["surf_season_points", "surf_break_specialism", "surf_seeding_and_field", "surf_heat_score", "xs_schedule_stability"]
+    },
+    "podium_top3": {
+      "swimming": ["swim_pb_by_event_and_course", "swim_season_best", "swim_world_aquatics_points", "swim_heat_to_final_progression"],
+      "weightlifting": ["wl_total", "wl_bomb_out_rate", "wl_bodyweight_exact", "wl_bodyweight_category"],
+      "shooting": ["sh_world_ranking_points", "sh_qual_to_final_conversion", "sh_rpo_status", "sh_series_consistency"],
+      "sailing": ["sail_world_ranking", "sail_series_points", "sail_discards", "sail_medal_race"],
+      "surfing": ["surf_season_points", "surf_break_specialism", "surf_seeding_and_field"],
+      "_note": "Podium is the market most exposed to DEAD-HEAT REDUCTION in swimming, because swimming times are recorded to 1/100 second only and genuine ties for a medal place are a recurring event, not a curiosity. Price the tie probability explicitly rather than assuming three distinct medallists."
+    },
+    "head_to_head_matchup": {
+      "swimming": ["swim_pb_by_event_and_course", "swim_splits", "swim_season_best", "swim_heat_to_final_progression", "swim_dq_rate"],
+      "weightlifting": ["wl_total", "wl_bomb_out_rate", "wl_bodyweight_exact", "wl_attempt_strategy"],
+      "shooting": ["sh_qualification_score", "sh_series_consistency", "sh_world_ranking_points", "sh_rpo_status"],
+      "sailing": ["sail_world_ranking", "sail_series_points", "sail_boat_class", "sail_finish_codes"],
+      "surfing": ["surf_break_specialism", "surf_heat_score", "surf_priority", "surf_seeding_and_field"],
+      "_note": "THE ONLY TWO-OUTCOME MARKET IN THIS FILE AND THEREFORE THE ONLY LADDERABLE ONE - see _ladder_note. Three sport-specific cautions. SWIMMING: splits matter more than final times, because a front-half swimmer and a back-half swimmer at identical PBs are not a coin flip over any distance other than the one they both PB'd at. WEIGHTLIFTING: bomb-out risk is asymmetric and is the dominant term - the stronger lifter with the more aggressive opener is often the WORSE head-to-head bet, and the both-bomb-out case must be confirmed as a void. SURFING: the heat itself is the market, so priority and the two-wave rule dominate; a surfer leading by 3 points with priority and four minutes left is far safer than the score gap alone implies."
+    },
+    "medal_counts": {
+      "all": ["xs_nation_strength", "xs_olympic_history", "sh_world_ranking_points", "sail_world_ranking", "wl_bodyweight_category"],
+      "_note": "Hard-capped by quota rules: a nation cannot win more medals in an event than it holds entries, and several of these sports cap entries at two or three per nation per event. Always intersect the statistical projection with the quota ceiling - and note that shooting's RPO status means an entered athlete is not necessarily a medal-eligible athlete."
+    },
+    "nation_markets": {
+      "all": ["xs_nation_strength", "xs_olympic_history", "sh_world_ranking_points", "sail_world_ranking", "swim_world_aquatics_points", "wl_robi_points"],
+      "_note": "Use the cross-category normalisers (World Aquatics points, Robi points, ranking points) rather than raw marks, because a nation market aggregates across events and raw marks are not commensurable across events, categories or courses."
+    },
+    "to_qualify_for_final": {
+      "swimming": ["swim_heat_to_final_progression", "swim_season_best", "swim_pb_by_event_and_course"],
+      "shooting": ["sh_qualification_score", "sh_series_consistency", "sh_rpo_status"],
+      "_note": "Shooting's version of this market is uniquely trap-laden: qualification RANK does not determine final ENTRY because RPO-status shooters are skipped over - verified at Ruse 2026, where qualification ranks 4 and 8 did not advance and ranks 9 and 10 did."
+    },
+    "world_record_broken": {
+      "swimming": ["swim_world_aquatics_points", "swim_pb_by_event_and_course", "swim_splits"],
+      "weightlifting": ["wl_world_record_standard", "wl_total", "wl_snatch_best", "wl_cj_best"],
+      "shooting": ["sh_record_proximity", "sh_final_score", "sh_qualification_score"],
+      "_note": "Three different traps in three sports. SWIMMING: the record must match the COURSE - a short-course world record is a different record book. WEIGHTLIFTING: most current-category records are synthetic 'World Standard' thresholds rather than performances, so the base rate is inflated. SHOOTING: WR, QWR, OR and QOR are four different records and a qualification score can only break QWR/QOR."
+    },
+    "event_completion_and_specials": {
+      "surfing": ["xs_schedule_stability", "surf_condition_dependence"],
+      "sailing": ["xs_schedule_stability", "sail_wind_specialism", "sail_medal_race"],
+      "_note": "Any 'will complete as scheduled' proposition in surfing or sailing should be treated as a weather derivative, not a sports bet, and we currently have NO verified free conditions feed for either (Surfline /api is disallowed; the World Sailing windSpeed field is empty). Do not price these."
+    }
+  },
+
+  "rules_critical": [
+    "LONG COURSE (50m) AND SHORT COURSE (25m) SWIMMING TIMES ARE NOT INTERCHANGEABLE AND MIXING THEM CORRUPTS ANY RANKING. This is not a convention, it is the federation's own structure: World Aquatics Competition Regulations Article 12 maintains SEPARATE world record lists for 50m pools and 25m pools, and the 25m list contains events with no 50m equivalent at all (100m Individual Medley, 4x50 Freestyle Relay, 4x50 Medley Relay, 4x50 Mixed relays). Verified live on the API: the 2026 Men's 100 Free LCM leader swam 46.96 for 964 World Aquatics points while the SCM leader swam 45.68 for 945 points - the short-course swim is 1.28 seconds FASTER in raw seconds and a WORSE performance. Short course is faster because a 25m pool gives twice as many turns and twice as much underwater dolphin-kick per 100m, and the gap is not a constant: it scales with the number of turns, so it is largest in breaststroke and in longer events and smallest in the 50s. Key every stored time on (event, COURSE) and convert across courses only via World Aquatics points, never by a fixed offset.",
+
+    "A SWIMMER CAN BE DISQUALIFIED AFTER APPARENTLY WINNING, AND THE RACE IS NOT RECALLED. World Aquatics CR Article 4.4 reads 'Any Athlete who initiates a start before the signal may be disqualified', and 4.4.1 is explicit that 'If the starting signal is given before the disqualification is declared, the race will continue and the Athlete will be disqualified at the completion of the race.' Under this one-start rule the field swims the whole race, the offender touches first, the scoreboard shows them first, and they are then removed. The same after-the-fact removal applies to illegal turns, illegal touches and stroke infringements, judged by Inspectors of Turns and confirmed by the Referee (Art 2.3.7). DQ IS NOT A SIMPLE LOSS: everyone below the disqualified swimmer is PROMOTED, so a DQ moves the whole finishing order, which settles podium and head-to-head markets differently from a plain defeat and can turn a losing head-to-head into a winning one without the other swimmer doing anything. Confirm with Betwinner whether an initially-announced result or the official post-protest result governs settlement.",
+
+    "SWIMMING IS TIMED TO 1/100 SECOND ONLY, SO DEAD HEATS ARE STRUCTURAL, NOT FREAK EVENTS. CR 11.1.4 and 11.1.5 require times to be RECORDED and DISPLAYED to one hundredth of a second; the equipment can resolve finer but the rules forbid using it, a deliberate choice dating to the pool-construction tolerance argument. Exact ties for a medal place therefore recur, and both swimmers are awarded the same place with no tie-break. For podium and head-to-head markets this is a real probability mass, not a rounding artefact, and it is where dead-heat reduction bites. CR 12.3.5.1 confirms the same logic for records: a time EQUAL to the existing world record to 1/100 is also recognised as a world record.",
+
+    "WEIGHTLIFTING IS DECIDED BY ATTEMPTS ACTUALLY MADE - A LIFTER WHO BOMBS OUT SCORES NOTHING AT ALL DESPITE BEING THE STRONGEST IN THE FIELD. A competition is six attempts, three snatch and three clean-and-jerk. A total exists only if at least one snatch AND at least one C&J is successful; fail all three of either lift and there is no total, no rank, and no placing - not last place, NO place. VERIFIED BY BODY at the 2026 European Championships: 31 of 311 athletes (10.0%) finished with Total '---' and Rank '---'. The decisive case: BERDELIDZE Goderdzi (GEO) snatched 125 kg in the 60 kg category - more than the gold medallist's 120 kg and the best snatch in the entire field - then missed all three clean and jerks and finished UNRANKED, beaten by every lifter who made a total, including one who totalled 220. A model that ranks by best lifts would have made him favourite and would have lost. Treat P(no total) as a first-class parameter of every weightlifting price, and require the book's rule for a head-to-head in which BOTH lifters bomb out.",
+
+    "SURFING AND SAILING ARE CONDITION-DEPENDENT AND 'WILL BE COMPLETED AS SCHEDULED' IS AN UNSAFE ASSUMPTION. These events are held in a waiting period, not on a fixed date: organisers call each day on or off based on swell and wind, and both the running order and the finish date move. VERIFIED WITH THREE REAL CASES. (1) Olympic surfing at Teahupo'o in 2024 was scheduled for 27-30 July with a 5-day contingency to 5 August; dangerous weather on 29 July cancelled the women's round 3 mid-competition, conditions stayed unsurfable, competition was called off again on 3 and 4 August, and the finals were eventually held on 5 August - the entire contingency window was consumed and the event finished six days after its original last scheduled day. (2) In July 2026 the WSL ADDED a twelfth tour event solely to guarantee 12 events could be delivered if the Surf Abu Dhabi Pro could not run because of the 2026 Iran war. (3) On 25 May 2026 the final day of the WSL New Zealand event was halted after a photographer was attacked by an unidentified sea creature. Sailing carries the mirror-image risk: too little wind and races are abandoned, too much and they are postponed, and a series can be declared valid on fewer races than scheduled - which changes the discard count and can invert the leaderboard. Every market on these two sports needs an explicit postponement/abandonment/shortening clause read from Betwinner's own terms, and any in-play or same-day assumption should be treated as unsafe.",
+
+    "SHOOTING FINALS START FROM ZERO - QUALIFICATION SCORES BUY ENTRY AND NOTHING ELSE. ISSF Rule Book Edition 2025 (Second Print 07/2026), rule 6.17.1.5, verbatim: 'Qualification scores entitle an athlete to a place in a Final, but do not carry forward. Scoring in Finals starts from zero (0).' The glossary says the same: the best eight qualifiers contest 'a new (start-from-zero) competition'. Verified in the result documents: the same shooter's qualification score was 635.7 and his final score was 252.7. A shooter who qualifies eighth by 0.1 has exactly the same starting position as the shooter who qualified first by six points. Any model that carries qualification form into the final as a score advantage rather than as a skill prior is wrong by construction, and any store with a single 'score' column for both stages is unusable.",
+
+    "SHOOTING FINALS ARE PROGRESSIVE-ELIMINATION, SO FINAL SCORES ARE NOT COMPARABLE BETWEEN PLACES. In the 10m final, eight athletes fire two 5-shot series, then single shots, with the lowest-ranked eliminated after every second shot: 8th place stops at 12 shots, 7th at 14, then 6th at 16, 5th at 18, 4th at 20, 3rd at 22, and only the last two reach 24. Verified in the Ruse 2026 final PDF: 121.6 / 144.9 / 165.8 / 187.0 / 208.1 / 230.0 / 251.5 / 252.7 from 8th up to 1st. The lower finishers did not shoot badly over 24 shots, they were switched off - so 'points behind the winner' is meaningless as a form measure and any per-shot average must be computed over the shots actually fired. The 50m 3-Position final differs again, eliminating TWO athletes simultaneously after the second standing series (30 shots, 8th and 7th together). Ties for an elimination place are broken by additional single tie-breaking shots fired until the tie breaks - so a head-to-head can be decided by a shoot-off, and 25m Rapid Fire Pistol finals are scored hit/miss (max 40) with ties broken by additional series.",
+
+    "QUALIFICATION RANK DOES NOT DETERMINE FINAL ENTRY IN SHOOTING - RPO STATUS SKIPS SHOOTERS. VERIFIED BY BODY at the 2026 ISSF Grand Prix in Ruse, 10m Air Rifle Men: the eight finalists were exactly the eight shooters whose Remarks column read 'Q', NOT the top eight on the scoreboard. Qualification rank 4 (OHLENBURGER, 632.1) and rank 8 (MIKULJAN, 630.2) were marked RPO and did not advance, while rank 9 (ROSSITER, 629.9) and rank 10 (OVIEDO, 629.8) were marked Q and did. Any 'to reach the final' or 'to win a medal' price computed from the qualification leaderboard alone is wrong whenever RPO entries are present. The precise eligibility rule behind RPO was not confirmed and must be read before this drives settlement - see open_questions.",
+
+    "SAILING SCORES LOW AND IS DECIDED BY A SERIES, NOT A RACE. Under the Low Point system a boat's score for a race is its finishing position (1st = 1 point) and the LOWEST series total wins - inverted relative to every other sport in this file, so any generic 'higher is better' ranking code must be special-cased. A regatta is 8-15 fleet races over several days; winning races is not the objective, avoiding deep finishes is. Verified in the World Sailing datafeed, which exposes ~1.79 million per-race results carrying placing, averagePoints, crewPoints and awardPlacing. NOTE: the Low Point mechanics stated here are INFERRED FROM THE DATAFEED'S FIELD SEMANTICS, NOT READ FROM THE RACING RULES OF SAILING - the RRS document could not be retrieved (see blocked.worldsailing_rrs_document) and must be confirmed.",
+
+    "DISCARDS MEAN A SAILING LEADERBOARD CAN INVERT WITHOUT ANYONE SAILING BADLY. Once a threshold number of races is completed, each boat drops its worst score(s), and a second discard often activates later in the series. A boat carrying a 25th that is about to be discarded is not where the standings say it is. VERIFIED BY BODY that the datafeed flags this per result: the discarded field returned 'Yes' on 53 of 400 sampled rows (~13%), consistent with one drop per ~8-race series. TWO TRAPS. (1) The field has THREE encodings for what should be two states - 'Yes', 'No', 'N' and null all appear - so naive parsing will mis-count discards. (2) Certain penalties are NON-DISCARDABLE by rule (DNE, and gross-misconduct disqualifications), which is the single most important asymmetry in sailing scoring: a normal DSQ can be dropped, a DNE cannot, so two identical-looking penalties have completely different series consequences. The non-discardable list is INFERRED, NOT VERIFIED - the RRS was unreachable and the datafeed's finishCode field was empty in every row sampled.",
+
+    "SAILING RESULTS ARE PROVISIONAL FOR HOURS AFTER THE BOATS FINISH. Protests and redress requests are heard by a jury after racing, within a protest time limit (the datafeed carries a protestTimeLimit field on every race), and the outcome can disqualify a boat that crossed first or award redress that changes a boat's score to something it never sailed. Scoring inquiries can also alter a series days later. Betwinner's settlement point - first-across-the-line, provisional results, or final jury-confirmed results - must be established before any sailing market is priced, and it is a different question from the one that matters in swimming because in sailing the revision window is measured in hours, not minutes.",
+
+    "THE SAILING MEDAL RACE COMPRESSES A WHOLE REGATTA INTO ONE RACE. The Olympic and most world-championship formats end with a medal race for the leading boats, scored at a multiple of a normal race and typically not discardable, which is why leaders lose titles on the last afternoon. VERIFIED that the datafeed marks it as a first-class object: a Tokyo 2020 record returned name 'Medal Race', number 13, medalRace 1, at Enoshima. HOWEVER the multiplier field on that record was NULL, so the double-points value itself is NOT verified from this source - the flag is trustworthy, the weighting is not. Never price a 'to win the regatta' market without conditioning on whether the medal race has been sailed.",
+
+    "SURFING HEATS ARE SCORED ON THE BEST TWO WAVES ONLY, BY A HUMAN PANEL, WITH NO OBJECTIVE ANCHOR. Each wave is scored 0.1-10.0; the heat score is the sum of a surfer's best TWO waves (maximum 20). Verified at Olympic level: heat length 25-40 minutes and a maximum of 25 waves per surfer are both set by the technical director ON THE DAY, and the panel was two head judges, two priority judges and seven regular judges. Criteria are difficulty of manoeuvres, innovation and progression, variety, combination, speed, power and flow - entirely subjective. Two consequences for pricing: a surfer can catch fifteen waves and lose to someone who caught two, so wave COUNT is not a proxy for performance; and panel composition is itself unstable - a judge was removed from the Paris 2024 panel on 1 August after posting a photo with a competitor.",
+
+    "PRIORITY DECIDES SURFING HEATS AND IS NOT VISIBLE IN THE SCORELINE. The surfer holding priority may take any wave they choose and cannot be interfered with; a non-priority surfer who takes a wave in front of them is penalised. A surfer trailing by 3 points with 4 minutes left and no priority is in a far worse position than the score gap suggests, and a leader with priority can simply deny waves. The existence of dedicated priority judges is VERIFIED (two on the Paris 2024 panel), but the full priority and interference rules were NOT retrieved because the WSL rulebook is on a domain that disallows five of our agent names. Do not code interference penalties from memory.",
+
+    "THE 2026 WSL TITLE FORMAT CHANGED AND ANY PRIOR TRAINED ON 2021-2025 IS WRONG. VERIFIED BY BODY: the WSL Finals - the one-day, five-surfer playoff that decided the champion from 2021 to 2025 - has been ABOLISHED for 2026. The title now goes to the season-long points leader, with the season ending at Pipeline. The counting rules are: best 7 of 9 regular-season results carried forward, and the FINAL SEASON RANKING IS BEST 9 OF 12. The Pipe Masters is the twelfth event and awards 15,000 points, 1.5x a standard CT event. Also new for 2026: NO mid-season cut for the first time in five years, and NO elimination rounds - lose your first heat at an event and you are out of that event, with seeds 29-36 (men) and 9-24 (women) entering through a qualifying round. Field is 36 men and 24 women for nine events, cut to 24 men and 16 women for three postseason events, then the FULL original field rejoins for Pipeline. An 'outright world title' market in 2026 is a dropped-results points race, not a playoff.",
+
+    "WEIGHTLIFTING BODYWEIGHT CATEGORIES HAVE BEEN REORGANISED THREE TIMES AND THE FEDERATION ITSELF REFUSES TO POOL THE ERAS. VERIFIED BY BODY: iwf.sport maintains three separate archives - current, 'Old Bodyweight Categories / 2018-2025', and 'Old Bodyweight Categories / Up to 2018' - each with its own Results by Events, Ranking List AND World Records. The current set (verified from the 2026 European Championships results) is MEN 60/65/71/79/88/94/110/110+ and WOMEN 48/53/58/63/69/77/86/86+. Separately, the OLYMPIC programme uses a REDUCED subset of categories that does not match the world-championship set in any era, so an athlete's world-championship category is frequently not the category they contest at a Games and they must move up or down. Any historical model must be filtered to a single era AND checked against the Olympic subset for the Games in question.",
+
+    "MOST CURRENT WEIGHTLIFTING WORLD RECORDS ARE SYNTHETIC THRESHOLDS, NOT PERFORMANCES. VERIFIED BY BODY on iwf.sport/results/world-records/: after the 2025 reorganisation the new categories were seeded with 'World Standard' values dated 01 Jun 2025 with no athlete and no venue - e.g. the 60 kg snatch record reads '141 kg / World Standard'. Real names appear only where the standard has already been beaten. This inflates the base rate for 'world record to be broken' markets early in a category cycle, and it means Robi points - which normalise a total against the category world record - are currently anchored to a committee decision rather than to a human lift.",
+
+    "WITHDRAWAL BEFORE AND AFTER THE START ARE DIFFERENT EVENTS IN EVERY ONE OF THESE SPORTS, AND THE BOOK'S NON-STARTER RULE GOVERNS. The industry norm is that an athlete who never starts is a non-runner and the bet voids, while one who starts and then retires simply loses - and the dividing line can be a single action. In swimming there is a further wrinkle verified in the rules: CR 3.4.3 provides that if an athlete withdraws from a FINAL, the fastest non-qualifying swimmer is promoted into the final and the whole field is RE-RANKED, RE-SEEDED and RE-LANED, so a withdrawal changes the opponent set for every remaining head-to-head. BETWINNER'S OWN NON-STARTER AND VOID TERMS FOR THESE FIVE SPORTS ARE UNREAD and every settlement statement here that depends on them is INFERRED FROM INDUSTRY NORM, NOT CONFIRMED FOR THIS BOOK.",
+
+    "TIES ARE RESOLVED DIFFERENTLY IN EVERY SPORT IN THIS FILE, AND ONE OF THEM IS RESOLVED BY NEGOTIATION. SWIMMING: exact ties stand as shared places with no tie-break; ties for the last final berth may trigger a swim-off, but the World Aquatics competition feed's own Comment field records a Tokyo 2020 case where two swimmers tied for 8th in a semifinal and 'no swim off but they decided between them who would go to the final' - i.e. the tie-break was an agreement between athletes. WEIGHTLIFTING: ties on total are broken by bodyweight (lighter wins), which is why the B.weight column is recorded to two decimal places, and secondarily by who reached the total first. SHOOTING: ties in a final are broken by additional tie-breaking shots or series fired until the tie breaks. SAILING: series ties are broken by count of better finishes and then by the last race. SURFING: a heat tie is broken by the third-best wave. Never apply one sport's tie-break to another, and never assume 'tie' means 'dead heat reduction' - in three of these five it means a decisive tie-break instead.",
+
+    "A SWIMMING RELAY LEAD-OFF LEG IS A STANDALONE INDIVIDUAL PERFORMANCE THAT SURVIVES ITS OWN TEAM'S DISQUALIFICATION. CR 12.3.4: an athlete in a relay may not set an individual world record except the one who swims the first quarter of the distance - and 'If the Athlete themselves is not disqualified but the relay team of that Athlete is disqualified for any reason that occurs or is identified after completion of the Athlete's performance, the Athlete's performance will be eligible for a World Record'. So a relay can be wiped out on a changeover infringement while the lead-off swimmer's individual time and record stand. Any ingestion that discards all results from a disqualified relay will silently lose legitimate individual bests, and any 'record broken' market must distinguish the leg from the team.",
+
+    "SWIMMING RANKINGS LIST SWIMS, NOT SWIMMERS. VERIFIED BY BODY: the 2026 Men's 100 Free LCM top five contained KORNEV Egor at ranks 1, 2 AND 5. The feed returns every qualifying performance, so 'the top 8 rows' is not 'the top 8 athletes' and any field-strength or podium calculation built on raw row order will double-count the same person. Deduplicate to best-per-athlete before doing anything with it - and note the same feed reported 50,321 LCM rows against 3,884 SCM rows for one event-year, so an undeduplicated union is also ~93% long course and silently course-weighted."
+  ],
+
+  "verdict_per_sport": {
+    "swimming": {
+      "verdict": "MODELLABLE - the strongest of the five, and the only one with a first-class free feed and a first-class free rulebook.",
+      "rationale": "api.worldaquatics.com is open, undocumented, permissive under robots, and returns everything the core markets need: times, World Aquatics points, course flag, athlete identity and age, meet identity and date, and the full heat/semifinal/final phase tree per competition. The 558-page Competition Regulations PDF is downloadable and settles every rules question authoritatively. Outright, podium, head-to-head, to-reach-the-final and record markets can all be priced from verified data.",
+      "gaps": "SPLITS AND PER-HEAT LANE TIMES WERE NOT RETRIEVED - splitId and heatId exist on every row but no endpoint resolving them was found, and Swimrankings, which would have filled this, is robots-disallowed to ClaudeBot by name. Omega Timing is the untried substitute. Until splits land, head-to-head pricing is weaker than it should be, because front-half/back-half profile is the thing that actually decides a two-swimmer market. Also no DQ history is available anywhere (the rankings feed only carries swims that counted), and no altitude data.",
+      "recommendation": "SHIP IT for outright, podium, to-reach-the-final and record markets. Ship head-to-heads with a wider margin until splits are sourced."
+    },
+    "weightlifting": {
+      "verdict": "MODELLABLE WITH ONE LARGE EXPLICIT UNCERTAINTY TERM.",
+      "rationale": "IWF result pages are open, permissive under robots, and give rank, nation, exact bodyweight, session group, best snatch, best C&J and total for every athlete at every event, with a clean event_id scheme and filters back to 2015. The bomb-out rate is directly measurable from the same pages (verified at 10.0% of athletes at a European Championships), which means the biggest risk in the sport is quantifiable rather than merely acknowledged. World records and Robi points are published.",
+      "gaps": "PER-ATTEMPT DATA IS NOT PUBLISHED in the scraped result pages - only best-of-three per lift - so attempt strategy, the mechanism by which weightlifting is actually won and lost, is an observed narrative rather than a feature. The three-era category split means historical data needs careful filtering. Current-category world records are synthetic 'World Standard' placeholders, which distorts record markets and Robi normalisation.",
+      "recommendation": "SHIP IT for outright, podium and nation markets. Head-to-heads only with an explicit P(no total) term for each lifter and only once Betwinner's both-bomb-out rule is confirmed."
+    },
+    "shooting": {
+      "verdict": "MODELLABLE, AND THE RULES ARE THE BEST-DOCUMENTED OF THE FIVE.",
+      "rationale": "The ISSF publishes structured per-event Qualification and Final result PDFs with per-series and per-shot detail, a monthly world ranking with a downloadable XLSX archive back to 2025, a five-way record table, and a 504-page rulebook that answers every format question verbatim. No robots.txt exists on the main site and /media/ is explicitly allowed on the document host. The two hardest questions in the sport - what a final score means and who actually gets into a final - were both resolved from primary sources in this pass.",
+      "gaps": "Everything is PDFs, so ingestion is a parsing job rather than a feed job, though the file naming is regular enough to automate. The RPO eligibility rule is observed but not explained. Shotgun (Trap/Skeet) and 25m Rapid Fire finals use hit/miss scoring on different scales, so 'score' is not one column across the sport.",
+      "recommendation": "SHIP IT, but build the Q/F PDF parser before the model - and never let a qualification score and a final score share a column."
+    },
+    "sailing": {
+      "verdict": "MODELLABLE FOR RANKINGS AND SERIES POINTS; NOT MODELLABLE FOR CONDITIONS. The single biggest surprise of this research, in both directions.",
+      "rationale": "datafeed.sailing.org is a fully open, robots-permissive JSON API of a scale nobody would expect: ~950,000 ranking rows, ~1,792,000 per-race results and ~23,600 races, with discards flagged per result, medal races flagged per race, boat-class metadata including optimal crew weight, and a per-sailor CloudFront JSON itemising exactly which regattas built their ranking and which counted. That is more structured history than most mainstream sports offer for free.",
+      "gaps": "TWO REAL ONES, BOTH FOUND ONLY BY READING PAYLOADS. (1) windSpeed and windDirection are declared in the schema and EMPTY IN PRACTICE - 0 of 461 sampled races - so wind-condition specialism, the most valuable feature in the sport, cannot be built from this feed. (2) finishCode was blank in all 400 sampled results, so penalty codes are unavailable, and the discarded field uses three encodings for two states. Separately, the Racing Rules of Sailing could not be retrieved, so the scoring rules stated in this file are inferred from field semantics rather than read - which is not good enough for settlement logic.",
+      "recommendation": "SHIP RANKINGS-BASED AND SERIES-POINTS-BASED MARKETS. Mark conditions and penalty-code logic as observed-but-not-modelled. Obtain the RRS before writing any settlement code, and probe sapsailing.com for the wind data the official feed does not carry."
+    },
+    "surfing": {
+      "verdict": "OBSERVED BUT NOT MODELLED. Do not price surfing from what we currently have.",
+      "rationale": "This is a data-access verdict, not a judgement about the sport. Every source that carries the numbers is closed to us: worldsurfleague.com disallows anthropic-ai, Claude-SearchBot, Claude-User, Claude-Web AND ClaudeBot by name, which removes heat scores, per-wave scores, priority records, per-break athlete history and the official rulebook in one line; isasurf.org, the Olympic governing body and the obvious substitute, sits behind a Cloudflare proof-of-work interstitial that returns 403 to us; olympics.com could not even have its robots.txt read, so it was not approached; and Surfline's /api, the conditions source, is disallowed to all agents. What remains is Wikipedia, which is genuinely good on FORMAT - it gave us the whole 2026 rule change, the field sizes, the seeding structure and the Olympic judging panel - and gives us essentially nothing on PERFORMANCE.",
+      "gaps": "No heat scores, no wave scores, no head-to-head history, no per-break records, no conditions feed. And the format itself just changed: the 2026 abolition of the WSL Finals, the removal of the mid-season cut, the removal of elimination rounds and the 1.5x Pipeline weighting mean even a well-sourced historical model would be calibrated to a format that no longer exists.",
+      "recommendation": "MARK AS OBSERVED-BUT-NOT-MODELLED IN THE PRODUCT. Display Betwinner's surfing markets if the scanner returns them, but do not attach a model-derived score to them, and do not let surfing selections into a ranked top-N table on the same footing as the other four. Revisit only if a permitted structured source appears."
+    }
+  },
+
+  "open_questions": [
+    "BETWINNER'S OWN TERMS FOR THESE FIVE SPORTS ARE COMPLETELY UNREAD - this is the top blocker and it affects every rules_critical entry that mentions settlement. Specifically needed: (a) does a swimming market settle on the initially-announced result or the official post-DQ/post-protest result; (b) what happens to a weightlifting head-to-head when BOTH lifters bomb out; (c) what happens to a surfing or sailing market when the event is postponed, shortened or abandoned, and what completion threshold applies; (d) the dead-heat formula for swimming podium markets given 1/100-second timing; (e) the non-starter definition per sport. Every one of these is currently INFERRED FROM INDUSTRY NORM. Prior research in this repo records that betwinner.com redirected to betwinner2.com with an empty English sitemap from the operator's machine - retry from a GitHub Actions runner.",
+    "WHICH MARKETS DOES BETWINNER ACTUALLY LIST FOR SPORT IDS 37, 112, 64, 63 AND 138, AND UNDER WHICH MARKET GROUP IDS? This file maps statistics to a plausible market set (outright, podium, head-to-head, medal counts, nation markets), but the group and outcome ids the feed parser needs have not been pulled. It is entirely possible that several of these sports carry only outright and head-to-head, or appear only during a Games - in which case the modelling effort should be reprioritised accordingly.",
+    "SWIMMING SPLITS: the World Aquatics API carries splitId on every ranking row and accepts a split parameter, and every competition exposes a HeatList with heat ids - but no endpoint returning per-heat lane-by-lane times or splits was located (six path shapes tried, all 404). Find it, or fall back to Omega Timing result documents. This is the highest-value single unlock for swimming head-to-heads.",
+    "OMEGA TIMING is untried and is the most likely home for swimming splits and reaction times as the official Olympic timekeeper. Its /robots.txt 302-redirects to the homepage, so no policy file exists to comply with or violate. Worth a careful, low-rate exploration.",
+    "SAPSAILING.COM is untried and has no robots.txt (verified: Jetty returns a genuine 404 for the path). SAP Sailing Analytics carries per-leg tracking and WIND data for many regattas - exactly the field that is empty in the official World Sailing feed. Highest-value retest for sailing.",
+    "THE RACING RULES OF SAILING could not be retrieved (client-rendered pages, no PDF in the SSR payload, no rules route in the WordPress REST namespace). Until it is read, the Low Point mechanics, the discard thresholds and the non-discardable-penalty list in rules_critical are inferred from the datafeed's field semantics and must not drive settlement code.",
+    "WHAT EXACTLY IS RPO IN ISSF COMPETITION? Verified that RPO-marked shooters are scored but skipped for final entry (Ruse 2026: ranks 4 and 8 excluded, ranks 9 and 10 promoted), but the rule behind it was not found in the searches run against the 504-page rulebook. Most likely a per-nation entry-quota mechanism - entries above a nation's ranked allocation shoot for result position only - but that is a hypothesis. Confirm before pricing 'to reach the final'.",
+    "OLYMPICS.COM was never approached because its robots.txt was unreadable from this environment across four attempts (HTTP/2 INTERNAL_ERROR and repeated timeouts). This is probably a network/edge issue rather than a policy one. Retest from a GitHub Actions runner; it is the natural substitute source for surfing and for cross-sport medal-count markets, both of which are currently thin.",
+    "PER-ATTEMPT WEIGHTLIFTING DATA: the IWF results pages publish best-of-three per lift only. Live competition feeds and start lists carry the attempt-by-attempt sequence; no scrapable archive of it was found. Without it, attempt strategy stays an observed narrative.",
+    "SWIMMING ALTITUDE: no free source for pool elevation was found and the direction-of-effect claim in this file is standard physiology, not measured. If altitude is to be used, join eventCity to an open elevation dataset and MEASURE the effect against the World Aquatics feed rather than assuming a coefficient.",
+    "LICENCE POSITION IS UNRESOLVED FOR THE FEDERATION FEEDS. World Aquatics, IWF, ISSF and World Sailing all permit crawling under robots but none publishes an open data licence; their terms of use were not read. Wikipedia is CC BY-SA 4.0 (attribution and sharealike obligations if redistributed) and Wikidata is CC0. If any of this data is ever surfaced to users rather than used internally to rank, the federation terms must be checked."
+  ],
+
+  "key_findings": [
+    "SOURCE VERDICT IN ONE LINE: four of the five sports have a genuinely good free source, and the fifth is closed to us by name. Swimming has api.worldaquatics.com, weightlifting has iwf.sport, shooting has the ISSF's PDF pipeline plus a 504-page rulebook, sailing has datafeed.sailing.org - and surfing has nothing, because worldsurfleague.com disallows five of our agent names and isasurf.org is behind Cloudflare.",
+    "THE SINGLE BEST SOURCE IS datafeed.sailing.org/stats/api - and it was found by grepping a Nuxt bundle, not by looking for it. It is fully open, robots-permissive, and returns roughly 1.79 million per-race results, 950,000 ranking rows and 23,600 races with discards flagged per result and medal races flagged per race. Nothing about World Sailing's public website suggests this exists.",
+    "THE VERIFY-BY-BODY RULE EARNED ITS KEEP FIVE TIMES IN THIS PASS: (1) Wikipedia returned HTTP 200 whose body was the plain-text notice 'Too many requests. Please contact bot-traffic@wikimedia.org' when queried with a ClaudeBot UA; (2) isasurf.org has a permissive robots.txt and serves a Cloudflare 'Just a moment...' challenge; (3) the World Sailing datafeed declares windSpeed and windDirection and populates them in 0 of 461 sampled races; (4) the same feed declares finishCode and left it blank in 400 of 400 sampled results; (5) ISSF's robots.txt is a Next.js 404 page, not a policy. Every one of these would have passed a status-code check.",
+    "SWIMMING'S COURSE TRAP IS NOT THEORETICAL AND IT INVERTS THE OBVIOUS READING: the 2026 Men's 100 Free short-course leader swam 45.68 and the long-course leader swam 46.96 - the short-course time is 1.28 seconds faster and worth 19 FEWER World Aquatics points. World Aquatics itself maintains two separate record books, and the 25m book contains events (100 IM, 4x50 relays) that do not exist at 50m. Key every time on (event, course); convert only via points.",
+    "WEIGHTLIFTING'S BOMB-OUT RATE IS 10.0% AND THERE IS A PERFECT WORKED EXAMPLE IN THE DATA: at the 2026 European Championships, 31 of 311 athletes recorded no total at all. BERDELIDZE Goderdzi snatched 125 kg in the 60 kg class - more than the gold medallist and the best snatch in the field - then missed all three clean and jerks and finished UNRANKED, behind a lifter who totalled 220. Best-lifts models make him the favourite. He scored nothing.",
+    "SHOOTING'S TWO STAGES ARE TWO DIFFERENT COMPETITIONS AND THE FEDERATION SAYS SO IN WRITING. ISSF rule 6.17.1.5: qualification scores 'do not carry forward. Scoring in Finals starts from zero (0).' Verified in the documents: the same shooter scored 635.7 in qualification and 252.7 in the final. The ISSF even keeps separate world-record books for the two stages (WR 255.0 vs QWR 637.9 for 10m Air Rifle Men).",
+    "AND SHOOTING HAS A SECOND, LESS OBVIOUS TRAP: qualification RANK does not determine final ENTRY. At Ruse 2026, qualification ranks 4 and 8 were marked RPO and did not advance, while ranks 9 and 10 did. The eight finalists were the eight rows marked 'Q', not the top eight rows. Every 'to reach the final' price built off the leaderboard is wrong when RPO entries are present.",
+    "SURFING'S 2026 FORMAT CHANGE INVALIDATES ANY PRIOR BUILT ON 2021-2025. The WSL Finals playoff is abolished; the title is decided on season points, best 9 of 12, with Pipeline worth 15,000 points (1.5x a normal event). There is also no mid-season cut and no elimination rounds - lose your first heat and you are out of the event. The outright title market has changed from a one-day playoff into a dropped-results points race.",
+    "CONDITION-DEPENDENCE IS MEASURABLE IN CALENDAR DAYS, NOT AS A VAGUE RISK. Olympic surfing at Teahupo'o 2024 was scheduled for 27-30 July with a 5-day contingency; it finished on 5 August after cancellations on 29 July, 3 August and 4 August - the entire contingency was consumed. In July 2026 the WSL added a whole extra tour event to insure against the Surf Abu Dhabi Pro not running because of the 2026 Iran war. 'Will be completed as scheduled' is not a safe default in surfing or sailing.",
+    "HEAD-TO-HEADS ARE THE ONLY TWO-OUTCOME MARKET ACROSS ALL FIVE SPORTS AND THEREFORE THE ONLY PLACE A SAFETY LADDER CAN APPLY. Everything else - outright, podium, medal counts, nation markets - is a many-outcome market where 'safer' only means 'more places', which is a different guarantee and is where dead-heat reduction bites. Note the uncomfortable pairing: surfing has the most naturally head-to-head STRUCTURE of the five (every heat from round two is two surfers, winner advances) and the worst DATA, so its most laddderable market is its least priceable one.",
+    "THREE OF THESE FIVE SPORTS PUBLISH A CROSS-COMPARABILITY METRIC AND ALL THREE SHOULD BE USED INSTEAD OF RAW MARKS: World Aquatics points in swimming, Robi points in weightlifting, ranking points in shooting and sailing. Raw seconds, raw kilograms and raw ring scores are not commensurable across events, categories, courses or stages - the normalisers are, with the caveat that weightlifting's Robi is currently anchored to synthetic 'World Standard' records rather than to human lifts.",
+    "TWO SOURCES WERE LOST TO ROBOTS DIRECTIVES NAMING US SPECIFICALLY, AND BOTH WERE THE BEST SOURCE FOR THEIR SPORT: swimrankings.net ('User-agent: ClaudeBot / Disallow: /', plus a bare 'User-agent: * / Disallow: /' and an EU Article 4 rights reservation) would have supplied swimming splits and athlete histories; worldsurfleague.com (anthropic-ai, Claude-SearchBot, Claude-User, Claude-Web and ClaudeBot all disallowed) is the entire evidence base for surfing. Neither was fetched. Checking robots for our own names before fetching was decisive here, not ceremonial."
+  ]
+}

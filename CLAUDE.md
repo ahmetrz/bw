@@ -8,22 +8,55 @@ claim** — it ranks selections within Betwinner's own prices. It emits a report
 does not place bets.
 
 ## Trigger → Transformation → Output
-- **Trigger:** manual dispatch or cron → fetch Betwinner odds for the configured
-  tournaments (via GitHub Actions; the operator's machine blocks the site).
-- **Transformation:** normalize → hard-filter (open, not stale, main line unless
-  alt-scan) → composite score (margin + limit + range) → rank → top N.
-- **Output:** ranked SINGLES as `report.json` + a human-readable table.
+- **Trigger:** the DAILY run (`.github/workflows/daily.yml`, cron 06:10 UTC, operator-
+  approved cadence: once a day) fetches the next 48 hours of Betwinner's pre-match card
+  via GitHub Actions; the operator's machine blocks the site. Manual dispatch also works.
+- **Transformation:** normalize → drop outrights and multi-day sports → model assigns a
+  DIRECTION → ladder converts it to its safest form → odds gate at 1.10 → confidence
+  floor → one selection per match. The composite score still ranks by within-book
+  cheapness for the scan path.
+- **Output:** `daily_report.json` + a Turkish Telegram message for the 24h and 48h
+  windows, plus `coupon.html` (phone-friendly deep links) and `report.json` for the scan.
+
+## The daily rule, in order (this is the product)
+1. **The model picks the direction.** Never the price. A short price is a probability
+   estimate plus the book's margin plus its exposure; reading it as a probability hands
+   the book's own opinion straight back to it.
+2. **The ladder picks the form** — the safest expression of that same view.
+3. **Odds are read at exactly one point:** the `MIN_ODDS` (1.10) gate. Nowhere else.
+4. **A confidence floor** (`MIN_MODEL_SURVIVAL`) throws away anything the model is not
+   actually sure of. Without it the ladder returns the safest form of a coin flip, which
+   is still a coin flip.
+5. Measured on **survival** (win + push), not on winning: a pushed leg is refunded at
+   1.00 rather than killing the coupon, and finding that difference is what a ladder is for.
+
+A match where the model has no confident view yields NOTHING. Padding the slip with the
+least-bad option available would defeat the whole exercise.
 
 ## Architecture (Parser → Rule Engine → Reporting)
-Same three-layer shape as the ITSM classifier / Inspection Engine.
 ```
-scan.py            entrypoint
-engine/parser.py   response → normalized rows (book-agnostic: works for any slug)
-engine/score.py    hard filters + composite score + tiering
-engine/report.py   ranked table + JSON + book-mismatch warning banner
-config.py          book, tournaments, weights, staleness, odds range, toggles
-fixtures/          real pulls = regression anchors
+scan.py                entrypoint for the ranked scan
+tools/daily_report.py  the daily run: windows → picks → Telegram
+tools/fetch_window.py  sports → tournaments → fixtures → markets, budgeted+checkpointed
+tools/make_coupon.py   phone-friendly slip of deep links
+engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
+engine/parser.py       OddsPapi response → the same rows (book-agnostic)
+engine/score.py        hard filters + composite score
+engine/ladder.py       safety laddering; three-way vs two-way read off the payload
+engine/pick.py         direction + ladder + gates → one selection per match
+engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
+engine/settlement.py   what a selection actually means when it settles
+engine/telegram.py     daily notification (no-ops without credentials)
+engine/tr.py           Turkish labels for everything user-facing
+config.py              gates, weights, exclusions, windows
+research/              per-sport statistics, free sources, rules traps (64 sports)
+fixtures/              real pulls = regression anchors
 ```
+
+## Secrets
+`TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` as GitHub Actions secrets. Their absence is
+NOT an error: the run still scans, still writes the report, and reports the send as
+skipped. A credential problem must never fail a scan that otherwise worked.
 
 ## The composite score (per selection, each component 0–1, weighted)
 1. **margin_score** — from the selection's MARKET overround (lower hold → higher
@@ -65,6 +98,25 @@ the first real Betwinner fixture.
    construction within one book it cannot be.
 5. **Never fabricate odds or limits.** If the loaded data's book ≠ the requested book,
    or the API 4xx's, STOP and report — never proceed on fallback data.
+6. **Direction never comes from the price.** See "The daily rule" above. This is the one
+   invariant most likely to be violated by accident, because sorting by short prices
+   looks like sorting by safety and is not.
+7. **Only emit what settles the same day.** Outrights are dropped structurally (an entry
+   with no second participant is not a head-to-head, which also removes tournament
+   winners, election questions, novelty bundles and multi-runner races in one rule), and
+   sports whose head-to-heads span days sit in `config.MULTI_DAY_SPORTS`. Do NOT filter
+   on the start timestamp for this: long-dated markets carry a near-term start. The 2026
+   Senate markets are stamped 5–16 days out because that is when the LINE runs.
+8. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
+   football's 8.65%, so left in they head every run. No model can ever justify one.
+   `config.EXCLUDED_SPORTS`.
+9. **Qualify a source on its BODY, never its status code.** Learned repeatedly and the
+   hard way: a 200 has been a Cloudflare block page, an Incapsula interstitial, a
+   proof-of-work challenge, an empty array, a "we're renovating" placeholder and a 404
+   page with a 257 KB body. Read the bytes.
+10. **Check robots.txt for OUR crawler by name before fetching.** ESPN disallows
+    `anthropic-ai`; FIVB, Natural Stat Trick, Tapology, CueTracker and others name
+    `ClaudeBot`. A source already recorded as verified can become disallowed — FIVB did.
 
 ## Coverage gate — do this FIRST
 Betwinner presence on the operator's key is UNCONFIRMED. Before building or trusting
