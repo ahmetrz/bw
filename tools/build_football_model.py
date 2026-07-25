@@ -62,6 +62,20 @@ DIVISIONS = [
     "G1",                                   # Greece
 ]
 
+# The second football-data.co.uk collection, one file per country, covering 2012-2026 in
+# a DIFFERENT schema (Country/League/Season/Home/Away/HG/AG rather than Div/HomeTeam/FTHG).
+# These were skipped at first for that reason, and skipping them was the single biggest
+# coverage hole in the product: they are exactly the leagues that play through the
+# European summer — Scandinavia, Brazil, MLS, Japan, Ireland — which is most of a
+# late-July card. Measured on a real 48-hour window, football was 562 of 1,607 matches
+# and almost none of it was in the main divisions.
+EXTRA_COUNTRIES = [
+    "ARG", "AUT", "BRA", "CHN", "DNK", "FIN", "IRL", "JPN",
+    "MEX", "NOR", "POL", "ROU", "RUS", "SWE", "SWZ", "USA",
+]
+EXTRA_BASE = "https://www.football-data.co.uk/new"
+EXTRA_FROM_SEASON = 2021
+
 K_FACTOR = 20.0
 HOME_ADV_ELO = 60.0     # starting value; refitted below
 START_RATING = 1500.0
@@ -97,6 +111,42 @@ def fetch(div, season, timeout=40):
         rows.append({"div": div, "season": season, "date": rec.get("Date", ""),
                      "home": h, "away": a, "hg": hg, "ag": ag})
     return rows
+
+
+def fetch_extra(country, from_season=EXTRA_FROM_SEASON, timeout=60):
+    """One country file from the extra collection -> rows keyed by "COUNTRY:League".
+
+    A single file can hold several leagues (Brazil carries Serie A and Serie B), so they
+    are split out: pooling them would put a Serie B side and a Serie A side on one rating
+    scale without a fixture ever having connected them.
+    """
+    try:
+        req = urllib.request.Request(f"{EXTRA_BASE}/{country}.csv",
+                                     headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            raw = r.read().decode("utf-8-sig", "replace")
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+        return {}
+    out = defaultdict(list)
+    for rec in csv.DictReader(io.StringIO(raw)):
+        try:
+            season = int(str(rec.get("Season", "")).strip()[:4])
+            hg, ag = int(rec["HG"]), int(rec["AG"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if season < from_season:
+            continue
+        h, a = (rec.get("Home") or "").strip(), (rec.get("Away") or "").strip()
+        league = (rec.get("League") or "").strip()
+        if not h or not a or not league:
+            continue
+        key = f"{country}:{league}"
+        out[key].append({"div": key, "season": str(season), "date": rec.get("Date", ""),
+                         "home": h, "away": a, "hg": hg, "ag": ag})
+    # These files are not guaranteed chronological across leagues; Elo must run forward.
+    for key in out:
+        out[key].sort(key=lambda m: (m["season"], m["date"]))
+    return out
 
 
 def run_elo(matches, k=K_FACTOR, home_adv=HOME_ADV_ELO):
@@ -183,6 +233,8 @@ def main():
     ap.add_argument("--seasons", type=int, default=5)
     ap.add_argument("--out", default="data/model_football.json")
     ap.add_argument("--divisions", default="")
+    ap.add_argument("--no-extra", action="store_true",
+                    help="skip the summer-league collection")
     args = ap.parse_args()
 
     divs = [d.strip() for d in args.divisions.split(",") if d.strip()] or DIVISIONS
@@ -196,6 +248,17 @@ def main():
             rows = fetch(d, season)
             by_div[d].extend(rows)
             total += len(rows)
+    print(f"  main divisions: {total} matches")
+
+    if not args.no_extra:
+        extra_total = 0
+        for country in EXTRA_COUNTRIES:
+            for key, rows in fetch_extra(country).items():
+                by_div[key].extend(rows)
+                extra_total += len(rows)
+        print(f"  extra countries: {extra_total} matches "
+              f"({len(EXTRA_COUNTRIES)} files, from {EXTRA_FROM_SEASON})")
+        total += extra_total
     print(f"matches downloaded: {total}")
     if total < 500:
         print("not enough history — refusing to fit", file=sys.stderr)
