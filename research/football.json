@@ -1,0 +1,227 @@
+{
+  "sport": "football",
+  "researched": "2026-07-25",
+  "verified_free_sources": [
+    {
+      "id": "fdcouk",
+      "url": "https://www.football-data.co.uk/mmz4281/{YY}{YY}/{div}.csv",
+      "auth": "none",
+      "api": false,
+      "coverage": "22+ divisions, 1993/94-present; shots, SoT, corners, fouls, cards, referee, HT/FT + closing odds/AH/OU2.5",
+      "rate_limit": "none observed (static CSV)",
+      "freshness": "~2x/week",
+      "verified": true
+    },
+    {
+      "id": "espn",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/{lg}/summary?event={id}",
+      "auth": "none",
+      "api": true,
+      "coverage": "global; 28 team stats, referee via gameInfo.officials, lineups, lastFiveGames, H2H, odds",
+      "rate_limit": "undocumented",
+      "freshness": "live",
+      "verified": true,
+      "note": "rosters populate only near kickoff - do not assume XI at T-24h"
+    },
+    {
+      "id": "understat",
+      "url": "https://understat.com/match/{id}",
+      "auth": "scraping",
+      "api": false,
+      "coverage": "Big-5 + RFPL 2014/15-; xG, shots, SoT, deep completions, PPDA",
+      "rate_limit": "none observed",
+      "freshness": "post-match",
+      "verified": true,
+      "note": "league index Cloudflare-gated from datacenter IPs; match pages OK"
+    },
+    {
+      "id": "clubelo",
+      "url": "http://api.clubelo.com/{Club}",
+      "auth": "none",
+      "api": true,
+      "coverage": "~60 European leagues, Elo back to 1946",
+      "rate_limit": "none observed",
+      "freshness": "daily",
+      "verified": true
+    },
+    {
+      "id": "openmeteo",
+      "url": "https://api.open-meteo.com/v1/forecast",
+      "auth": "none",
+      "api": true,
+      "coverage": "global hourly temp/precip/wind, 16-day forecast",
+      "rate_limit": "<10k/day",
+      "freshness": "hourly",
+      "verified": true
+    },
+    {
+      "id": "openligadb",
+      "url": "https://api.openligadb.de/getmatchdata/{lg}/{yr}",
+      "auth": "none",
+      "api": true,
+      "coverage": "Bundesliga 1/2/3 + DFB-Pokal",
+      "rate_limit": "none observed",
+      "freshness": "live",
+      "verified": true
+    },
+    {
+      "id": "openfootball",
+      "url": "https://raw.githubusercontent.com/openfootball/football.json",
+      "auth": "none",
+      "api": false,
+      "coverage": "many leagues multi-season, fixtures + HT/FT",
+      "freshness": "per-commit",
+      "verified": true
+    },
+    {
+      "id": "statsbomb",
+      "url": "https://raw.githubusercontent.com/statsbomb/open-data",
+      "auth": "none",
+      "api": false,
+      "coverage": "80 competition-seasons, event-level w/ xG",
+      "freshness": "archival",
+      "verified": true,
+      "note": "historical calibration only, not pre-match"
+    },
+    {
+      "id": "footballdata_org",
+      "url": "https://api.football-data.org/v4",
+      "auth": "free_key",
+      "api": true,
+      "coverage": "free plan ~12 competitions; fixtures/standings only, no shot stats",
+      "rate_limit": "~10/min, 49 per 86400s observed",
+      "freshness": "daily",
+      "verified": true
+    },
+    {
+      "id": "wikidata",
+      "url": "https://query.wikidata.org/sparql",
+      "auth": "none",
+      "api": true,
+      "coverage": "stadium coords for travel_km, capacity",
+      "rate_limit": "fair use, UA required",
+      "verified": true
+    }
+  ],
+  "blocked_or_unverified": [
+    {
+      "id": "fbref",
+      "status": "BLOCKED",
+      "detail": "403 Cloudflare from datacenter IP even with browser UA; richest free set but needs residential egress"
+    },
+    {
+      "id": "sofascore",
+      "status": "BLOCKED",
+      "detail": "403 with and without browser headers"
+    },
+    {
+      "id": "apifootball",
+      "status": "UNVERIFIED",
+      "detail": "endpoint live but free-tier limits unconfirmed (pricing page 403)"
+    }
+  ],
+  "no_free_source": [
+    "throw_ins",
+    "pitch_dimensions_surface",
+    "structured_injuries_suspensions"
+  ],
+  "stat_to_bet": {
+    "1x2": [
+      "elo_rating",
+      "xg",
+      "xga",
+      "home_away_split",
+      "injuries_suspensions",
+      "rest_days",
+      "travel_km",
+      "market_odds"
+    ],
+    "double_chance": [
+      "elo_rating",
+      "xga",
+      "clean_sheet_rate"
+    ],
+    "asian_handicap": [
+      "xg",
+      "xga",
+      "possession_pct",
+      "ppda",
+      "elo_rating",
+      "home_away_split"
+    ],
+    "european_handicap": [
+      "elo_rating",
+      "xg",
+      "clean_sheet_rate"
+    ],
+    "over_under_goals": [
+      "xg",
+      "xga",
+      "ppda",
+      "possession_pct",
+      "weather",
+      "rest_days",
+      "standings_motivation"
+    ],
+    "team_totals": [
+      "xg",
+      "xga",
+      "set_piece_share",
+      "home_away_split"
+    ],
+    "btts": [
+      "xg",
+      "xga",
+      "clean_sheet_rate",
+      "elo_rating"
+    ],
+    "correct_score": [
+      "xg",
+      "xga",
+      "set_piece_share"
+    ],
+    "half_time_full_time": [
+      "ht_result",
+      "ppda",
+      "set_piece_share"
+    ],
+    "over_under_corners": [
+      "corners_for",
+      "shots",
+      "possession_pct",
+      "set_piece_share",
+      "weather"
+    ],
+    "over_under_cards": [
+      "referee_tendency",
+      "fouls",
+      "ppda",
+      "h2h",
+      "standings_motivation"
+    ],
+    "first_to_score": [
+      "ht_result",
+      "ppda",
+      "xg",
+      "home_away_split"
+    ],
+    "clean_sheet": [
+      "xga",
+      "clean_sheet_rate",
+      "set_piece_share",
+      "injuries_suspensions"
+    ],
+    "win_to_nil": [
+      "elo_rating",
+      "xga",
+      "clean_sheet_rate"
+    ]
+  },
+  "key_findings": [
+    "Closing market odds are the single strongest predictor available; use as prior/benchmark.",
+    "xG beats raw goals at predicting future goals; stabilises in 10-15 matches vs 30-40.",
+    "Referee explains more card variance than the teams do - never model cards without it.",
+    "Head-to-head is the weakest item: small n, stale rosters. Near-zero weight.",
+    "Practical zero-key stack: fdcouk + espn + understat + clubelo + openmeteo covers ~90%."
+  ]
+}
