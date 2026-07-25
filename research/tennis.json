@@ -1,0 +1,174 @@
+{
+  "sport": "tennis",
+  "researched": "2026-07-25",
+  "verified_free_sources": [
+    {
+      "id": "tennis_data_uk",
+      "url": "http://www.tennis-data.co.uk/alldata.php",
+      "auth": "none",
+      "api": false,
+      "verified": true,
+      "coverage": "ATP 2000+, WTA 2007+; per-set games, RET/walkover flag, ranks + bookmaker closing odds (B365, Pinnacle, Betfair)",
+      "freshness": "updated 2026-07-20"
+    },
+    {
+      "id": "tennis_abstract",
+      "url": "https://tennisabstract.com/reports/atp_elo_ratings.html",
+      "auth": "scraping",
+      "api": false,
+      "verified": true,
+      "coverage": "ATP+WTA Elo incl. surface Elo (hElo/cElo/gElo) and peak; court speed ratings per event 1991+; player pages with DR, Ace%, DF%, SPW, RPW",
+      "note": "robots.txt disallows /jsmatches/, /jsplayers/, /jsfrags/ - use /reports/ and cgi-bin/ only"
+    },
+    {
+      "id": "uts",
+      "url": "https://www.ultimatetennisstatistics.com/",
+      "auth": "scraping",
+      "api": false,
+      "verified": true,
+      "coverage": "Open Era ATP ~99%; Elo by surface, indoor/outdoor, set, game, service/return game, tiebreak; 100+ stat categories"
+    },
+    {
+      "id": "sackmann_mcp",
+      "url": "https://raw.githubusercontent.com/JeffSackmann/tennis_MatchChartingProject/master/",
+      "auth": "none",
+      "api": false,
+      "verified": true,
+      "coverage": "7566 men's + ~4k women's charted matches 1960-2026; serve/return splits, pressure-point stats",
+      "license": "CC BY-NC-SA (non-commercial)"
+    },
+    {
+      "id": "tml_database",
+      "url": "https://raw.githubusercontent.com/Tennismylife/TML-Database/master/",
+      "auth": "none",
+      "api": false,
+      "verified": true,
+      "coverage": "ATP tour-level 1968-2026; ace, df, svpt, 1stIn/Won, 2ndWon, bpSaved/Faced, minutes, height, rank + indoor flag",
+      "note": "STALE on GitHub (2026 ends 2026-01-17)",
+      "license": "no redistribution/commercial use"
+    },
+    {
+      "id": "itf_api",
+      "url": "https://www.itftennis.com/tennis/api/TournamentApi/GetCalendar?circuitCode=MT",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "ITF World Tennis Tour M/W calendar: category, surface, indoor/outdoor, prize money"
+    },
+    {
+      "id": "tennisexplorer",
+      "url": "https://www.tennisexplorer.com/results/?type=atp-challenger",
+      "auth": "scraping",
+      "api": false,
+      "verified": true,
+      "coverage": "ATP, WTA, Challenger AND ITF results by date + per-match serve/return stats + H2H"
+    },
+    {
+      "id": "espn_tennis",
+      "url": "https://site.api.espn.com/apis/site/v2/sports/tennis/atp/scoreboard",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "ATP/WTA tour-level only; atp-challenger returns 400",
+      "note": "no historical depth"
+    },
+    {
+      "id": "open_meteo",
+      "url": "https://api.open-meteo.com/v1/elevation",
+      "auth": "none",
+      "api": true,
+      "verified": true,
+      "coverage": "venue altitude + weather; verified Denver 1612m"
+    }
+  ],
+  "blocked_or_unverified": [
+    {
+      "id": "sackmann_atp_wta",
+      "status": "BLOCKED BY EGRESS",
+      "detail": "github raw 404 / github.com 403 / codeload 403 / jsDelivr >50MB. Repo exists; this is our proxy. It is the ONLY free source with Challenger/ITF match statistics at scale - re-verify from an unrestricted network."
+    },
+    {
+      "id": "sofascore",
+      "status": "BLOCKED",
+      "detail": "403 from this environment"
+    }
+  ],
+  "licensing_warning": "Sackmann datasets are CC BY-NC-SA and TML forbids commercial use. Both are NON-COMMERCIAL only - relevant if anything here is ever monetised.",
+  "stat_to_bet": {
+    "match_winner": [
+      "surface_elo",
+      "elo_overall",
+      "dominance_ratio",
+      "age_trajectory",
+      "match_load_fatigue",
+      "retirement_injury_flag",
+      "best_of_format",
+      "handedness_matchup"
+    ],
+    "over_under_games": [
+      "hold_pct",
+      "ace_rate",
+      "first_serve_won_pct",
+      "return_pts_won_pct",
+      "court_speed_rating",
+      "altitude",
+      "indoor_outdoor",
+      "best_of_format"
+    ],
+    "over_under_sets": [
+      "surface_elo",
+      "hold_pct",
+      "df_rate",
+      "retirement_injury_flag"
+    ],
+    "set_handicap": [
+      "surface_elo",
+      "break_pct",
+      "hold_pct",
+      "ace_rate",
+      "best_of_format"
+    ],
+    "game_handicap": [
+      "break_pct",
+      "hold_pct",
+      "dominance_ratio",
+      "court_speed_rating",
+      "altitude"
+    ],
+    "set_betting": [
+      "surface_elo",
+      "break_pct",
+      "hold_pct",
+      "ace_rate"
+    ],
+    "first_set_winner": [
+      "first_serve_pct",
+      "first_serve_won_pct",
+      "df_rate",
+      "days_since_last_match"
+    ],
+    "player_to_win_a_set": [
+      "hold_pct",
+      "ace_rate",
+      "tiebreak_record",
+      "best_of_format"
+    ],
+    "tiebreak_yes_no": [
+      "hold_pct",
+      "ace_rate",
+      "first_serve_won_pct",
+      "height_serve_proxy",
+      "court_speed_rating",
+      "altitude",
+      "surface_elo"
+    ]
+  },
+  "key_findings": [
+    "Surface Elo is the primary predictor; clay/grass specialists diverge 100-200 points from overall.",
+    "Break points converted is the noisiest common stat - near-random year to year. Shrink hard.",
+    "Tiebreak and deciding-set records are almost pure noise beyond serve quality. Use as prior, not signal.",
+    "For over/under games, CLOSENESS matters more than level: near-equal Elo -> OVER, large gap -> UNDER.",
+    "Tiebreak yes/no is almost entirely combined hold percentage.",
+    "Best-of-5 amplifies the favourite's edge - the same Elo gap should price shorter than in Bo3."
+  ]
+}
