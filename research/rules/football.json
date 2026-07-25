@@ -1,0 +1,18 @@
+{
+  "source": "rules agent 2026-07-25",
+  "sport": "football",
+  "critical": [
+    "DEFAULT SETTLEMENT IS 90 MINUTES + STOPPAGE. A knockout team losing in extra time still WINS a 'does not lose'/X2 bet - the tie result and the bet result diverge. This VALIDATES the ladder's double-chance rung in knockouts.",
+    "Knockout draw at 90 is a live, routinely underbet outcome - never model knockout draw probability from league data.",
+    "Shootout kicks are NEVER goals for any goal market.",
+    "Own goals count for team markets (and make win-to-nil LOSE) but never for player scorer markets.",
+    "Card conventions split: points (10/25/35) vs count (1/2, second-yellow=2 not 3). Betwinner's own table must be read before pricing cards.",
+    "Corner base rates shifted UP twice in 13 months: keeper 8-second corner rule (2025/26) and 5-second goal-kick countdown (World Cup 2026 onward). Historical corner models are STALE.",
+    "Abandonment: Convention A (decided markets stand) vs Convention B (all void) - same over 2.5 ticket wins at one book, refunds at another. Betwinner's convention unknown.",
+    "Friendlies: rolling subs (8-11 in internationals from July 2026), collapsed card rates, non-standard periods - player and card markets effectively unpriceable.",
+    "Youth halves are shorter (2x40 U16-18 etc.) - a per-90 model overstates totals/corners/cards by ~11%.",
+    "Statistical markets settle on the book's DATA PROVIDER (Opta/Sportradar), not the broadcast - provider disagreement is the main dispute source.",
+    "VAR: goal timing = when the ball crossed the line, not the decision; a red can arrive after the next restart for violent conduct - in-play card positions are never safe.",
+    "Settlement uses the on-field result only - later federation rulings never re-settle."
+  ]
+}
