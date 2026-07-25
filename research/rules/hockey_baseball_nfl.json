@@ -1,0 +1,30 @@
+{
+  "source": "rules agent 2026-07-25",
+  "sports": [
+    "ice_hockey",
+    "baseball",
+    "american_football"
+  ],
+  "ice_hockey_critical": [
+    "THE CENTRAL DISTINCTION: three-way (1X2/'60 min') settles on REGULATION ONLY - a team winning in OT LOSES the three-way on it while WINNING the moneyline. ~22-25% of NHL games reach OT. Never treat the two prices as one market.",
+    "1xBET-FAMILY WARNING (Betwinner): totals and handicaps frequently default to REGULATION time unless labelled 'incl. OT' - the same 'Over 5.5' can be two different products. Scope must be part of market identity. If terms don't state it, STOP and confirm.",
+    "Shootout credits exactly ONE deciding goal (2-2 finishes 3-2), credited to no player: adds exactly +1 to OT-inclusive totals, can never cover -1.5, settles no goalscorer prop.",
+    "NHL playoffs: no shootout, no ties, unlimited 20-min periods - three-way should not exist, OT-inclusive totals have a fat right tail.",
+    "Empty-net goals push one-directionally toward OVER and favourite -1.5, and kill the draw late - a 1-goal-game model without ENG misprices the puck line AND the 1X2-vs-ML gap."
+  ],
+  "baseball_critical": [
+    "5-INNING RULE with ASYMMETRIC settlement: moneyline settles as ACTION once official (5 or 4.5 innings) while run line and totals typically need the FULL game and VOID otherwise - the same rain-shortened game pays the ML and refunds the total. Betwinner's thresholds MUST be read.",
+    "Listed-pitcher rule: a scratch voids ML at listed-pitcher books, but 1xBet-family books often settle as ACTION because no pitcher is named - a pitcher-matchup edge may not survive the scratch and you keep the risk without the reason.",
+    "Home team doesn't bat in the 9th when leading: home margins cap at +1 except walk-off HR - home -1.5 run lines lose coverage; home totals structurally suppressed.",
+    "MLB automatic runner from the 10th (regular season ONLY): extras are OVER-biased where it applies, completely different in postseason.",
+    "NPB/KBO allow TIES (12-inning cap): their 'moneyline' can PUSH - not the same instrument as an MLB moneyline.",
+    "Doubleheader 7-inning games where used: a 9-inning total on a 7-inning game is structurally too high - key totals to scheduled innings."
+  ],
+  "american_football_critical": [
+    "Spread, total and moneyline INCLUDE overtime unless labelled 'regulation'; quarter/half markets exclude it - a full-game total is NOT the sum of its half totals.",
+    "NFL regular-season TIE is real: two-way moneyline PUSHES while spread and total settle - and playoffs have no tie.",
+    "NCAA overtime is a different game: possessions from the 25, mandatory 2-pt from 2nd OT, alternating 2-pt attempts from 3rd - NFL OT assumptions on NCAA are a direct pricing error.",
+    "Margins are LUMPY: 3 (~14-15%) then 7 (~9%). A half-point across 3 costs ~25-30 cents of juice; across 5, almost nothing. NEVER linearly interpolate alternate spreads across 3/7/10/6/14.",
+    "Venue change: most books VOID everything; neutral site removes ~1.5-2.5 pts of HFA - venue is part of staleness, not just changedAt."
+  ]
+}

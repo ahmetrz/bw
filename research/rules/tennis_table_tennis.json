@@ -1,0 +1,24 @@
+{
+  "source": "rules agent 2026-07-25",
+  "sports": [
+    "tennis",
+    "table_tennis"
+  ],
+  "tennis_critical": [
+    "All four Grand Slams use a 10-POINT tiebreak at 6-6 in the deciding set (since 2022, in force 2026). No Slam final set is open-ended: Bo5 caps at 65 games, Bo3 at 39.",
+    "Tiebreak counts as ONE game - per-set max is 13 games, not 12.",
+    "Best-of-5 ONLY in men's singles main draw at Slams. Slam QUALIFYING and juniors are Bo3. NO women's event uses Bo5 - a WTA Bo5 market is a corrupt feed, suppress it.",
+    "Doubles use a 10-point match tiebreak instead of a 3rd set (counts as 1 game): doubles cap at 27 games. Singles totals models over-bet doubles systematically.",
+    "RETIREMENT: three conventions exist (all-void / one-ball-served / first-set-completed) and books differ. Under ALL of them totals/handicaps/correct-score VOID unless determined. Betwinner's own terms MUST be read.",
+    "Surface change: some books void ALL bets, others let them stand - opposite outcomes, verify Betwinner's rule.",
+    "No-ad scoring (doubles, many Challengers) raises underdog break probability - favourite handicaps worth less than ad-scoring equivalent."
+  ],
+  "table_tennis_critical": [
+    "Game to 11 win-by-2: per-game totals are open-ended above 21 (deuce tail).",
+    "Fast circuits (Liga Pro, TT Cup, TT Elite, Setka) are Bo5 - but playoffs/finals sometimes Bo7. FORMAT MUST BE READ PER MATCH, never inherited from league name - the highest-frequency TT mispricing trap.",
+    "From 10-10 service alternates every point - serve advantage neutralised, deuce games near coin-flip.",
+    "Points handicap and games handicap are NOT interchangeable (3-0 yields far fewer points than 3-2).",
+    "Self-umpired circuits: manual score feeds, duplicate player names, late substitutions - treat as high-staleness by default.",
+    "Retirement rates on amateur circuits EXCEED tour tennis - larger EV drag from voids."
+  ]
+}
