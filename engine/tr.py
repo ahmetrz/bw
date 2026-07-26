@@ -21,13 +21,18 @@ SPORTS = {
     22: "Alp Disiplini Kayak", 23: "Kayakla Atlama", 24: "Kayak", 25: "Plaj Futbolu",
     26: "Formula 1", 27: "Çim Hokeyi", 28: "Avustralya Futbolu", 29: "Plaj Voleybolu",
     30: "Snooker", 31: "Motosiklet", 36: "Bisiklet", 37: "Yüzme", 38: "Poker",
-    40: "E-Spor", 41: "Golf", 44: "At Yarışı", 48: "Lakros", 56: "Dövüş Sanatları",
+    40: "E-Spor", 41: "Golf", 44: "At Yarışı", 48: "Lakros", 49: "Netbol",
+    56: "Dövüş Sanatları",
     60: "Eskrim", 63: "Yelken", 64: "Atıcılık", 66: "Kriket", 68: "Tazı Yarışı",
-    69: "Toto", 80: "Gal Futbolu", 81: "Sumo", 82: "Loto", 87: "Özel Bahisler",
-    92: "Koşu Atı", 102: "Speedway", 112: "Halter", 126: "Hurling",
+    69: "Toto", 80: "Gal Futbolu", 81: "Sumo", 82: "Loto", 83: "Softbol",
+    86: "Counter-Strike", 87: "Özel Bahisler",
+    92: "Koşu Atı", 97: "Dota 2", 102: "Speedway", 109: "Rocket League",
+    112: "Halter", 125: "Call of Duty", 126: "Hurling",
     132: "At Yarışı (uzun vadeli)", 133: "Koşu Atı (uzun vadeli)", 138: "Sörf",
-    151: "Tazı Yarışı (uzun vadeli)", 155: "Bilek Güreşi", 176: "Hava Durumu",
-    189: "UFC", 202: "Siyaset", 278: "Çıplak El Boksu", 303: "Geleceğin Oyunları",
+    150: "StarCraft 2", 151: "Tazı Yarışı (uzun vadeli)", 155: "Bilek Güreşi",
+    176: "Hava Durumu", 180: "Kabaddi",
+    189: "UFC", 202: "Siyaset", 278: "Çıplak El Boksu", 298: "Overwatch",
+    303: "Geleceğin Oyunları",
     307: "Profesyonel Güreş", 314: "Polybet",
 }
 
@@ -46,6 +51,9 @@ MARKET_TYPES = {
     "teamTotal": "Takım Toplamı",
     "setHandicap": "Set Handikapı",
     "totalSets": "Toplam Set",
+    "totalFrames": "Toplam Frame",
+    "totalMaps": "Toplam Harita",
+    "mapHandicap": "Harita Handikapı",
     "correctScore": "Skor Tahmini",
     "other": "Diğer",
 }
@@ -74,6 +82,10 @@ _EXACT = {
 _PREFIXED = [
     ("sets over ", "{v} Set Üst"),
     ("sets under ", "{v} Set Alt"),
+    ("frames over ", "{v} Frame Üst"),
+    ("frames under ", "{v} Frame Alt"),
+    ("maps over ", "{v} Harita Üst"),
+    ("maps under ", "{v} Harita Alt"),
     ("T1 over ", "1. taraf {v} Üst"),
     ("T1 under ", "1. taraf {v} Alt"),
     ("T2 over ", "2. taraf {v} Üst"),
@@ -82,6 +94,8 @@ _PREFIXED = [
     ("under ", "{v} Alt"),
     ("SH1 ", "1. taraf {v} set handikap"),
     ("SH2 ", "2. taraf {v} set handikap"),
+    ("MH1 ", "1. taraf {v} harita handikap"),
+    ("MH2 ", "2. taraf {v} harita handikap"),
     ("H1 ", "1. taraf {v} handikap"),
     ("H2 ", "2. taraf {v} handikap"),
 ]
@@ -185,9 +199,12 @@ _TOTAL_UNIT = {
     2: "gol",       # ice hockey
     3: "sayı",      # basketball
     4: "oyun",      # tennis — group 17 counts GAMES, not sets
+    6: "sayı",      # volleyball — group 17 counts RALLIES won, not sets
+    8: "gol",       # handball
     10: "sayı",     # table tennis — group 17 counts POINTS, not sets
-    29: "sayı",     # volleyball
-    107: "gol",     # handball
+    29: "sayı",     # beach volleyball
+    30: "puan",     # snooker — group 17 counts POINTS in a frame, not frames
+    107: "gol",     # handball, as the feed also numbers it
 }
 
 

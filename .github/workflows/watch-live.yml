@@ -1,0 +1,106 @@
+name: watch-live
+
+# Canli izleyici: kitabin KENDI canli akisindan biten maclari kaydeder.
+#
+# NEDEN: Her sonuc kaynagi bugune kadar baskasinindi ve her biri tek bir dilimi
+# kapsiyordu — football-data futbolu, EuroLeague basketbolu, Setka ise sadece Setka Cup'i.
+# Masa tenisi kartinin %58'i (Pro League, TT-Cup, Masters) hicbir arsivde yoktu; voleybol,
+# snooker, dart, hentbol ve futsalin ise hic kaynagi yoktu. Aday kaynaklarin bir kismi
+# robots.txt'te bizim ajan adimiza kapali ve bu degismeyecek.
+#
+# Kitap bu maclarin hepsini kendisi oynatiyor ve skoru oynanirken yayinliyor. Bu is akisi
+# LiveFeed'i tarar, her fikstürün son skorunu hatirlar ve mac bittiginde (ya akis "Match
+# finished" dedigi icin ya da fikstür akistan dustugu icin) sonucu data/results/ altina
+# yazar. tools/collect_live.py neyi kaydetmeyi REDDETTIGINI aciklar.
+#
+# CADENCE OLCULDU, TAHMIN EDILMEDI. 15 dakika boyunca 51 saniyede bir tarayip biten
+# maclarin akista NE KADAR KALDIGINA baktim: 274 fikstürün 36'si dustu, biten bir mac
+# akista ~50-150 saniye duruyor, bir kismi tek taramada gorunup kayboluyor. Yani bir maci
+# BITMIS skoruyla yakalama sansi kabaca (kalma suresi / tarama araligi):
+#   dakikada bir tarama  -> neredeyse hepsi
+#   2-3 dakikada bir     -> yarisi kadari
+#   saatte bir           -> ~%2, yani pratikte hicbir sey
+# Bu yuzden is SEYREK VE SIK degil, GUNDE BIRKAC KEZ YOGUN calisiyor: her calistirmada
+# dakikada bir tarayan kisa bir pencere aciyor ve o pencerede biten her maci yakaliyor.
+# Saatte tek tarama ayni dakikayi harcayip neredeyse hicbir sey toplamazdi.
+#
+# MALIYET, ve bu depo PRIVATE oldugu icin gercekten onemli: dakikalar sinirli. Mevcut
+# yuk daily ~25 dk/gun, collect-results ~2.4 dk/gun, results ~1.8 dk/gun = ~30 dk/gun,
+# aylik ~900 dakika. Ucretsiz kota 2.000. Gunde 3 x 10 dakikalik pencere ~33 dk/gun,
+# aylik ~990 dakika ekler ve toplam ~1.900'de kalir. Kotasi daha buyuk olan operator
+# minutes girdisini ya da cron'u buyuterek dogrudan daha cok sonuc toplar — kapsam
+# tarama suresiyle neredeyse dogru orantili.
+
+on:
+  schedule:
+    - cron: "13 2,10,18 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Pencere uzunlugu, dakika (0 = tek tarama)"
+        required: false
+        default: "10"
+      every:
+        description: "Taramalar arasi saniye (olculen kalma suresi ~50-150 sn)"
+        required: false
+        default: "60"
+      sports:
+        description: "Sadece bu spor idleri (virgullu), bos = izleme listesinin tamami"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+# Ayni anda iki tarama calisirsa ikisi de ayni fikstürü 'kayboldu' sanabilir ve durum
+# dosyasi birbirinin uzerine yazar.
+concurrency:
+  group: watch-live
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sweep the live feed
+        run: |
+          python3 tools/collect_live.py \
+            --minutes "${{ github.event.inputs.minutes || '10' }}" \
+            --every "${{ github.event.inputs.every || '60' }}" \
+            --sports "${{ github.event.inputs.sports || '' }}"
+
+      # Modeller sadece yeni sonuc geldiginde yeniden kuruluyor. Bir spor ancak kendi
+      # tutulan kalibrasyonu gecerse kabul edilir; gecmezse build_generic_model nedenini
+      # soyler ve gunluk kosu bunu kapsam raporunda tekrarlar.
+      - name: Rebuild the models the sweep touched
+        run: |
+          CHANGED=$(git diff --name-only -- data/results | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p')
+          if [ -z "$CHANGED" ]; then
+            echo "yeni sonuc yok — model kurulmadi"
+            exit 0
+          fi
+          for SPORT in $CHANGED; do
+            python3 tools/build_generic_model.py --sport "$SPORT" \
+              || echo "spor $SPORT icin model kurulamadi"
+          done
+
+      - name: Commit
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/results data/models data/live_state.json || true
+          if git diff --cached --quiet; then
+            echo "degisiklik yok"
+            exit 0
+          fi
+          git commit -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ)"
+          # Bu is saatte bir yaziyor ve gunluk kosu da ayni dala yaziyor.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep $((i * 5))
+          done
+          echo "push basarisiz — bir sonraki calistirma yakalar"

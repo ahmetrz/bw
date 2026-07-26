@@ -62,6 +62,7 @@ tools/make_picks_page.py  ONE template for picks.html and results.html
 tools/daily_results.py    settles a logged day, rebuilds the page as a scorecard
 tools/make_coupon.py   scan-path slip of deep links (NOT the daily product)
 tools/collect_results.py  one small adapter per source -> the results store
+tools/collect_live.py  watches the book's OWN live feed; every sport, every circuit
 tools/build_generic_model.py  fits + calibrates any sport; refuses the ones that fail
 tools/make_method_page.py  method.html, generated from signals/pick/ladder/config/research
 engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
@@ -112,9 +113,16 @@ skipped. A credential problem must never fail a scan that otherwise worked.
 the first real Betwinner fixture.
 
 ## Adding a sport (this is the whole procedure now)
-1. Write an adapter in `tools/collect_results.py` that yields `{date, home, away,
-   home_score, away_score, unit}`. `unit` is what the score COUNTS — goals, points, runs
-   or sets — and it decides which market groups the model is allowed to answer. Get it
+1. **Add a finish condition to `SPORTS` in `tools/collect_live.py`** — one line saying
+   what the score counts and what finishing looks like (a race to N sets/frames/maps, or
+   N scheduled periods). The watcher then collects that sport from the book's OWN live
+   feed: no source hunt, no robots question, no adapter, every circuit the book carries.
+   Write an adapter only when an ARCHIVE exists and history-now beats history-later — the
+   watcher starts from zero and fills at the rate the sport is actually played.
+1b. If you do write an adapter in `tools/collect_results.py`, it yields `{date, home, away,
+   home_score, away_score, unit}`. `unit` is what the score COUNTS — goals, points, runs,
+   sets, frames or maps — and it decides which market groups the model is allowed to
+   answer. Get it
    wrong and the model prices a points market off a distribution of sets: "total 76.5
    under" came back at 100.00% on a 1.79 shot, because every set total ever recorded is
    between 3 and 5. Check robots.txt for OUR crawler by name FIRST and record
@@ -124,6 +132,37 @@ the first real Betwinner fixture.
 2. `python tools/build_generic_model.py --sport <id>`.
 3. Read the held-out calibration. If it holds, the sport is admitted automatically. If it
    does not, it is REFUSED and the daily run says why, every day, in the coverage report.
+
+## Where results come from (the live watcher is the default now)
+Every source before it was somebody else's and covered exactly one slice: football-data
+football, EuroLeague basketball, MLB baseball, Setka **only Setka Cup** — so 58% of the
+table tennis card had no source, and volleyball, snooker, darts, handball and futsal had
+none at all. `LiveFeed/Get1x2_VZip` carries every sport the book runs, with both names,
+both STABLE participant ids, the running score, the period breakdown and the FORMAT note.
+`tools/collect_live.py` sweeps it and writes a result two ways:
+  1. **The feed says so** — `SC.CPS` becomes "Match finished". Nothing is inferred.
+  2. **It vanished**, and its last score looks finished FOR ITS OWN FORMAT. The format is
+     read, never assumed: table tennis runs best-of-five and best-of-seven on the same day,
+     so 3-1 is a finished match on one circuit and a lead on the other.
+It refuses a sport whose finish condition we cannot state, a tie in a sport that cannot
+draw, an unreadable format, and anything gone too briefly to be sure it is gone. A watcher
+that guesses is worse than no watcher: a wrong row is indistinguishable from a real one
+once it is inside a rating.
+
+Betwinner has a results SERVICE as well, and it is worth another look but is not a blocker:
+`service-api/result/web/api/v3/games` is the live version (v1/v2/v4+ answer
+UnsupportedApiVersion; v3 answers a clean 400, so the route and version are right and only
+the parameter names are unknown). Eight parameter shapes were tried, the app bundle does
+not carry the path as a string, and `/en/results/` 302s to `betwinner2.com`, whose
+robots.txt is `Disallow: /`. Finding those parameters would replace hourly polling with one
+call a day AND backfill history.
+
+**Cost is a design constraint here, not an afterthought.** The repo is private, so Actions
+minutes are finite: `daily` averages 25 min/run, so the whole schedule already spends about
+30 min/day. `watch-live.yml` runs hourly at ~1 min/run, which fits inside the free tier
+alongside it. Sweeping more often catches more matches — a table tennis match lasts about
+half an hour — so the cadence is the dial the operator turns, and `--minutes` lets one job
+loop instead of scheduling more of them.
 
 There is deliberately no step for writing a model. Football, table tennis and basketball
 each got a bespoke one, and both bugs that reached a live card came from that duplication

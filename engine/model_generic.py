@@ -83,15 +83,26 @@ HANDICAP_GROUPS = {
     "goals":  {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
     "points": {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
     "runs":   {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
-    # Set handicaps: 109 is tennis, 7099 table tennis. The POINT handicap (group 2) is a
-    # different bet in these sports and is deliberately absent.
+    # Set handicaps: 109 is tennis AND volleyball, 7099 table tennis. The POINT handicap
+    # (group 2) is a different bet in these sports and is deliberately absent — volleyball
+    # quotes it at ±10.5, which is a rally count, not a set count.
     "sets":   {109: {732: "home", 733: "away"}, 7099: {5749: "home", 5750: "away"}},
+    # Snooker counts frames and quotes them on the ORDINARY handicap group, so the group
+    # id alone cannot say what the line means — only the sport's declared unit can.
+    "frames": {2: {7: "home", 8: "away"}},
+    # Esports has its own map handicap. Group 2 there is a ROUND handicap and is excluded
+    # for the same reason volleyball's is.
+    "maps":   {2438: {2826: "home", 2827: "away"}},
 }
 TOTAL_GROUPS = {
     "goals": {17}, "points": {17}, "runs": {17},
-    # 182 is total sets in tennis, 2604 in table tennis. Group 17 for these sports counts
-    # points or games and is NOT what this distribution measures.
+    # 182 is total sets in tennis and volleyball, 2604 in table tennis. Group 17 for these
+    # sports counts points or games and is NOT what this distribution measures.
     "sets": {182, 2604},
+    # Snooker total frames; esports total maps. Group 17 in esports is a total of ROUNDS
+    # (51.5 on a CS2 fixture), which a maps distribution would price as a certainty.
+    "frames": {876},
+    "maps": {2436},
 }
 
 

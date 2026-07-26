@@ -22,7 +22,8 @@ import config  # noqa: E402
 from engine import (bwfeed, grade, ladder, mirror, model_generic,  # noqa: E402
                     parlay, pick, rating, results_store, score, settlement, signals,
                     telegram)
-from tools import daily_report, daily_results as tools_daily_results  # noqa: E402
+from tools import collect_live, daily_report  # noqa: E402
+from tools import daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
@@ -1007,6 +1008,130 @@ class TestRegression(unittest.TestCase):
         clipped = telegram.chunks(notice, 1000)[0]
         self.assertLessEqual(len(clipped), 1000)
         self.assertEqual(clipped.count("<b>"), clipped.count("</b>"))
+
+    def test_the_watcher_reads_the_format_instead_of_assuming_it(self):
+        """The live watcher decides a match is over from the book's own format note.
+
+        This matters most exactly where the collector is most useful. Table tennis runs
+        best-of-five and best-of-seven on the SAME day — Setka Cup against Masters — so
+        3-1 is a finished match on one circuit and a 3-1 lead on the other. Assuming
+        either would write down a wrong result at the precise moment the watcher is
+        earning its keep."""
+        def game(note, sport=10):
+            return {"MIS": [{"K": 1, "V": "Group A"}, {"K": 3, "V": note}]}
+
+        self.assertEqual(collect_live.format_of(game("5 Games Match"), 10), ("target", 3))
+        self.assertEqual(collect_live.format_of(game("7 Games Match"), 10), ("target", 4))
+        # The explicit form wins over the headline count when the note carries both.
+        self.assertEqual(
+            collect_live.format_of(game("7 Frames Match (4 Frames up to win)", 30), 30),
+            ("target", 4))
+        self.assertEqual(collect_live.format_of(game("Best of 3 maps"), 40), ("target", 2))
+        # Duration notation is a PERIOD count, not a race: 4x10 is four quarters.
+        self.assertEqual(collect_live.format_of(game("4x10"), 3), ("periods", 4))
+        self.assertEqual(collect_live.format_of(game("3x5"), 2), ("periods", 3))
+        # No note: a sport with a single format may fall back to it, one with several
+        # may NOT, and the ones with several are exactly tennis and table tennis.
+        self.assertEqual(collect_live.format_of({}, 6), ("target", 3))
+        self.assertEqual(collect_live.format_of({}, 1), ("periods", 2))
+        self.assertEqual(collect_live.format_of({}, 10), ("target", None))
+        self.assertEqual(collect_live.format_of({}, 4), ("target", None))
+
+    def test_the_watcher_refuses_a_match_it_cannot_prove_is_over(self):
+        """A watcher that guesses is worse than no watcher.
+
+        Every result this collector writes down goes straight into a rating, and a match
+        recorded at the score it held when the feed hiccuped is indistinguishable from a
+        real one afterwards. So each branch that cannot answer refuses, and the cost of
+        refusing is one result rather than a corrupted history."""
+        def rec(**kw):
+            base = {"sport": 10, "kind": "target", "n": 4, "s1": 4, "s2": 2, "period": 0}
+            base.update(kw)
+            return base
+
+        self.assertTrue(collect_live.looks_finished(rec()))
+        # A best-of-SEVEN at 3-1 is a lead, not a result.
+        self.assertFalse(collect_live.looks_finished(rec(s1=3, s2=1)))
+        # The same score on a best-of-five is the match.
+        self.assertTrue(collect_live.looks_finished(rec(n=3, s1=3, s2=1)))
+        # Unreadable format: refuse rather than fall back to something plausible.
+        self.assertFalse(collect_live.looks_finished(rec(n=None)))
+        # Both sides at the target means we are reading a running total, not a final one.
+        self.assertFalse(collect_live.looks_finished(rec(s1=4, s2=4)))
+        # A PERIOD sport is never settled by inference, however complete it looks. A
+        # football match at 1-0 in the second half satisfies every structural check and
+        # may still finish 3-1, so recording it invents a scoreline. Being in the last
+        # period is not being finished, and nothing in the payload turns one into the
+        # other — so these are recorded only when the feed itself says so.
+        foot = {"sport": 1, "kind": "periods", "n": 2, "s1": 2, "s2": 1, "period": 2}
+        self.assertFalse(collect_live.looks_finished(foot))
+        self.assertFalse(collect_live.looks_finished({**foot, "period": 9}))
+        self.assertFalse(collect_live.looks_finished(
+            {"sport": 3, "kind": "periods", "n": 4, "s1": 91, "s2": 88, "period": 4}))
+        # And the feed saying so needs no inference at all.
+        self.assertTrue(collect_live.is_finished_now({"cps": "Match finished"}))
+        self.assertFalse(collect_live.is_finished_now({"cps": "2nd half"}))
+        # Once the feed HAS said so, a race's target is not guessed but read off the
+        # result: a race ends when somebody reaches it, so the winner's tally is it. That
+        # recovers the fixtures whose format note the book omits — a real 0-4 at the CTT
+        # World Championship was thrown away for want of a "7 Games Match" line.
+        got = collect_live.settle_target(
+            {"sport": 10, "kind": "target", "n": None, "s1": 0, "s2": 4})
+        self.assertEqual(got["n"], 4)
+        self.assertTrue(collect_live.placeable(got))
+        self.assertEqual(collect_live.to_result({**got, "p1": "A", "p2": "B",
+                                                 "start": 1_753_500_000}, 0)["pool"], "bo7")
+        # A stated format is never overwritten by the score.
+        self.assertEqual(collect_live.settle_target(
+            {"sport": 10, "kind": "target", "n": 3, "s1": 3, "s2": 1})["n"], 3)
+        # And a period sport has no target to settle.
+        self.assertIsNone(collect_live.settle_target(
+            {"sport": 1, "kind": "periods", "n": None, "s1": 2, "s2": 1}).get("n"))
+
+    def test_a_watched_result_carries_identity_and_its_own_rating_scale(self):
+        """What the watcher stores has to be usable by the generic model unchanged.
+
+        Two details do the work. The book's participant ids survive a rename and a
+        transliteration where a name does not, and a race to four sets is a different bet
+        from a race to three — pooling them would rate a Masters player on a Setka Cup
+        scale and price a best-of-seven handicap off best-of-five history."""
+        row = collect_live.to_result(
+            {"sport": 10, "league": "Masters. Russia", "p1": "A", "p2": "B",
+             "id1": "2778933", "id2": "4097977", "s1": 4, "s2": 2, "start": 1_753_500_000,
+             "kind": "target", "n": 4}, 1_753_500_000)
+        self.assertEqual(row["home_id"], "2778933")
+        self.assertEqual(row["pool"], "bo7")
+        self.assertEqual(row["unit"], "sets")
+        self.assertEqual(row["source"], "betwinner-live")
+        # And the store accepts it as it stands — no adapter-side repair on the way in.
+        self.assertIsNotNone(results_store.clean(row))
+        five = collect_live.to_result(
+            {"sport": 10, "p1": "A", "p2": "B", "s1": 3, "s2": 1, "start": 1_753_500_000,
+             "kind": "target", "n": 3, "league": "Setka Cup"}, 1_753_500_000)
+        self.assertEqual(five["pool"], "bo5")
+        # A period sport has no such split, so it stays on one scale.
+        self.assertNotIn("pool", collect_live.to_result(
+            {"sport": 1, "p1": "A", "p2": "B", "s1": 1, "s2": 0, "start": 1_753_500_000,
+             "kind": "periods", "n": 2, "league": "E0"}, 1_753_500_000))
+
+    def test_the_watch_list_is_a_list_of_finish_conditions(self):
+        """A sport is watched only when we can say what finishing it looks like.
+
+        The temptation is to sweep everything the book runs and sort it out later. But
+        `data/results/` feeds ratings directly, and there is no honest finish rule for a
+        marble race, a card game or a simulated FIFA ladder — nor is there anything worth
+        modelling in one. The watch list IS the statement of what we can settle."""
+        for sport, (unit, kind, n) in collect_live.SPORTS.items():
+            self.assertIn(kind, ("target", "periods"), sport)
+            self.assertIn(unit, ("goals", "points", "runs", "sets", "frames", "maps"),
+                          sport)
+            self.assertTrue(n is None or n >= 1, sport)
+            # A unit the model cannot price would store history nothing reads.
+            self.assertTrue(
+                unit in model_generic.HANDICAP_GROUPS
+                or unit in model_generic.TOTAL_GROUPS, f"sport {sport} unit {unit}")
+        for excluded in config.EXCLUDED_SPORTS:
+            self.assertNotIn(excluded, collect_live.SPORTS)
 
 
 if __name__ == "__main__":

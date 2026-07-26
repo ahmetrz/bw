@@ -193,6 +193,13 @@ def _tt_file(path):
                 "home_id": r.get("p1_id"), "away_id": r.get("p2_id"),
                 "home_score": s1, "away_score": s2,
                 "league": r.get("tournament") or "Setka", "unit": "sets", "source": "setka",
+                # Setka Cup is best-of-five throughout: every one of the 25,725 stored
+                # matches was won 3-x, with three to five sets played. Declaring it puts
+                # this archive on the SAME rating scale as the best-of-five circuits the
+                # live watcher records, and off the best-of-seven ones — where the same
+                # set handicap is a different bet. Left undeclared, the archive sat in an
+                # unnamed pool and the live rows could not reach it.
+                "pool": "bo5",
             }
 
 
@@ -335,6 +342,8 @@ def main():
     ap.add_argument("--source", help="one adapter name")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--list", action="store_true")
+    ap.add_argument("--restate", action="store_true",
+                    help="re-apply this adapter's fields to the rows it already stored")
     args = ap.parse_args()
 
     if args.list or not (args.source or args.all):
@@ -353,6 +362,18 @@ def main():
             print(f"unknown adapter {name!r}", file=sys.stderr)
             continue
         sid, fn = ADAPTERS[name]
+        if args.restate:
+            # An adapter that learns to declare a new field leaves every row it wrote
+            # BEFORE that without it, because merge keeps what is already stored and only
+            # adds what is missing. That is the right default — a collector must never
+            # rewrite history on a re-run — but it means `unit` and `pool` only ever
+            # reached new rows. Restating re-derives the adapter's own rows and lets the
+            # fresh version win, while leaving other sources' rows in the same file
+            # untouched. The SCORE is not re-derived from anywhere new: it is the same
+            # adapter reading the same source.
+            added, total = results_store.restate(sid, fn())
+            print(f"{name:<12} sport {sid}: {added} restated, {total} stored", flush=True)
+            continue
         added, total = results_store.merge(sid, fn())
         print(f"{name:<12} sport {sid}: +{added} new, {total} stored", flush=True)
     return 0

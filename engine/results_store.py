@@ -133,6 +133,33 @@ def merge(sport_id, incoming):
     return added, save(sport_id, list(have.values()))
 
 
+def restate(sport_id, incoming):
+    """Let an adapter's CURRENT output replace the rows it wrote before. Returns (n, total).
+
+    `merge` deliberately never overwrites, because a collector re-running on an
+    overlapping window must not rewrite history. The cost of that rule shows up when an
+    adapter learns to declare something new: `unit` and then `pool` were both added after
+    tens of thousands of rows had already been stored without them, so the declaration
+    reached only rows collected afterwards and the archive sat in a nameless pool that the
+    live watcher's rows could never join.
+
+    This is the deliberate, explicit way out. It rewrites ONLY the rows this adapter
+    produces now, leaves every other source's rows in the same file alone, and re-derives
+    nothing — it is the same adapter reading the same source, so the scores are the scores.
+    """
+    have = {key(r): r for r in load(sport_id)}
+    changed = 0
+    for raw in incoming:
+        row = clean(raw)
+        if not row:
+            continue
+        k = key(row)
+        if have.get(k) != row:
+            changed += 1
+        have[k] = row
+    return changed, save(sport_id, list(have.values()))
+
+
 def summary():
     """What we hold, per sport — the number that says how far coverage actually goes."""
     out = {}

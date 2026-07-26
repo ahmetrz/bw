@@ -43,10 +43,18 @@ GROUP_TYPES = {
     62: "teamTotal",     # team 2 total, T = 13 / 14
     109: "setHandicap",  # tennis, T = 732 / 733
     7099: "setHandicap",  # table tennis, T = 5749 / 5750
-    182: "totalSets",    # tennis, T = 971 / 972
+    182: "totalSets",    # tennis AND volleyball, T = 971 / 972
     2604: "totalSets",   # table tennis, T = 3150 / 3151
+    876: "totalFrames",  # snooker, T = 1850 / 1851
+    2436: "totalMaps",   # esports, T = 2824 / 2825
+    2438: "mapHandicap",  # esports, T = 2826 / 2827
     136: "correctScore",  # P encodes the scoreline itself, see OUTCOME_ENUM_GROUPS
 }
+
+# Volleyball publishes its set handicap and total sets on the SAME groups as tennis (109
+# and 182), which is why it needed no new entry here. Snooker instead reuses the ordinary
+# handicap group 2 with the line counted in FRAMES, so the group alone does not say what
+# a line means — engine/model_generic keys on the sport's declared unit for that reason.
 
 # A two-way result market and a three-way 1X2 are deliberately different types. Ice
 # hockey publishes BOTH on the same game — G=1 settles on regulation and can draw, G=101
@@ -70,8 +78,11 @@ OUTCOME_LABELS = {
     3829: "H1", 3830: "H2",
     732: "SH1", 733: "SH2",                    # tennis set handicap
     5749: "SH1", 5750: "SH2",                  # table tennis set handicap
-    971: "sets over", 972: "sets under",       # tennis total sets
+    971: "sets over", 972: "sets under",       # tennis and volleyball total sets
     3150: "sets over", 3151: "sets under",     # table tennis total sets
+    1850: "frames over", 1851: "frames under",  # snooker total frames
+    2824: "maps over", 2825: "maps under",     # esports total maps
+    2826: "MH1", 2827: "MH2",                  # esports map handicap
 }
 
 # Handicap groups publish the two sides of ONE market at OPPOSITE signed lines: home -1.5
