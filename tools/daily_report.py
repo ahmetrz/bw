@@ -244,7 +244,7 @@ def main():
             tt = (tt_model, model_tt.build_player_index(setka.ratings()))
             print(f"Table tennis model: {tt_model['samples']} samples, "
                   f"logloss {tt_model['logloss']} vs {tt_model['baseline_logloss']} baseline; "
-                  f"{len(tt[1])} rated players")
+                  f"{len(tt[1].get('exact', {}))} rated players")
         except Exception as e:
             print(f"Setka ratings unavailable: {e}", file=sys.stderr)
     else:

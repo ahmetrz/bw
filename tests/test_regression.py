@@ -21,6 +21,9 @@ sys.path.insert(0, ROOT)
 import config  # noqa: E402
 from engine import bwfeed, grade, ladder, pick, score, settlement, telegram  # noqa: E402
 
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import grade_predictions  # noqa: E402
+
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
 
@@ -416,6 +419,31 @@ class TestRegression(unittest.TestCase):
         # Staked 3, returned 2.0 (win) + 1.0 (push) + 0 = 3.0 -> break even.
         self.assertAlmostEqual(s["returned"], 3.0)
         self.assertAlmostEqual(s["roi_pct"], 0.0)
+
+    def test_grader_will_not_score_an_unplayed_match(self):
+        """The grader must key on the DATE, not just on the two teams.
+
+        This is the bug that nearly poisoned the whole measurement. Keyed on teams alone,
+        31 predictions whose matches had not yet kicked off came back graded, 87.1% of
+        them winners — every one of them settled against an EARLIER meeting of the same
+        two sides. A hit rate built that way is worse than no hit rate, because every
+        later change would have been steered by it.
+        """
+        table = {("ilves", "lahti"): [("2026-03-01", 3, 0), ("2026-07-26", 0, 0)]}
+
+        # The earlier meeting must not answer for the later fixture.
+        self.assertEqual(
+            grade_predictions.lookup_result(table, "Ilves", "Lahti", "2026-07-26T12:00"),
+            (0, 0))
+        self.assertEqual(
+            grade_predictions.lookup_result(table, "Ilves", "Lahti", "2026-03-01T12:00"),
+            (3, 0))
+        # A fixture with no matching date is ungraded, not graded from a neighbour.
+        self.assertIsNone(
+            grade_predictions.lookup_result(table, "Ilves", "Lahti", "2026-05-15T12:00"))
+        # An unknown pairing stays ungraded.
+        self.assertIsNone(
+            grade_predictions.lookup_result(table, "Ilves", "Nobody", "2026-07-26T12:00"))
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must
