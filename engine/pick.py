@@ -24,9 +24,12 @@ from engine import ladder, model_football
 # Sports with a calibrated model. Everything else is counted as unmodelled rather than
 # guessed at, and that count is reported.
 #   1  football     — Elo + goal supremacy + Poisson scoreline matrix
-#   3  basketball   — Elo + a normal margin, calibrated against observed cover rates
 #   10 table tennis — Setka ratings + a measured set-score distribution
-MODELLED_SPORTS = {1, 3, 10}
+# Everything else goes through engine/model_generic.py, which admits a sport only when its
+# own held-out calibration says the model works. So this set is no longer the list of
+# sports the product covers — it is the list of sports with a HAND-WRITTEN model, and it
+# is meant to stop growing.
+MODELLED_SPORTS = {1, 10}
 
 # Directions to consider, in the order they are tried. Sides first: a side view is what
 # the ladder can soften most, since double chance and the handicap family both exist.
@@ -41,13 +44,13 @@ def _win_push(row, probs):
     measured set distribution. The probs dict carries its own source so the two can never
     be crossed — pricing a set handicap off a goals matrix would be silently meaningless.
     """
-    from engine import model_basketball, model_tt
+    from engine import model_generic, model_tt
 
     source = probs.get("_source")
     if source == "setka":
         return model_tt.rung_probs(row, probs)
-    if source == "basketball":
-        return model_basketball.rung_probs(row, probs)
+    if source == "generic":
+        return model_generic.rung_probs(row, probs)
     return model_football.rung_probs(row, probs)
 
 
@@ -144,7 +147,7 @@ def best(rows, sport_id, probs, min_odds=None, min_survival=None):
 
 
 def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
-            basketball=None):
+            generic=None):
     """Probabilities for one fixture from whichever model can reach it.
 
     Football: our own Elo model is tried FIRST. It is fitted on 298,950 results across 39
@@ -158,17 +161,22 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
 
     Returns (probs, name_score, source) or (None, 0.0, None).
     """
-    from engine import model_basketball, model_elo, model_football as mf, model_tt
+    from engine import model_elo, model_football as mf, model_generic, model_tt
 
     home, away = sample.get("p1"), sample.get("p2")
     sport = sample.get("sport_id")
 
-    if sport == 3 and basketball:
-        # EuroLeague and EuroCup clubs only. Most of the book's basketball card is
-        # domestic leagues this rating pool has never seen, and those go unpriced.
-        probs, score = model_basketball.lookup(basketball, home, away)
+    # The generic path first, for any sport that is not one of the two hand-written ones.
+    # `generic` is a dict of already-loaded, already-admitted models — a sport whose
+    # held-out calibration failed is simply not in it, so there is no way to price from a
+    # model the data does not support.
+    if sport not in MODELLED_SPORTS:
+        model = (generic or {}).get(sport)
+        if not model:
+            return None, 0.0, None
+        probs, score = model_generic.lookup(model, home, away)
         if probs and score >= 0.86:
-            return probs, score, "basketball"
+            return probs, score, "generic"
         return None, 0.0, None
 
     if sport == 10 and tt:
@@ -190,7 +198,7 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
 
 
 def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=None,
-                 min_name_score=0.82, tt=None, basketball=None):
+                 min_name_score=0.82, tt=None, generic=None):
     """Run the whole selection over a scan's worth of rows, one pick per match.
 
     `rows` should be UNFILTERED normalized rows, not the scored top-N: the ladder needs
@@ -208,11 +216,14 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
     skipped = {"no_model": 0, "no_confident_rung": 0, "unmodelled_sport": 0}
     for match_id, match_rows in by_match.items():
         sample = match_rows[0]
-        if sample.get("sport_id") not in MODELLED_SPORTS:
+        sport = sample.get("sport_id")
+        if sport not in MODELLED_SPORTS and sport not in (generic or {}):
             skipped["unmodelled_sport"] += 1
+            skipped.setdefault("by_sport", {})
+            skipped["by_sport"][sport] = skipped["by_sport"].get(sport, 0) + 1
             continue
         probs, name_score, source = resolve(sample, index, elo_model, min_name_score,
-                                           tt, basketball)
+                                           tt, generic)
         if not probs:
             skipped["no_model"] += 1
             continue
@@ -230,11 +241,10 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
         chosen["model_n"] = probs.get("_n")
         div = ((elo_model or {}).get("divisions") or {}).get(probs.get("_division") or "")
         chosen["division_matches"] = (div or {}).get("matches")
-        if source == "basketball":
-            # The whole basketball pool is one fitted sample, so every selection from it
-            # rests on the same amount of history — reported per pick so the evidence
-            # half of the score has something real to read.
-            chosen["division_matches"] = (basketball or {}).get("games")
+        if source == "generic":
+            # How much history stands behind THIS band, so the evidence half of the score
+            # reads a real number rather than the size of the whole sport.
+            chosen["division_matches"] = probs.get("sample_n")
         picks.append(chosen)
 
     picks.sort(key=lambda r: -r["model_survival"])

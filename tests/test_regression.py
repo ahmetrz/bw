@@ -19,8 +19,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import (bwfeed, grade, ladder, mirror, model_basketball,  # noqa: E402
-                    parlay, pick, rating, score, settlement, signals, telegram)
+from engine import (bwfeed, grade, ladder, mirror, model_generic,  # noqa: E402
+                    parlay, pick, rating, results_store, score, settlement, signals,
+                    telegram)
 from tools import daily_report, daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
@@ -740,65 +741,94 @@ class TestRegression(unittest.TestCase):
         self.assertAlmostEqual(s["hit_rate"], 0.75)
         self.assertIn("%75.0", page)
 
-    def test_basketball_model_is_calibrated_where_the_ladder_works(self):
-        """The fitted normal must match the OBSERVED cover rate, not merely look plausible.
+    def test_a_model_is_admitted_only_by_held_out_calibration(self):
+        """The gate that replaces judgement about whether a sport is "ready".
 
-        The first fit had the sign of the fitted mean flipped in both branches and claimed
-        90.4% for a +12.5 line against a real 74.9%. Nothing about "90% for +12.5" invites
-        suspicion, and it clears MIN_MODEL_SURVIVAL with room to spare — the floor cannot
-        catch this, because the floor trusts the model. Only this comparison can.
+        Two bugs reached a live card before this existed: a basketball handicap with its
+        sign flipped, claiming 90.4% where the truth was 74.9%, and a table tennis logistic
+        extrapolated to 97% on a 3.30 shot. Neither looks wrong and both clear
+        MIN_MODEL_SURVIVAL — the confidence floor CANNOT catch them, because the floor
+        trusts the model. Only a comparison against unseen matches can.
         """
-        model = model_basketball.load()
-        if not model:
-            self.skipTest("basketball model not built")
-        cal = model["calibration"]
-        self.assertGreaterEqual(len(cal), 6)
-        # The ladder only ever selects lines the model is confident about, so the fit has
-        # to be tight exactly there — a wide line, not a coin-flip one.
-        for c in cal:
-            gap = abs(c["predicted"] - c["observed"])
-            limit = 0.05 if c["line"] < 6.5 else 0.02
-            self.assertLess(gap, limit,
-                            f"+{c['line']}: model {c['predicted']} vs observed {c['observed']}")
-        # And it must be monotone: a bigger head start cannot be less likely to cover.
-        rates = [c["observed"] for c in sorted(cal, key=lambda x: x["line"])]
-        self.assertEqual(rates, sorted(rates))
+        for sid in sorted(results_store.summary()):
+            model = model_generic.load(sid)
+            if not model:
+                continue
+            ok, why = model_generic.usable(model)
+            if not ok:
+                continue
+            ho = model.get("calibration_holdout") or {}
+            self.assertTrue(ho.get("test"), f"sport {sid} was admitted with no holdout")
+            self.assertGreaterEqual(
+                ho["test"], 100,
+                f"sport {sid} was admitted on {ho['test']} unseen matches")
+            # The check must be capable of failing: an identical train and test set would
+            # report a perfect 0.000 and mean nothing.
+            self.assertGreater(ho["train"], ho["test"])
+            for c in model["calibration"]:
+                self.assertLess(abs(c["predicted"] - c["observed"]), 0.03,
+                                f"sport {sid} admitted with +{c['line']} off by "
+                                f"{c['predicted'] - c['observed']:+.3f}")
 
-    def test_basketball_names_resolve_across_sponsor_renames(self):
-        """One club is ONE rating, whatever it was called that season.
+    def test_a_sport_with_too_little_history_is_refused(self):
+        """Refusing is a feature. A thin sample will happily report 100% cover rates."""
+        thin = {"games": 40, "calibration": [{"line": 1.5, "predicted": 0.9,
+                                              "observed": 0.9}]}
+        ok, why = model_generic.usable(thin)
+        self.assertFalse(ok)
+        self.assertIn("40", why)
+        ok, why = model_generic.usable({"games": 5000, "calibration": []})
+        self.assertFalse(ok, "a model with no calibration table must never be admitted")
+        skewed = {"games": 5000, "calibration": [{"line": 1.5, "predicted": 0.90,
+                                                  "observed": 0.74}]}
+        self.assertFalse(model_generic.usable(skewed)[0])
 
-        Keyed by name, 167 clubs became 343 rating entries each holding a fragment of one
-        club's history. Keyed by code with the old names as aliases, the book's older
-        spellings still resolve and the rating is whole.
+    def test_generic_handicap_probability_moves_the_right_way(self):
+        """A bigger head start is safer, and the two sides of one line sum to 1.
+
+        Counted rather than fitted, so there is no expression to get backwards — which is
+        the structural reason the basketball sign error cannot recur here.
         """
-        model = model_basketball.load()
-        if not model:
-            self.skipTest("basketball model not built")
-        for a, b in (("Fenerbahce Beko", "Olympiacos Piraeus"),
-                     ("Efes Pilsen", "Panathinaikos"),      # a sponsor era ago
-                     ("Real Madrid", "Barcelona")):
-            probs, score = model_basketball.lookup(model, a, b)
-            self.assertIsNotNone(probs, f"{a} v {b} did not resolve")
-            self.assertGreaterEqual(score, 0.86)
-        # A club outside the pool must produce nothing rather than a neighbour's rating.
-        probs, _ = model_basketball.lookup(model, "Some Random BC", "Other BC")
-        self.assertIsNone(probs)
-
-    def test_basketball_handicap_probability_moves_the_right_way(self):
-        """A bigger head start is safer, and the two sides of one line must sum to 1."""
-        probs = {"margin_mu": 6.0, "margin_sd": 12.6, "total_mu": 163.0,
-                 "total_sd": 15.0, "_source": "basketball"}
+        pmf = {-3.0: 0.1, -1.0: 0.2, 0.0: 0.2, 1.0: 0.2, 4.0: 0.2, 9.0: 0.1}
+        probs = {"margin_pmf": pmf, "total_pmf": {5.0: 1.0}, "_source": "generic"}
         last = 0.0
-        for line in (2.5, 6.5, 10.5, 14.5, 20.5):
+        for line in (0.5, 1.5, 2.5, 3.5, 5.5):
             row = {"market_key": ("k", f"2|{-line}"), "outcome_id": 8}   # away +line
-            win, push = model_basketball.rung_probs(row, probs)
-            self.assertGreater(win, last, f"+{line} came out no safer than the line below")
+            win, _push = model_generic.rung_probs(row, probs)
+            self.assertGreaterEqual(win, last, f"+{line} came out no safer than below it")
             last = win
-        home = model_basketball.rung_probs(
-            {"market_key": ("k", "2|-10.5"), "outcome_id": 7}, probs)[0]
-        away = model_basketball.rung_probs(
-            {"market_key": ("k", "2|-10.5"), "outcome_id": 8}, probs)[0]
-        self.assertAlmostEqual(home + away, 1.0, places=6)
+        home = model_generic.rung_probs(
+            {"market_key": ("k", "2|-2.5"), "outcome_id": 7}, probs)[0]
+        away = model_generic.rung_probs(
+            {"market_key": ("k", "2|-2.5"), "outcome_id": 8}, probs)[0]
+        self.assertAlmostEqual(home + away, 1.0, places=9)
+
+    def test_ratings_never_cross_a_pool(self):
+        """Football divisions do not play each other, so their ratings are not comparable.
+
+        Pooling all 46 of them onto one scale was tried and football failed its own
+        calibration by 4.8 points at +0.5 — a mid-table League Two side was being called
+        the equal of a mid-table Premier League side. Generalizing a model is precisely
+        when a sport's real structure gets dropped.
+        """
+        rows = [
+            {"date": "2025-01-01", "home": "A", "away": "B", "home_score": 3,
+             "away_score": 0, "pool": "top"},
+            {"date": "2025-01-02", "home": "C", "away": "D", "home_score": 3,
+             "away_score": 0, "pool": "bottom"},
+        ]
+        rating = model_generic.fit_ratings(rows)
+        self.assertIn(("top", "A"), rating)
+        self.assertIn(("bottom", "C"), rating)
+        model = {"pools": {"top": {"A": 1600.0, "B": 1400.0},
+                           "bottom": {"C": 1600.0, "D": 1400.0}},
+                 "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
+                                         "mean_abs_margin": 1.0},
+                 "bands": [{"lo": -9, "hi": 9, "n": 500, "margin": {"0": 1}}],
+                 "_margin": [{0.0: 1.0}], "_total": [{2.0: 1.0}]}
+        # A and D never share a pool, so the fixture cannot be priced at all.
+        self.assertIsNone(model_generic.lookup(model, "A", "D")[0])
+        self.assertIsNotNone(model_generic.lookup(model, "A", "B")[0])
 
     def test_every_modelled_sport_has_a_live_signal(self):
         """A sport that produces selections must have something marked live behind it.

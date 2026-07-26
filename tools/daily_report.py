@@ -26,9 +26,9 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, mirror, model_basketball, model_elo,  # noqa: E402
-                    model_football, model_tt, parlay, pick, rating, score, setka,
-                    settlement, telegram, tr)
+from engine import (bwfeed, mirror, model_elo, model_football,  # noqa: E402
+                    model_generic, model_tt, parlay, pick, rating, results_store,
+                    score, setka, settlement, telegram, tr)
 from tools import make_picks_page  # noqa: E402
 
 
@@ -57,7 +57,7 @@ def within(rows, hours, now=None):
     return out
 
 
-def analyse(rows, hours, index, elo_model=None, tt=None, basketball=None):
+def analyse(rows, hours, index, elo_model=None, tt=None, generic=None):
     """One window's worth of analysis."""
     windowed = within(rows, hours)
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
@@ -67,7 +67,7 @@ def analyse(rows, hours, index, elo_model=None, tt=None, basketball=None):
         return {"hours": hours, "matches": 0, "picks": [], "skipped": {}}
 
     picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model,
-                                       tt=tt, basketball=basketball)
+                                       tt=tt, generic=generic)
     settlement.annotate(picks)
     # Picks come from the unfiltered rows, so they carry no hold yet. Attach it here so
     # the parlay's hard-rule-4 figures can be computed from the same numbers as the scan.
@@ -81,6 +81,61 @@ def analyse(rows, hours, index, elo_model=None, tt=None, basketball=None):
         "picks": picks,
         "skipped": skipped,
     }
+
+
+def coverage(rows, results, generic):
+    """Per sport: what was on the card, what was priced, and WHY the rest was not.
+
+    This exists because the operator kept discovering the same class of problem by
+    accident — "only football and table tennis" was true for weeks and nothing said so
+    where it would be read. A gap that is reported every day is a decision; a gap you
+    trip over is a surprise, and surprises are what made this expensive.
+    """
+    full = max(results, key=lambda r: r["hours"]) if results else None
+    if not full:
+        return []
+    by_sport = {}
+    for r in rows:
+        sid = r.get("sport_id")
+        by_sport.setdefault(sid, set()).add(r.get("match_id", r["fixture_id"]))
+    picked = {}
+    for p in full["picks"]:
+        sid = p.get("sport_id")
+        picked[sid] = picked.get(sid, 0) + 1
+
+    excluded = getattr(config, "EXCLUDED_SPORTS", set())
+    multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
+    out = []
+    for sid, matches in sorted(by_sport.items(), key=lambda kv: -len(kv[1])):
+        if sid in excluded:
+            state, detail = "excluded", "config.EXCLUDED_SPORTS"
+        elif sid in multi_day:
+            state, detail = "excluded", "aynı gün sonuçlanmıyor"
+        elif sid in pick.MODELLED_SPORTS:
+            state, detail = "modelled", "hand-written model"
+        elif sid in (generic or {}):
+            model = generic[sid]
+            worst = max(abs(c["predicted"] - c["observed"])
+                        for c in model["calibration"])
+            state = "modelled"
+            detail = f"generic, {model['games']} sonuç, kalibrasyon {worst:.3f}"
+        else:
+            stored = results_store.summary().get(sid)
+            state = "no_model"
+            if not stored:
+                detail = "sonuç verisi yok — adaptör yazılmadı"
+            else:
+                ok, why = model_generic.usable(model_generic.load(sid))
+                detail = f"model reddedildi: {why}"
+        out.append({
+            "sport_id": sid,
+            "sport": tr.sport(sid, str(sid)),
+            "matches": len(matches),
+            "picks": picked.get(sid, 0),
+            "state": state,
+            "detail": detail,
+        })
+    return out
 
 
 def pick_key(p):
@@ -271,14 +326,16 @@ def main():
     else:
         print("Table tennis model absent — run tools/build_tt_model.py", file=sys.stderr)
 
-    basketball = model_basketball.load()
-    if basketball:
-        m = basketball["margin"]
-        worst = max(abs(c["predicted"] - c["observed"]) for c in basketball["calibration"])
-        print(f"Basketball model: {basketball['games']} games, {basketball['teams']} teams; "
-              f"margin sd {m['residual_sd']} pts, worst calibration gap {worst:.3f}")
-    else:
-        print("Basketball model absent — run tools/build_basketball_model.py", file=sys.stderr)
+    # Every generic model that PASSES its own held-out calibration. One line, and it is
+    # the same line however many sports there eventually are.
+    generic = {}
+    for sid in sorted(results_store.summary()):
+        model = model_generic.load(sid)
+        ok, why = model_generic.usable(model)
+        label = tr.sport(sid, str(sid))
+        print(f"generic model {label} ({sid}): {'ADMITTED' if ok else 'refused'} — {why}")
+        if ok:
+            generic[sid] = model
 
     try:
         index = model_football.build_index()
@@ -288,7 +345,7 @@ def main():
         index = {}
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = number([analyse(rows, h, index, elo_model, tt, basketball)
+    results = number([analyse(rows, h, index, elo_model, tt, generic)
                       for h in windows])
 
     for r in results:
@@ -298,8 +355,19 @@ def main():
     host, host_source = mirror.current(getattr(config, "REFERRAL_URL", None))
     print(f"link host: {host} ({host_source})")
 
+    cov = coverage(rows, results, generic)
+    reach = sum(c["matches"] for c in cov if c["state"] == "modelled")
+    total = sum(c["matches"] for c in cov)
+    print(f"\ncoverage: {len(cov)} sports on the card, "
+          f"{sum(1 for c in cov if c['state'] == 'modelled')} modelled, "
+          f"{reach}/{total} matches reachable")
+    for c in cov[:14]:
+        print(f"  {c['sport'][:22]:<22} {c['matches']:>5} maç  {c['picks']:>4} seçim  "
+              f"{c['state']:<10} {c['detail']}")
+
     payload = {
         "generated": datetime.now(timezone.utc).isoformat(),
+        "coverage": cov,
         "link_host": host,
         "min_odds": config.MIN_ODDS,
         "min_model_survival": config.MIN_MODEL_SURVIVAL,

@@ -61,7 +61,8 @@ tools/fetch_window.py  sports → tournaments → fixtures → markets, budgeted
 tools/make_picks_page.py  ONE template for picks.html and results.html
 tools/daily_results.py    settles a logged day, rebuilds the page as a scorecard
 tools/make_coupon.py   scan-path slip of deep links (NOT the daily product)
-tools/harvest_basketball.py + build_basketball_model.py  EuroLeague/EuroCup -> the margin model
+tools/collect_results.py  one small adapter per source -> the results store
+tools/build_generic_model.py  fits + calibrates any sport; refuses the ones that fail
 tools/make_method_page.py  method.html, generated from signals/pick/ladder/config/research
 engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
 engine/parser.py       OddsPapi response → the same rows (book-agnostic)
@@ -69,8 +70,9 @@ engine/score.py        hard filters + composite score
 engine/ladder.py       safety laddering; three-way vs two-way read off the payload
 engine/pick.py         direction + ladder + gates → one selection per match
 engine/rating.py       the 0-100 score = model probability, discounted by evidence
+engine/results_store.py   ONE results table per sport: date, teams, score. Nothing else.
+engine/model_generic.py   ONE model for every sport, counted from that table
 engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
-engine/model_basketball.py  Elo -> a NORMAL margin, calibrated against observed cover rates
 engine/settlement.py   what a selection actually means when it settles
 engine/telegram.py     daily notification (no-ops without credentials)
 engine/tr.py           Turkish labels for everything user-facing
@@ -108,6 +110,27 @@ skipped. A credential problem must never fail a scan that otherwise worked.
 
 `score = Σ wᵢ · componentᵢ`. Weights in `config.WEIGHTS` are provisional; tune against
 the first real Betwinner fixture.
+
+## Adding a sport (this is the whole procedure now)
+1. Write an adapter in `tools/collect_results.py` that yields `{date, home, away,
+   home_score, away_score}`. Check robots.txt for OUR crawler by name FIRST and record
+   the check next to the adapter. Supply `pool` when the sport's competitions do NOT play
+   each other (football divisions), and a stable `home_id`/`away_id` when the source has
+   one (a name does not survive a sponsor rename; an id does).
+2. `python tools/build_generic_model.py --sport <id>`.
+3. Read the held-out calibration. If it holds, the sport is admitted automatically. If it
+   does not, it is REFUSED and the daily run says why, every day, in the coverage report.
+
+There is deliberately no step for writing a model. Football, table tennis and basketball
+each got a bespoke one, and both bugs that reached a live card came from that duplication
+— a sign error in the basketball handicap and a table tennis logistic extrapolated past
+its fitted range. `engine/model_generic.py` counts what happened instead of assuming a
+distribution, so a sport with a fat draw, one that cannot draw and one scored in sets all
+work with the same code. Basketball now runs on it; its bespoke model was deleted rather
+than kept alongside.
+
+`MODELLED_SPORTS` in `engine/pick.py` is the list of HAND-WRITTEN models and is meant to
+stop growing. Coverage is `data/results/` plus whatever passes its calibration.
 
 ## Hard rules (engineering invariants — do not violate)
 1. **Every emitted selection carries:** odds, implied_prob, market_overround,
@@ -155,7 +178,12 @@ the first real Betwinner fixture.
    about that number looks wrong, and it clears `MIN_MODEL_SURVIVAL` comfortably: the
    confidence floor CANNOT catch this class of error, because the floor trusts the model.
    Table tennis was caught the same way (extrapolating a logistic past its fitted range to
-   97% on a 3.30 shot). A calibration table ships with each model and a test asserts it.
+   97% on a 3.30 shot). The calibration must be HELD OUT: the first generic version scored
+   predictions and outcomes from the same matches and reported a gap of 0.000 on every
+   line, which is an arithmetic identity dressed as a test. `model_generic.usable()` is the
+   gate — under 400 results, no calibration table, or a gap over 0.03 and the sport is
+   refused. Football's own generic model is refused today at 0.043; that is the gate
+   working, not a failure to be tuned away.
 9. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
    football's 8.65%, so left in they head every run. No model can ever justify one.
    `config.EXCLUDED_SPORTS`.

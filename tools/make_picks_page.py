@@ -167,6 +167,7 @@ PAGE = """<!doctype html>
   model güven eşiği %{floor} · maç başına tek seçim · iadeli bahisler kapalı</div>
 
 {scorecard}
+{coverage}
 
 <details class="note">
   <summary>Puan ne demek?</summary>
@@ -481,6 +482,24 @@ def build(report, out_path):
 
     # The count the model could NOT reach is the honest headline of this product, so it
     # goes on the page rather than being quietly left out of it.
+    cov = report.get("coverage") or []
+    if cov:
+        modelled = [c for c in cov if c["state"] == "modelled"]
+        gap = [c for c in cov if c["state"] == "no_model"]
+        rows.append("")  # keep the table markup separate from the note below
+        cov_note = (
+            f'<div class="note"><b>Kapsam.</b> Kartta {len(cov)} spor var; '
+            f'{len(modelled)} tanesi modelli ve '
+            f'{sum(c["matches"] for c in modelled)} maça ulaşılıyor. '
+            f'Modeli olmayan {len(gap)} sporda '
+            f'{sum(c["matches"] for c in gap)} maç var — bunlardan seçim ÇIKMAZ. '
+            + "; ".join(f'{html.escape(c["sport"])} ({c["matches"]} maç: '
+                        f'{html.escape(c["detail"])})' for c in gap[:6])
+            + '</div>')
+        rows.pop()
+    else:
+        cov_note = ""
+
     sk = windows[longest].get("skipped") or {}
     foot = [
         f"{windows[longest].get('matches', 0)} maç tarandı · "
@@ -515,6 +534,7 @@ def build(report, out_path):
         window_opts=window_opts,
         result_filter=result_filter,
         scorecard=scorecard,
+        coverage=cov_note,
         rows="\n".join(rows),
         footer="<br>".join(foot),
     )
