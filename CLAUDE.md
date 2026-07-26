@@ -27,8 +27,12 @@ does not place bets.
 4. **A confidence floor** (`MIN_MODEL_SURVIVAL`) throws away anything the model is not
    actually sure of. Without it the ladder returns the safest form of a coin flip, which
    is still a coin flip.
-5. Measured on **survival** (win + push), not on winning: a pushed leg is refunded at
-   1.00 rather than killing the coupon, and finding that difference is what a ladder is for.
+5. **Refund (push) markets are OFF** (`ALLOW_PUSH_MARKETS = False`). Whole-number
+   handicaps, quarter handicaps and whole-number totals can all return the stake instead
+   of winning, so they are excluded and only half-lines survive. With them gone the
+   confidence floor is a floor on WINNING rather than on merely surviving. The ladder
+   still walks down to the next clean rung rather than dropping the match — on a live
+   card "+0.75 handikap" became "kaybetmez", not nothing.
 
 A match where the model has no confident view yields NOTHING. Padding the slip with the
 least-bad option available would defeat the whole exercise.

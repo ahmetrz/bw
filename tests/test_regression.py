@@ -334,9 +334,13 @@ class TestRegression(unittest.TestCase):
         for match_rows in by_match.values():
             for direction in ("home", "away"):
                 rungs = ladder.build(match_rows, 1, direction)
+                # Mirrors every gate the picker applies, including the push exclusion —
+                # otherwise this test expects a rung the picker is right to refuse.
+                allow_push = getattr(config, "ALLOW_PUSH_MARKETS", True)
                 qualifying = [
                     x for x in rungs
                     if x["row"]["odds"] >= config.MIN_ODDS
+                    and (allow_push or not pick._can_push(x["row"]))
                     and (pick._survival(x["row"], probs) or 0) >= config.MIN_MODEL_SURVIVAL
                 ]
                 if len(qualifying) < 2:
@@ -444,6 +448,52 @@ class TestRegression(unittest.TestCase):
         # An unknown pairing stays ungraded.
         self.assertIsNone(
             grade_predictions.lookup_result(table, "Ilves", "Nobody", "2026-07-26T12:00"))
+
+    def test_push_markets_are_excluded_when_disabled(self):
+        """With ALLOW_PUSH_MARKETS off, nothing that can return the stake may be offered.
+
+        Three families can push and all three must go: whole-number handicaps (+1 refunds
+        on an exact one-goal defeat), quarter handicaps (+0.25 splits the stake so half can
+        be returned), and whole-number totals (over 3.0 refunds on exactly three goals).
+        Half-lines never can, which is why they are what remains.
+
+        Detection is on the LINE rather than on the model's push probability, because a
+        model can put zero mass on the pushing scoreline for one fixture while the market
+        still carries the possibility.
+        """
+        def row(group, line):
+            return {"market_key": (1, f"{group}|{line}")}
+
+        for group, line in [(2, "1"), (2, "0.25"), (2, "-2.75"), (2854, "2"),
+                            (17, "3.0"), (7099, "2"), (2604, "4")]:
+            self.assertTrue(pick._can_push(row(group, line)), f"G{group} {line} can push")
+        for group, line in [(2, "1.5"), (2, "-2.5"), (17, "2.5"), (7099, "1.5"),
+                            (8, "None"), (1, "None"), (101, "None")]:
+            self.assertFalse(pick._can_push(row(group, line)), f"G{group} {line} cannot push")
+
+        if getattr(config, "ALLOW_PUSH_MARKETS", True):
+            self.skipTest("push markets are enabled in config")
+
+        probs = {
+            "p_home": 0.55, "p_draw": 0.25, "p_away": 0.20,
+            "p_over": {0.5: 0.94, 1.5: 0.75, 2.5: 0.48, 3.5: 0.25, 4.5: 0.11, 5.5: 0.04},
+            "gd": {-3: 0.03, -2: 0.06, -1: 0.11, 0: 0.25, 1: 0.28, 2: 0.17, 3: 0.10},
+            "score_mass": 1.0,
+        }
+        rows = [r for r in bwfeed.normalize(_sample()) if not r.get("sub_game")]
+        by_match = collections.defaultdict(list)
+        for r in rows:
+            by_match[r.get("match_id", r["fixture_id"])].append(r)
+
+        offered = 0
+        for match_rows in by_match.values():
+            for got in pick.candidates(match_rows, 1, probs):
+                offered += 1
+                self.assertFalse(pick._can_push(got),
+                                 f"offered a pushable market: {got.get('ladder_rung')}")
+                self.assertEqual(got.get("model_push"), 0.0,
+                                 f"offered a leg with push mass: {got.get('ladder_rung')}")
+        self.assertGreater(offered, 5, "not enough selections produced to test")
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must

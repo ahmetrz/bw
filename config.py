@@ -115,6 +115,19 @@ MIN_ODDS = 1.10
 # the entire point of a safety ladder.
 MIN_MODEL_SURVIVAL = 0.75
 
+# Refuse markets that can return the stake instead of winning or losing outright.
+#
+# Three families can push: whole-number handicaps (+1 refunds on an exact one-goal
+# defeat), quarter handicaps (+0.25 and +0.75 split the stake, so half of it can be
+# returned), and whole-number totals (over 3.0 refunds on exactly three goals).
+#
+# Operator's call, and it tightens the product rather than loosening it: with pushes
+# excluded the confidence floor becomes a floor on WINNING, not on merely surviving, so
+# every remaining selection is a clean win-or-lose at the stated probability. A pushed leg
+# on a coupon also pays 1.00, which quietly drags the combined return down without ever
+# showing up as a loss.
+ALLOW_PUSH_MARKETS = False
+
 # --- Daily run --------------------------------------------------------------
 # Windows reported each day. Both are pre-match only.
 DAILY_WINDOWS_HOURS = (24, 48)

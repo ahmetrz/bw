@@ -30,8 +30,8 @@ MODELLED_SPORTS = {1, 10}
 DIRECTIONS = ("home", "away", "over", "under")
 
 
-def _survival(row, probs):
-    """P(this leg does not lose the coupon) = win + push, or None if unpriceable.
+def _win_push(row, probs):
+    """(win, push) for one selection, or None if the model cannot price it.
 
     Dispatches on the model that produced `probs`, because each sport prices its rungs
     from a different distribution: football from a scoreline matrix, table tennis from a
@@ -41,8 +41,37 @@ def _survival(row, probs):
     from engine import model_tt
 
     source = probs.get("_source")
-    got = (model_tt.rung_probs(row, probs) if source == "setka"
-           else model_football.rung_probs(row, probs))
+    return (model_tt.rung_probs(row, probs) if source == "setka"
+            else model_football.rung_probs(row, probs))
+
+
+def _can_push(row):
+    """True when this market can return the stake rather than win or lose outright.
+
+    Read off the LINE rather than off the model's push probability, because a model can
+    put zero mass on the pushing scoreline for a particular fixture while the market still
+    carries the possibility. Whole numbers push on the exact result; quarter lines split
+    the stake and can push half of it. Half-lines (.5) never can, which is why they are
+    the only handicaps and totals left once this is on.
+    """
+    try:
+        group, line = str(row["market_key"][1]).split("|", 1)
+        group = int(group)
+    except (KeyError, ValueError, TypeError, IndexError):
+        return False
+    # Groups whose line is a threshold the result can land exactly on.
+    if group not in (2, 2854, 17, 99, 15, 62, 8427, 8429, 7099, 2604, 109, 182):
+        return False
+    try:
+        value = abs(float(line))
+    except (TypeError, ValueError):
+        return False
+    return abs(value % 1 - 0.5) > 1e-9
+
+
+def _survival(row, probs):
+    """P(this leg does not lose the coupon) = win + push, or None if unpriceable."""
+    got = _win_push(row, probs)
     if not got:
         return None
     win, push = got
@@ -60,6 +89,7 @@ def candidates(rows, sport_id, probs, min_odds=None, min_survival=None):
         min_odds = getattr(config, "MIN_ODDS", 1.10)
     if min_survival is None:
         min_survival = getattr(config, "MIN_MODEL_SURVIVAL", 0.75)
+    allow_push = getattr(config, "ALLOW_PUSH_MARKETS", True)
 
     out = []
     for direction in DIRECTIONS:
@@ -73,13 +103,21 @@ def candidates(rows, sport_id, probs, min_odds=None, min_survival=None):
             row = rung["row"]
             if row["odds"] < min_odds:
                 continue
-            surv = _survival(row, probs)
-            if surv is None or surv < min_survival:
+            if not allow_push and _can_push(row):
+                continue
+            got = _win_push(row, probs)
+            if not got:
+                continue
+            win, push = got
+            surv = win + push
+            if surv < min_survival:
                 continue
             picked = dict(row)
             picked["ladder_rung"] = rung["label"]
             picked["ladder_scope"] = rung["scope"]
             picked["model_survival"] = round(surv, 4)
+            picked["model_win"] = round(win, 4)
+            picked["model_push"] = round(push, 4)
             picked["direction"] = direction
             picked["ladder_available"] = len(rungs)
             out.append(picked)
