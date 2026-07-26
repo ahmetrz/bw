@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import unittest
+from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -1125,6 +1126,51 @@ class TestRegression(unittest.TestCase):
             collect_live.to_result({**crick, "note": "Test Match"}, 0)["pool"], "Test Match")
         self.assertTrue(collect_live.placeable(crick))
         self.assertFalse(collect_live.placeable({**crick, "note": ""}))
+
+    def test_a_second_model_may_fill_a_gap_but_never_overrule_a_refusal(self):
+        """A fallback model answers where the first CANNOT reach, never where it declined.
+
+        Table tennis runs two models: Setka's rating index reaches four times as many
+        fixtures on a real card (70 of 350 against 18), and the generic one now holds Pro
+        League, Masters and TT-Cup players from the live watcher that Setka's index does
+        not carry at all — 3 fixtures on the measured card. Running them in sequence adds
+        that reach.
+
+        What it must NOT do is ask the second model when the first said no. The confidence
+        floor exists to throw away what a model is not sure of; consulting another model
+        until one clears the floor would select for whichever happens to be overconfident,
+        and would do it invisibly. So the fallback is at the RESOLVE step — can this model
+        price this fixture at all — and never at the pick step."""
+        called = []
+
+        def tt_lookup(_m, _i, home, _away):
+            called.append(("setka", home))
+            # Setka knows this player and has an opinion.
+            return ({"_source": "setka"}, 1.0) if home == "known" else (None, 0.0)
+
+        def generic_lookup(_m, home, _away, home_id=None, away_id=None):
+            called.append(("generic", home))
+            return {"_source": "generic"}, 1.0
+
+        # resolve() imports these inside the function, so patch the modules themselves.
+        from engine import model_tt
+        with mock.patch.object(model_tt, "lookup", tt_lookup), \
+             mock.patch.object(model_generic, "lookup", generic_lookup):
+            # Setka can price it: the generic model is never consulted, whatever the
+            # ladder later decides about the rungs.
+            probs, _score, source = pick.resolve(
+                {"p1": "known", "p2": "x", "sport_id": 10},
+                tt=("model", "index"), generic={10: "gen"})
+            self.assertEqual(source, "setka")
+            self.assertNotIn("generic", [c[0] for c in called])
+
+            called.clear()
+            # Setka cannot reach this player at all — that is a gap, not a refusal.
+            probs, _score, source = pick.resolve(
+                {"p1": "unknown", "p2": "x", "sport_id": 10},
+                tt=("model", "index"), generic={10: "gen"})
+            self.assertEqual(source, "generic")
+            self.assertEqual([c[0] for c in called], ["setka", "generic"])
 
     def test_a_generated_competition_is_caught_without_touching_setka_cup(self):
         """A league is called generated on PHYSICAL IMPOSSIBILITY, nothing weaker.

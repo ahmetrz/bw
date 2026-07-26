@@ -191,10 +191,33 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
             return probs, score, "generic"
         return None, 0.0, None
 
-    if sport == 10 and tt:
-        probs, score = model_tt.lookup(tt[0], tt[1], home, away)
-        if probs:
-            return probs, score, "setka"
+    if sport == 10:
+        # Setka's rating index FIRST, because on a measured card it reaches four times as
+        # many fixtures: 70 of 350 against 18, for 11 selections against 4. The generic
+        # model has the better evidence — a held-out calibration at 0.011, which the
+        # hand-written one does not have at all — so hard rule 8 says it should take over,
+        # and it will. What decides the order today is that Setka publishes live ratings
+        # for its own circuit and the generic store is still filling.
+        #
+        # THE GENERIC MODEL IS THE FALLBACK RATHER THAN THE REPLACEMENT, and it is not
+        # redundant: it now holds Pro League, Masters and TT-Cup players from the live
+        # watcher, which Setka's index does not carry at all. So the two cover different
+        # parts of the same card. Running them in sequence was checked before it was wired
+        # in — where both priced the same fixture they agreed on the direction AND on the
+        # ladder rung every time, so this adds reach without mixing two opinions.
+        # tools/compare_models.py re-runs that check; when the generic side wins on reach
+        # as well, swap the order and delete the hand-written model.
+        if tt:
+            probs, score = model_tt.lookup(tt[0], tt[1], home, away)
+            if probs:
+                return probs, score, "setka"
+        model = (generic or {}).get(sport)
+        if model:
+            probs, score = model_generic.lookup(
+                model, home, away,
+                home_id=sample.get("p1_id"), away_id=sample.get("p2_id"))
+            if probs and score >= 0.86:
+                return probs, score, "generic"
         return None, 0.0, None
 
     if sport == 1:
