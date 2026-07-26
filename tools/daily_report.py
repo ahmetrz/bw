@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config  # noqa: E402
 from engine import (bwfeed, mirror, model_elo, model_football,  # noqa: E402
                     model_generic, model_tt, parlay, pick, rating, results_store,
-                    score, setka, settlement, telegram, tr)
+                    score, setka, settlement, simulated, telegram, tr)
 from tools import collect_live, fetch_window, make_picks_page  # noqa: E402
 
 
@@ -57,11 +57,14 @@ def within(rows, hours, now=None):
     return out
 
 
-def analyse(rows, hours, index, elo_model=None, tt=None, generic=None):
+def analyse(rows, hours, index, elo_model=None, tt=None, generic=None, fake=None):
     """One window's worth of analysis."""
     windowed = within(rows, hours)
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
     windowed = [r for r in windowed if r.get("sport_id") not in multi_day]
+    if fake:
+        windowed = [r for r in windowed
+                    if (r.get("sport_id"), r.get("league")) not in fake]
     matches = {r.get("match_id", r["fixture_id"]) for r in windowed}
     if not windowed:
         return {"hours": hours, "matches": 0, "picks": [], "skipped": {}}
@@ -360,6 +363,7 @@ def main():
     ap.add_argument("--windows", default=",".join(str(h) for h in config.DAILY_WINDOWS_HOURS))
     ap.add_argument("--out", default="daily_report.json")
     ap.add_argument("--page", default="picks.html")
+    ap.add_argument("--simulated-out", default=simulated.STORE)
     ap.add_argument("--no-telegram", action="store_true")
     args = ap.parse_args()
 
@@ -410,8 +414,17 @@ def main():
         print(f"ClubElo unavailable: {e}", file=sys.stderr)
         index = {}
 
+    # Competitions whose schedule is physically impossible — a participant starting a
+    # second fixture before the first could have ended. See engine/simulated.py. Written
+    # out so the live watcher refuses to store their "results" too: the daily run sees the
+    # whole 48-hour card, which is where the pattern is visible at all.
+    fake = simulated.leagues(rows)
+    for (sid, league), why in sorted(fake.items(), key=lambda kv: str(kv[0])):
+        print(f"simulated: {tr.sport(sid, str(sid))} / {league} — {why}")
+    simulated.save(fake, args.simulated_out)
+
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = number([analyse(rows, h, index, elo_model, tt, generic)
+    results = number([analyse(rows, h, index, elo_model, tt, generic, fake)
                       for h in windows])
 
     for r in results:

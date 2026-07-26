@@ -53,7 +53,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import results_store  # noqa: E402
+from engine import results_store, simulated  # noqa: E402
 
 BASE = "https://betwinner.com/service-api/LiveFeed"
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -371,10 +371,11 @@ def write_state(path, state):
     os.replace(tmp, path)
 
 
-def sweep(state, ids, quiet, round_no):
+def sweep(state, ids, quiet, round_no, fake=None):
     """One pass over the live feed. Returns (finished rows by sport, counters)."""
     now = int(time.time())
     seen_ids, answered, live, done = set(), set(), 0, {}
+    fake = fake or {}
 
     for sport in ids:
         if quiet.get(sport, 0) >= QUIET_AFTER and round_no % RECHECK_EVERY:
@@ -390,6 +391,11 @@ def sweep(state, ids, quiet, round_no):
         for game in games:
             rec = snapshot(game, sport)
             if not rec:
+                continue
+            # A competition whose schedule is physically impossible is generated, and its
+            # "results" would teach the model about teams that never played. Flagged by
+            # the daily run, which sees a whole card; refused here.
+            if (sport, rec.get("league")) in fake:
                 continue
             gid = str(game["I"])
             seen_ids.add(gid)
@@ -451,10 +457,14 @@ def main():
         return 1
 
     state = read_state(args.state)
+    fake = simulated.load()
+    if fake:
+        print(f"refusing {len(fake)} generated competition(s): "
+              + ", ".join(sorted(str(l) for _s, l in fake)))
     quiet, round_no, added, deadline = {}, 0, 0, time.time() + args.minutes * 60
     while True:
         round_no += 1
-        done, counts = sweep(state, ids, quiet, round_no)
+        done, counts = sweep(state, ids, quiet, round_no, fake)
         finished = sum(len(v) for v in done.values())
         print(f"[{time.strftime('%H:%M:%S')}] sweep {round_no}: {counts['live']} live · "
               f"{finished} finished · {counts['waiting']} waiting · "

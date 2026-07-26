@@ -21,8 +21,9 @@ sys.path.insert(0, ROOT)
 import config  # noqa: E402
 from engine import (bwfeed, grade, ladder, mirror, model_generic,  # noqa: E402
                     parlay, pick, rating, results_store, score, settlement, signals,
-                    telegram)
+                    simulated, telegram)
 from tools import collect_live, daily_report, fetch_window  # noqa: E402
+from tools import grade_predictions  # noqa: E402
 from tools import daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
@@ -1124,6 +1125,58 @@ class TestRegression(unittest.TestCase):
             collect_live.to_result({**crick, "note": "Test Match"}, 0)["pool"], "Test Match")
         self.assertTrue(collect_live.placeable(crick))
         self.assertFalse(collect_live.placeable({**crick, "note": ""}))
+
+    def test_a_generated_competition_is_caught_without_touching_setka_cup(self):
+        """A league is called generated on PHYSICAL IMPOSSIBILITY, nothing weaker.
+
+        Two weaker signals were tried first and both flagged real competitions. Identical
+        prices: six RHL fixtures were byte-identical across 35 markets, but so were four
+        Setka Cup fixtures across 33 — the book templates prices for any thin market.
+        A completed micro round-robin: RHL and UPVL both showed one, and so does Setka
+        Cup, because that is genuinely how the circuit runs. Either rule would have
+        deleted the sport behind 25,738 stored results and a 0.011 calibration.
+
+        What separates them is whether a body could keep the schedule. Berkut Volgograd
+        starts at 02:50 and again at 04:20; an ice hockey game is not over in ninety
+        minutes. A Setka Cup player's matches sit thirty minutes apart and a best-of-five
+        is done in eighteen."""
+        hour = 3600
+
+        def fx(pairs, sport):
+            return [(a, b, t) for a, b, t in pairs], sport
+
+        # RHL: a three-team cycle inside ninety minutes, in ice hockey.
+        rhl, sport = fx([("berkut", "phoenix", 0),
+                         ("phoenix", "elektronik", 40 * 60),
+                         ("elektronik", "berkut", 90 * 60)], 2)
+        bad, why = simulated.impossible_schedule(rhl, sport)
+        self.assertTrue(bad)
+        self.assertIn("üretilmiş", why)
+
+        # The SAME schedule in table tennis is ordinary — the sport is the whole point.
+        self.assertFalse(simulated.impossible_schedule(rhl, 10)[0])
+
+        # Setka Cup's real shape: four players, a full round-robin, half-hour spacing.
+        setka_like = [("a", "b", 0), ("c", "d", 30 * 60), ("a", "c", 60 * 60),
+                      ("b", "d", 90 * 60), ("a", "d", 120 * 60), ("b", "c", 150 * 60)]
+        self.assertFalse(simulated.impossible_schedule(setka_like, 10)[0])
+
+        # A real group stage in a slow sport, spread over days, is fine too.
+        spread = [("x", "y", 0), ("y", "z", 26 * hour), ("z", "x", 50 * hour)]
+        self.assertFalse(simulated.impossible_schedule(spread, 2)[0])
+
+        # One double-booked participant is a mislabelled fixture, not a fake league.
+        single = [("p", "q", 0), ("p", "r", 30 * 60), ("s", "t", 5 * hour)]
+        self.assertFalse(simulated.impossible_schedule(single, 2)[0])
+
+        # And the flagged set survives a round trip to disk, which is how the live
+        # watcher learns about it — it never sees a whole card itself.
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "sim.json")
+            simulated.save({(2, "RHL"): "why"}, path)
+            self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
+        self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
 
     def test_a_running_match_is_never_graded(self):
         """The grader must not be able to settle a fixture that is still being played.
