@@ -29,7 +29,7 @@ import config  # noqa: E402
 from engine import (bwfeed, mirror, model_elo, model_football,  # noqa: E402
                     model_generic, model_tt, parlay, pick, rating, results_store,
                     score, setka, settlement, telegram, tr)
-from tools import make_picks_page  # noqa: E402
+from tools import collect_live, fetch_window, make_picks_page  # noqa: E402
 
 
 def load(path):
@@ -83,7 +83,59 @@ def analyse(rows, hours, index, elo_model=None, tt=None, generic=None):
     }
 
 
-def coverage(rows, results, generic):
+def skipped_at_fetch(card_path):
+    """What the fetcher left on the card without pulling, and why.
+
+    The fetcher now applies two rules — excluded sports, and hard rule 7's "no second
+    participant is not a head-to-head" — at ENUMERATION rather than after pulling a
+    thousand events for each fixture. That is a large saving and it would otherwise make
+    those sports disappear from this report entirely, which is the exact failure this
+    report exists to prevent. So the fetcher writes down what it skipped and the count is
+    read back here.
+    """
+    if not card_path:
+        return {}
+    try:
+        with open(fetch_window.skipped_path(card_path)) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out = {}
+    for reason, per_sport in (data or {}).items():
+        for sid, n in (per_sport or {}).items():
+            try:
+                sid = int(sid)
+            except (TypeError, ValueError):
+                continue
+            got = out.setdefault(sid, {"matches": 0, "reason": reason})
+            got["matches"] += int(n or 0)
+    return out
+
+
+def _why_no_model(sid, _cache={}):
+    """Why this sport produced nothing, in the words that say what happens next.
+
+    "No results data — no adapter written" was true when every sport needed somebody
+    else's archive. It stopped being true the day the live watcher went in: fencing,
+    volleyball and esports are not waiting for an adapter, they are waiting for matches to
+    finish. Those are different situations and only one of them is work for a person.
+    """
+    if not _cache:
+        _cache.update(results_store.summary() or {"_": None})
+    stored = _cache.get(sid)
+    if stored:
+        model = model_generic.load(sid)
+        if model:
+            return f"model reddedildi: {model_generic.usable(model)[1]}"
+        return (f"{stored['games']} sonuç toplandı, model henüz kurulmadı "
+                f"(kalibrasyon için {model_generic.MIN_RESULTS} gerekiyor)")
+    if sid in collect_live.SPORTS:
+        return "canlı izleniyor — sonuçlar biriktikçe modellenecek"
+    why = collect_live.UNWATCHABLE.get(sid)
+    return f"modellenemez: {why}" if why else "sonuç kaynağı yok"
+
+
+def coverage(rows, results, generic, card_path=None):
     """Per sport: what was on the card, what was priced, and WHY the rest was not.
 
     This exists because the operator kept discovering the same class of problem by
@@ -98,6 +150,8 @@ def coverage(rows, results, generic):
     for r in rows:
         sid = r.get("sport_id")
         by_sport.setdefault(sid, set()).add(r.get("match_id", r["fixture_id"]))
+    # Sports the fetcher never pulled still belong in the report, with their real count.
+    never_fetched = skipped_at_fetch(card_path)
     picked = {}
     for p in full["picks"]:
         sid = p.get("sport_id")
@@ -120,13 +174,7 @@ def coverage(rows, results, generic):
             state = "modelled"
             detail = f"generic, {model['games']} sonuç, kalibrasyon {worst:.3f}"
         else:
-            stored = results_store.summary().get(sid)
-            state = "no_model"
-            if not stored:
-                detail = "sonuç verisi yok — adaptör yazılmadı"
-            else:
-                ok, why = model_generic.usable(model_generic.load(sid))
-                detail = f"model reddedildi: {why}"
+            state, detail = "no_model", _why_no_model(sid)
         out.append({
             "sport_id": sid,
             "sport": tr.sport(sid, str(sid)),
@@ -135,6 +183,20 @@ def coverage(rows, results, generic):
             "state": state,
             "detail": detail,
         })
+    for sid, info in never_fetched.items():
+        if sid in by_sport:
+            continue
+        out.append({
+            "sport_id": sid,
+            "sport": tr.sport(sid, str(sid)),
+            "matches": info["matches"],
+            "picks": 0,
+            "state": "excluded",
+            "detail": ("config.EXCLUDED_SPORTS — kart çekilirken atlandı"
+                       if info["reason"] == "excluded_sport"
+                       else "ikinci taraf yok, ikili karşılaşma değil — çekilirken atlandı"),
+        })
+    out.sort(key=lambda r: -r["matches"])
     return out
 
 
@@ -355,7 +417,7 @@ def main():
     host, host_source = mirror.current(getattr(config, "REFERRAL_URL", None))
     print(f"link host: {host} ({host_source})")
 
-    cov = coverage(rows, results, generic)
+    cov = coverage(rows, results, generic, card_path=args.input)
     reach = sum(c["matches"] for c in cov if c["state"] == "modelled")
     total = sum(c["matches"] for c in cov)
     print(f"\ncoverage: {len(cov)} sports on the card, "

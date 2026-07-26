@@ -24,11 +24,16 @@ behind different endpoints.
 import argparse
 import gzip
 import json
+import os
 import sys
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import config  # noqa: E402
 
 BASE = "https://betwinner.com/service-api/LineFeed"
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -83,9 +88,28 @@ def champs(sid, partner):
 
 
 def fixtures(champ, sid, partner):
+    """(game id, start, is head-to-head) for one tournament.
+
+    The third value is hard rule 7 applied where it is FREE. An entry with no second
+    participant is not a head-to-head — that one test removes tournament winners, top
+    scorers, election questions, novelty bundles and every multi-runner race at once — and
+    the tournament listing already says so, in `O2`. It used to be applied after the full
+    market list had been pulled for each of them, which on a live card meant fetching every
+    horse in every race and every lottery draw at a thousand events apiece, then discarding
+    all of it. The rule has not changed; it is just enforced before the expensive part.
+    """
     v = get(f"Get1x2_VZip?sports={sid}&champs={champ}&count=200&lng=en&mode=4"
             f"&partner={partner}&getEmpty=true") or []
-    return [(g.get("CI"), g.get("S")) for g in v if g.get("CI")]
+    return [(g.get("CI"), g.get("S"), bool(g.get("O2"))) for g in v if g.get("CI")]
+
+
+def skipped_path(out):
+    """Where the "what we did not fetch" note sits, next to the card it describes.
+
+    One definition, imported by the reader, so the writer and the reader cannot drift
+    into two different filenames and silently report an empty card as a complete one.
+    """
+    return os.path.splitext(out)[0] + ".skipped.json"
 
 
 def game(ci, partner):
@@ -104,6 +128,11 @@ def main():
     ap.add_argument("--max-fixtures", type=int, default=0, help="0 = no cap")
     ap.add_argument("--budget-min", type=float, default=150.0,
                     help="wall-clock budget in minutes; stops gracefully and writes what it has")
+    ap.add_argument("--sub-games", action="store_true",
+                    help="also pull halves, corners and 'first to happen' (nothing in the "
+                         "daily product reads these)")
+    ap.add_argument("--keep-outrights", action="store_true",
+                    help="do not apply hard rule 7 at enumeration time")
     args = ap.parse_args()
 
     now = time.time()
@@ -141,15 +170,43 @@ def main():
     # A fixture can be listed under several tournaments; dedupe on the game id, and
     # keep only what starts inside the window. Starts slightly in the past are dropped
     # rather than trusted — that is in-play territory and this is a pre-match pull.
-    in_window = {}
+    #
+    # THE TWO RULES BELOW WERE ALWAYS IN FORCE — they were simply applied after the whole
+    # market list had been pulled for each fixture and then discarded. On a live 48-hour
+    # card that was 549 of 1,745 fixtures fetched at a thousand events apiece purely to
+    # throw them away: 281 lottery draws, 254 horses and greyhounds, 14 crypto derivatives.
+    # Applying them at enumeration costs nothing and is the same product.
+    excluded = getattr(config, "EXCLUDED_SPORTS", set())
+    in_window, skipped = {}, {"excluded_sport": {}, "not_head_to_head": {}}
     total_seen = 0
-    for lst in fx_lists:
-        for ci, s in lst:
+    for (_champ, sid), lst in zip(pairs, fx_lists):
+        for ci, s, h2h in lst:
             total_seen += 1
-            if s and now <= s <= until:
-                in_window[ci] = s
-    print(f"fixtures seen: {total_seen} | starting within {args.hours}h: {len(in_window)}",
-          flush=True)
+            if not s or not (now <= s <= until) or ci in in_window:
+                continue
+            if sid in excluded:
+                skipped["excluded_sport"][sid] = skipped["excluded_sport"].get(sid, 0) + 1
+                continue
+            if not h2h and not args.keep_outrights:
+                skipped["not_head_to_head"][sid] = (
+                    skipped["not_head_to_head"].get(sid, 0) + 1)
+                continue
+            in_window[ci] = s
+    dropped = sum(sum(v.values()) for v in skipped.values())
+    print(f"fixtures seen: {total_seen} | starting within {args.hours}h: "
+          f"{len(in_window) + dropped} | to fetch: {len(in_window)} "
+          f"(dropped {dropped}: "
+          f"{sum(skipped['excluded_sport'].values())} excluded sport, "
+          f"{sum(skipped['not_head_to_head'].values())} not head-to-head)", flush=True)
+    # Written next to the card so the daily coverage report can still say what was on it
+    # and why it was left out. A gap that is reported every day is a decision; a gap you
+    # trip over is a surprise, and this filter would otherwise make those sports vanish
+    # silently rather than be listed as excluded.
+    try:
+        with open(skipped_path(args.out), "w") as f:
+            json.dump(skipped, f)
+    except OSError:
+        pass
 
     ids = sorted(in_window, key=lambda c: in_window[c])
     if args.max_fixtures:
@@ -171,9 +228,15 @@ def main():
         flush(f"fixtures {i + len(chunk)}/{len(ids)}")
     print(f"fixtures fetched: {len(collected)}", flush=True)
 
-    # Sub-games only with leftover budget - the main card outranks them.
-    sub_ids = {sg["CI"] for g in collected for sg in (g.get("SG") or []) if sg.get("CI")}
-    sub_ids -= set(ids)
+    # Sub-games — halves, corners, "first to happen" — are OPT-IN, because nothing in the
+    # daily product reads one. engine/pick.py drops them (full-match probabilities do not
+    # describe a half, and pricing one with the other produced edges above +1.0 before it
+    # was caught) and engine/edge.py drops them again. They were 365,329 of the 674,379
+    # rows on a real card: 54% of the payload, fetched and normalized to be skipped.
+    sub_ids = set()
+    if args.sub_games:
+        sub_ids = {sg["CI"] for g in collected for sg in (g.get("SG") or []) if sg.get("CI")}
+        sub_ids -= set(ids)
     subs_done = 0
     if sub_ids and not timed_out:
         sub_list = sorted(sub_ids)

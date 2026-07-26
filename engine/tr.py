@@ -32,7 +32,7 @@ SPORTS = {
     150: "StarCraft 2", 151: "Tazı Yarışı (uzun vadeli)", 155: "Bilek Güreşi",
     176: "Hava Durumu", 180: "Kabaddi",
     189: "UFC", 202: "Siyaset", 278: "Çıplak El Boksu", 298: "Overwatch",
-    303: "Geleceğin Oyunları",
+    282: "Padel", 283: "Pickleball", 303: "Geleceğin Oyunları",
     307: "Profesyonel Güreş", 314: "Polybet",
 }
 

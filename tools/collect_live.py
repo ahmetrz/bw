@@ -112,15 +112,28 @@ SPORTS = {
     180: ("points", "periods", 2),      # kabaddi — two halves
 }
 
-# NOT watched, and each for a reason rather than an omission:
-#   9   Boxing, 189 UFC — settled by decision or stoppage. There is no score PAIR, so
-#       there is no margin, and engine/model_generic fits a distribution of margins.
-#       Fifty fights on the card and not one of them is a number this model can read.
-#   11  Chess — scored 1 / 0.5 / 0 over a match that runs for days. Same problem.
-#   18, 37, 41, 44, 57, 68, 102 — motorsport, swimming, golf, racing, athletics. Fields,
-#       not head-to-heads; hard rule 7 drops them from the card anyway.
-#   85 FIFA, 103 Mortal Kombat, 144 PES and the marble, card and lotto ladders — a
-#       template, not a contest. Hard rule 9.
+# NOT watched, and each for a reason rather than an omission. Data rather than a comment,
+# because tools/make_method_page.py reports it: "no source yet" and "cannot have a source"
+# are different answers and the operator should not have to guess which one applies.
+UNWATCHABLE = {
+    9:   "kazanan hakem kararı veya nakavtla belirlenir — skor ÇİFTİ yok, dolayısıyla "
+         "fark yok; genel model fark dağılımı kuruyor",
+    189: "kazanan hakem kararı veya nakavtla belirlenir — skor çifti yok",
+    307: "gösteri güreşi — sonucu önceden belirlenmiş",
+    11:  "1 / 0.5 / 0 puanlanır ve günlerce sürer — fark dağılımı yok",
+    18:  "yarış, ikili karşılaşma değil — sert kural 7",
+    37:  "yarış, ikili karşılaşma değil — sert kural 7",
+    41:  "sahada herkes birbirine karşı — ikili karşılaşma değil",
+    44:  "yarış, ikili karşılaşma değil — sert kural 7",
+    57:  "yarış, ikili karşılaşma değil — sert kural 7",
+    68:  "yarış, ikili karşılaşma değil — sert kural 7",
+    92:  "yarış, ikili karşılaşma değil — sert kural 7",
+    102: "yarış, ikili karşılaşma değil — sert kural 7",
+    85:  "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
+    144: "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
+    103: "simülasyon — sert kural 9",
+    321: "simülasyon — sert kural 9",
+}
 
 # Sports that can legitimately finish level. Everywhere else a tie in the last seen score
 # means we caught the match mid-flight, not that it ended that way.

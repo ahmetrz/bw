@@ -22,7 +22,7 @@ import config  # noqa: E402
 from engine import (bwfeed, grade, ladder, mirror, model_generic,  # noqa: E402
                     parlay, pick, rating, results_store, score, settlement, signals,
                     telegram)
-from tools import collect_live, daily_report  # noqa: E402
+from tools import collect_live, daily_report, fetch_window  # noqa: E402
 from tools import daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
@@ -1124,6 +1124,43 @@ class TestRegression(unittest.TestCase):
             collect_live.to_result({**crick, "note": "Test Match"}, 0)["pool"], "Test Match")
         self.assertTrue(collect_live.placeable(crick))
         self.assertFalse(collect_live.placeable({**crick, "note": ""}))
+
+    def test_a_sport_skipped_before_fetching_is_still_reported(self):
+        """Cutting the fetch must not cut the coverage report.
+
+        The fetcher now drops excluded sports and non-head-to-head entries while reading
+        the fixture list, instead of after pulling a thousand markets for each of them —
+        on a live card that was 750 lottery draws and 311 races and outrights. But those
+        sports then never reach the normalized rows, and the coverage report is built from
+        those rows, so they would silently vanish from the one place that says what is on
+        the card and why it was left out. "Only football and table tennis" was true for
+        weeks precisely because nothing said so where it would be read."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            card = os.path.join(tmp, "card.json.gz")
+            # Through the fetcher's own helper, so writer and reader cannot drift into
+            # two filenames and quietly report a trimmed card as a complete one.
+            with open(fetch_window.skipped_path(card), "w") as f:
+                json.dump({"excluded_sport": {"82": 731, "314": 14},
+                           "not_head_to_head": {"44": 151}}, f)
+            got = daily_report.skipped_at_fetch(card)
+            self.assertEqual(got[82]["matches"], 731)
+            self.assertEqual(got[44]["reason"], "not_head_to_head")
+
+            rows = [{"sport_id": 1, "fixture_id": 7, "match_id": 7}]
+            results = [{"hours": 48, "picks": [], "matches": 1}]
+            cov = daily_report.coverage(rows, results, {}, card_path=card)
+            by_sport = {c["sport_id"]: c for c in cov}
+            self.assertIn(82, by_sport)
+            self.assertEqual(by_sport[82]["matches"], 731)
+            self.assertEqual(by_sport[82]["state"], "excluded")
+            self.assertIn(44, by_sport)
+            self.assertEqual(by_sport[44]["state"], "excluded")
+            # Biggest first, so the report opens on what actually fills the card.
+            self.assertEqual([c["matches"] for c in cov],
+                             sorted((c["matches"] for c in cov), reverse=True))
+        # A missing sidecar is not an error: an older card simply reports what it has.
+        self.assertEqual(daily_report.skipped_at_fetch("/nonexistent/card.json.gz"), {})
 
     def test_the_watch_list_is_a_list_of_finish_conditions(self):
         """A sport is watched only when we can say what finishing it looks like.

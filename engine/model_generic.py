@@ -338,6 +338,12 @@ def margin_pmf(model, gap, pool=""):
     return model["_margin"][key][i], mu, (key, i)
 
 
+# The least history a sport can be admitted on. Named rather than inline because the
+# coverage report now tells the operator how far a sport still has to go, and a target
+# quoted from one place and enforced from another eventually disagree.
+MIN_RESULTS = 400
+
+
 def usable(model, max_gap=0.03):
     """Is this sport's model good enough to be allowed to price anything?
 
@@ -350,7 +356,7 @@ def usable(model, max_gap=0.03):
     cal = model.get("calibration") or []
     if not cal:
         return False, "no calibration table"
-    if model.get("games", 0) < 400:
+    if model.get("games", 0) < MIN_RESULTS:
         return False, f"only {model.get('games', 0)} results"
     worst = max(abs(c["predicted"] - c["observed"]) for c in cal)
     if worst > max_gap:

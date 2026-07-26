@@ -158,11 +158,24 @@ robots.txt is `Disallow: /`. Finding those parameters would replace hourly polli
 call a day AND backfill history.
 
 **Cost is a design constraint here, not an afterthought.** The repo is private, so Actions
-minutes are finite: `daily` averages 25 min/run, so the whole schedule already spends about
-30 min/day. `watch-live.yml` runs hourly at ~1 min/run, which fits inside the free tier
-alongside it. Sweeping more often catches more matches — a table tennis match lasts about
-half an hour — so the cadence is the dial the operator turns, and `--minutes` lets one job
-loop instead of scheduling more of them.
+minutes are finite, and the daily fetch was most of the spend. `watch-live.yml` opens three
+short dense windows a day rather than one thin sweep an hour, because yield is roughly
+(linger / interval) and hourly sweeping collects about 2% of what finishes — the cadence is
+the dial the operator turns, and `--minutes` lets one job loop instead of scheduling more.
+
+**What the fetcher does NOT fetch is part of the design.** `tools/fetch_window.py` applies
+two rules while reading the fixture list rather than after pulling a thousand markets per
+fixture and discarding them. Both were already in force; only their position moved:
+  * `config.EXCLUDED_SPORTS` — 750 fixtures on a live card, mostly lottery draws.
+  * Hard rule 7's "no second participant is not a head-to-head" — 311 fixtures, including
+    every horse and greyhound race.
+Sub-games (halves, corners, "first to happen") are now opt-in via `--sub-games`. Nothing in
+the daily product reads one — `engine/pick.py` drops them because full-match probabilities
+do not describe a half, and `engine/edge.py` drops them again — yet they were 365,329 of
+674,379 rows on a real card, 54% of the payload, fetched and normalized in order to be
+skipped. The fetcher writes `<card>.skipped.json` beside the card so the daily coverage
+report still names those sports and their real counts; trimming the fetch must never trim
+the one report that says what was on the card and why it was left out.
 
 There is deliberately no step for writing a model. Football, table tennis and basketball
 each got a bespoke one, and both bugs that reached a live card came from that duplication

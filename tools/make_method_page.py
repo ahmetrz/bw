@@ -25,7 +25,8 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import ladder, pick, signals, tr  # noqa: E402
+from engine import ladder, model_generic, pick, results_store, signals, tr  # noqa: E402
+from tools import collect_live  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESEARCH = os.path.join(ROOT, "research")
@@ -134,14 +135,58 @@ def english_catalogue():
         return {s["id"]: s["name"] for s in json.load(f)["sports"]}
 
 
+_STORED = {}
+
+
+def stored():
+    """results_store.summary(), read once.
+
+    It re-reads every results file on each call, and the store now holds 227,000 rows
+    across five sports. Calling it once per sport in `tier` turned a two-second test run
+    into forty-three seconds, which is the cheap version of the same mistake in a workflow.
+    """
+    if not _STORED:
+        _STORED.update(results_store.summary() or {"_": None})
+    return _STORED
+
+
 def tier(sport_id):
+    """Where a sport actually stands today, read off the code and the store rather than a
+    hand-kept list. `MODELLED_SPORTS` used to be the whole answer; now most sports are
+    priced by the generic model when their own held-out calibration admits them, and the
+    rest are being COLLECTED by the live watcher on the way there. A page that showed
+    football as unmodelled because it left the hand-written list would be worse than no
+    page — the point of this one is that the operator can see the real state."""
     if sport_id in getattr(config, "EXCLUDED_SPORTS", set()):
         return "excluded", "config.EXCLUDED_SPORTS"
     if sport_id in getattr(config, "MULTI_DAY_SPORTS", set()):
         return "excluded", "config.MULTI_DAY_SPORTS — aynı gün sonuçlanmıyor"
     if sport_id in pick.MODELLED_SPORTS:
-        return "modelled", "engine/pick.py MODELLED_SPORTS"
-    return "ladder", "engine/ladder.py _rungs_generic_side"
+        return "modelled", "engine/pick.py MODELLED_SPORTS — elle yazılmış model"
+    model = model_generic.load(sport_id)
+    if model:
+        ok, why = model_generic.usable(model)
+        if ok:
+            return "modelled", f"engine/model_generic.py — {why}"
+        return "ladder", f"model REDDEDİLDİ: {why}"
+    have = stored().get(sport_id)
+    if have:
+        return "ladder", (f"{have['games']} sonuç toplandı, model henüz kurulmadı "
+                          f"({have['first']} → {have['last']})")
+    if sport_id in collect_live.SPORTS:
+        unit, kind, n = collect_live.SPORTS[sport_id]
+        if kind == "target":
+            shape = f"{n} sete/frame'e yarış" if n else "format maçın kendisinden okunuyor"
+        else:
+            shape = f"{n} periyot"
+        return "ladder", (f"canlı izleniyor (tools/collect_live.py, birim {unit}, "
+                          f"{shape}) — henüz sonuç birikmedi")
+    # "No source yet" and "cannot have a source" are different answers, and only one of
+    # them is work waiting to be done.
+    why = collect_live.UNWATCHABLE.get(sport_id)
+    if why:
+        return "excluded", f"modellenemez: {why}"
+    return "ladder", "sonuç kaynağı yok — engine/ladder.py _rungs_generic_side"
 
 
 def ladder_note(sport_id):

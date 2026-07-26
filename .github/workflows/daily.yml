@@ -59,6 +59,15 @@ jobs:
 
       # 48 saatlik pencereyi bir kez cekiyoruz; 24 saatlik pencere onun alt kumesi,
       # ikinci bir cekim gereksiz yuk olur.
+      #
+      # NE CEKILMEDIGI DE ONEMLI. Cekici artik iki kurali fikstür listesini okurken
+      # uyguluyor, her fikstür icin binlerce marketi cektikten SONRA degil:
+      #   * config.EXCLUDED_SPORTS — canli kartta 750 fikstür, cogunlugu loto.
+      #   * sert kural 7, "ikinci taraf yoksa ikili karsilasma degildir" — 311 fikstür,
+      #     her at yarisi ve tazi yarisi dahil.
+      # Ikisi de zaten yururlukteydi; sadece pahali kisimdan once uygulaniyor. Ust oyunlar
+      # (devre, korner, "ilk olan") ise --sub-games ile opsiyonel: gunluk urunde hicbir
+      # sey onlari okumuyor, ama gercek bir kartta satirlarin %54'uydu.
       - name: Fetch 48h window
         if: inputs.use_committed_card != 'true'
         env:
@@ -70,8 +79,8 @@ jobs:
             --hours 48 \
             --partner 159 \
             --max-fixtures "${MF}" \
-            --workers 6 \
-            --budget-min 120 \
+            --workers 8 \
+            --budget-min 45 \
             --out data/betwinner_daily.json.gz
           ls -la data/
 
