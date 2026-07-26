@@ -57,7 +57,8 @@ FD_EXTRA = ("ARG", "AUT", "BRA", "CHN", "DNK", "FIN", "IRL", "JPN", "MEX", "NOR"
             "POL", "ROU", "RUS", "SWE", "SWZ", "USA")
 
 
-def football(seasons=("2324", "2425", "2526")):
+def football(seasons=("1617", "1718", "1819", "1920", "2021", "2122", "2223",
+                      "2324", "2425", "2526")):
     """football-data.co.uk season CSVs — the same source the grader already settles on.
 
     robots.txt checked 2026-07-26 for ClaudeBot and anthropic-ai: neither is named and
