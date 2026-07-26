@@ -193,8 +193,17 @@ def main():
         top = " ".join(f"{k}:{v:.2f}" for k, v in sorted(d["dist"].items(), reverse=True)[:6])
         print(f"   gap {key:<7} n={d['n']:>5}  {top}")
 
+    # The range the fit was actually VALIDATED over. Beyond it the logistic keeps
+    # extrapolating — at a gap of 33 it claims 99% — and nothing in the data supports that.
+    gaps = sorted(abs(x) for x, _ in rec_s)
+    max_gap = gaps[int(len(gaps) * 0.99)] if gaps else 0.0
+    print(f"\ncalibrated gap range: median {gaps[len(gaps)//2]:.1f}, p99 {max_gap:.1f}, "
+          f"max {gaps[-1]:.1f} — fixtures beyond p99 will not be priced")
+
     model = {
         "source": "setka compare archive",
+        "max_rating_gap": round(max_gap, 2),
+        "min_player_matches": 30,
         "fitted_on": args.since,
         "samples": len(rec_s),
         "logistic": {"a": round(a, 6), "b": round(b, 8)},

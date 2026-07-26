@@ -28,6 +28,10 @@ on:
         description: "true = Telegram'a gonderme, sadece yazdir"
         required: false
         default: "false"
+      use_committed_card:
+        description: "true = yeni cekim yapma, repodaki karti kullan"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -56,6 +60,7 @@ jobs:
       # 48 saatlik pencereyi bir kez cekiyoruz; 24 saatlik pencere onun alt kumesi,
       # ikinci bir cekim gereksiz yuk olur.
       - name: Fetch 48h window
+        if: inputs.use_committed_card != 'true'
         env:
           MF: ${{ inputs.max_fixtures || '0' }}
         run: |
@@ -69,6 +74,11 @@ jobs:
             --budget-min 120 \
             --out data/betwinner_daily.json.gz
           ls -la data/
+
+      # Bir defalik: repoda duran karti kullan (yeni cekim beklemeden bugunun listesi).
+      - name: Use committed card
+        if: inputs.use_committed_card == 'true'
+        run: cp data/card_today.json.gz data/betwinner_daily.json.gz
 
       - name: Analyse and notify
         env:

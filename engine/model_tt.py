@@ -15,6 +15,7 @@ to find, and the clearest evidence so far that the operator's rule is the right 
 So the set distribution is measured, not derived. A per-point model would need serve data
 that nobody publishes, and the observed 3-0 / 3-1 / 3-2 split IS the set-handicap market.
 """
+import difflib
 import json
 import os
 
@@ -43,19 +44,77 @@ def _norm(name):
     return " ".join(p for p in s.split() if p and p not in _NOISE)
 
 
-def build_player_index(players):
-    """Normalized name -> rating, from engine.setka.ratings()."""
-    idx = {}
+def build_player_index(players, min_matches=30):
+    """Normalized name -> rating, from engine.setka.ratings().
+
+    Players whose rating rests on too few matches are excluded: a provisional rating of
+    5.6 is not evidence that someone is weak, and pairing it against an established one
+    manufactures exactly the extreme gap the model must not price.
+
+    Also keyed by surname, because the two sources transliterate from Cyrillic
+    differently and often disagree on every letter of the first name: the book writes
+    "Evgeniy Pismenny" where the circuit writes "Yevhen Pysmennyi", and "Alexandr
+    Tuzhilin" against "Oleksandr Tuzhylin". Those are the same players.
+    """
+    idx, by_surname = {}, {}
     for pid, p in (players or {}).items():
         rating = p.get("ratingSc")
         if rating is None:
             continue
-        name = _norm(f"{p.get('firstName','')} {p.get('lastName','')}")
-        if name:
-            # Two players can share a normalized name; an ambiguous name must not resolve
-            # to whichever happened to be indexed last.
-            idx.setdefault(name, []).append(rating)
-    return {n: r[0] for n, r in idx.items() if len(r) == 1}
+        if (p.get("totalMatches") or 0) < min_matches:
+            continue
+        first = _norm(p.get("firstName") or "")
+        last = _norm(p.get("lastName") or "")
+        name = _norm(f"{first} {last}")
+        if not name:
+            continue
+        # Two players can share a name; an ambiguous one must not resolve to whichever
+        # happened to be indexed last.
+        idx.setdefault(name, []).append(rating)
+        if last:
+            by_surname.setdefault(last, []).append((first, rating))
+    return {
+        "exact": {n: r[0] for n, r in idx.items() if len(r) == 1},
+        "surname": {s: v for s, v in by_surname.items() if len(v) == 1},
+    }
+
+
+def _resolve(index, name):
+    """Rating for a player name, tolerating transliteration, or None.
+
+    Falls back to a fuzzy match on the SURNAME only, since that is the part the two
+    sources agree on most: "tuzhilin" against "tuzhylin" is near-identical while the
+    first names share almost nothing. A close second candidate is refused rather than
+    resolved by a hair.
+    """
+    if not index:
+        return None
+    key = _norm(name)
+    exact = index.get("exact") or {}
+    if key in exact:
+        return exact[key]
+
+    parts = key.split()
+    if not parts:
+        return None
+    surname = parts[-1]
+    by_surname = index.get("surname") or {}
+    if surname in by_surname:
+        return by_surname[surname][0][1]
+
+    scored = []
+    for cand, entries in by_surname.items():
+        if abs(len(cand) - len(surname)) > 3:
+            continue
+        ratio = difflib.SequenceMatcher(None, surname, cand).ratio()
+        if ratio >= 0.82:
+            scored.append((ratio, cand, entries[0][1]))
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.04:
+        return None
+    return scored[0][2]
 
 
 def _bucket(model, gap):
@@ -75,8 +134,18 @@ def lookup(model, index, p1, p2):
     """Probabilities for one fixture, or (None, 0.0) when either player is unrated."""
     if not model or not index:
         return None, 0.0
-    r1, r2 = index.get(_norm(p1)), index.get(_norm(p2))
+    r1, r2 = _resolve(index, p1), _resolve(index, p2)
     if r1 is None or r2 is None:
+        return None, 0.0
+
+    # Refuse to extrapolate. The logistic was fitted on gaps up to about 23 and keeps
+    # climbing outside that: at a gap of 33 it returns 0.989, which is not a measurement
+    # but an extension of a curve into a region containing no data. Left unchecked it put
+    # four such fixtures at the TOP of a day's list, one of them a 3.30 shot the model
+    # called 97% — the sort of confident nonsense a confidence floor is meant to stop, and
+    # would have waved straight through.
+    cap = model.get("max_rating_gap")
+    if cap and abs(r1 - r2) > cap:
         return None, 0.0
 
     a = model["logistic"]["a"]

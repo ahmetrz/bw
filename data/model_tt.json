@@ -1,5 +1,7 @@
 {
  "source": "setka compare archive",
+ "max_rating_gap": 11.9,
+ "min_player_matches": 30,
  "fitted_on": "2024-01-01",
  "samples": 7726,
  "logistic": {
