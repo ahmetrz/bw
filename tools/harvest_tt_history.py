@@ -13,8 +13,17 @@ It was found by reading the site's own JS bundle, which named the route; the par
 names took a few tries, and the endpoint returns an empty envelope rather than an error
 when they are wrong — a 200 that looks like "no data" and actually means "wrong query".
 
-Pairs are taken from the upcoming card, which is the right population by construction:
-those are the players we will be asked to price.
+PAIRS COME FROM THE WHOLE RATED POOL, NOT JUST TODAY'S FIXTURES, and that is the change
+that made this useful. Drawing them from the current schedule only reached the few dozen
+players in it: 7,465 matches accumulated across 88 distinct players, while Setka rates
+2,007 and the book's card on one day carried 321. Coverage was not thin because the sport
+is hard, it was thin because the crawl kept asking about the same people.
+
+So the pool is every rated player, ordered by how much they play, and the pairs already
+queried are REMEMBERED between runs in data/tt_pairs_seen.json. Each run spends its budget
+on ground it has not covered, so running it on a schedule widens the archive instead of
+re-reading it. Players on the upcoming card are queried first, because those are the ones
+we will be asked to price today.
 
 Append-only and deduplicated on match id, so re-running only adds what is new.
 """
@@ -34,6 +43,11 @@ from engine import setka  # noqa: E402
 BASE = "https://tabletennis.setkacup.com/api"
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/126 Safari/537.36")
+
+
+def _pair(a, b):
+    """A pair is unordered — asking (A,B) and (B,A) would spend the budget twice."""
+    return (a, b) if str(a) <= str(b) else (b, a)
 
 
 def compare(p1, p2, timeout=25):
@@ -76,7 +90,13 @@ def normalize(m):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default="data/tt_history.jsonl")
-    ap.add_argument("--pairs", type=int, default=300)
+    ap.add_argument("--memo", default="data/tt_pairs_seen.json",
+                    help="pairs already queried; skipped on the next run")
+    ap.add_argument("--pairs", type=int, default=1200)
+    ap.add_argument("--pool", type=int, default=1200,
+                    help="how many of the most active rated players to draw pairs from")
+    ap.add_argument("--neighbours", type=int, default=8,
+                    help="how many rating-adjacent opponents to query per player")
     ap.add_argument("--workers", type=int, default=6)
     args = ap.parse_args()
 
@@ -91,22 +111,59 @@ def main():
                     continue
     before = len(seen)
 
+    asked = set()
+    if os.path.exists(args.memo):
+        try:
+            with open(args.memo) as f:
+                asked = {tuple(p) for p in json.load(f)}
+        except (OSError, json.JSONDecodeError, TypeError):
+            asked = set()
+
+    # Today's fixtures first: those are the players we are about to be asked to price.
     fixtures = setka.nearest()
-    pairs = []
-    players = []
+    pairs, on_card = [], []
     for m in fixtures:
         a, b = m.get("player1Id"), m.get("player2Id")
         if a and b:
-            pairs.append((a, b))
-            players += [a, b]
-    # Beyond the scheduled pairings, cross-pair the same player pool: these players face
-    # each other constantly on these circuits, so most combinations have real history and
-    # each one that does multiplies the calibration set.
-    pool = list(dict.fromkeys(players))
-    extra = [p for p in itertools.combinations(pool, 2) if p not in set(pairs)]
-    pairs = (pairs + extra)[: args.pairs]
-    print(f"upcoming fixtures: {len(fixtures)} | player pool: {len(pool)} | "
-          f"pairs to query: {len(pairs)}")
+            pairs.append(_pair(a, b))
+            on_card += [a, b]
+
+    # Then the wider rated pool, most active first. These circuits run the same players
+    # against each other constantly, so most combinations have real history, and each one
+    # that does multiplies the archive.
+    rated = setka.ratings() or {}
+    ranked = sorted(
+        (pid for pid, p in rated.items() if (p.get("totalMatches") or 0) >= 30),
+        key=lambda pid: -(rated[pid].get("totalMatches") or 0))
+    try:
+        ranked = [int(p) for p in ranked]
+    except (TypeError, ValueError):
+        pass
+    pool = list(dict.fromkeys(on_card + ranked))[: args.pool]
+    # Pair each player with their RATING NEIGHBOURS rather than enumerating combinations
+    # in list order. Straight combinations spend the whole budget on the first few
+    # players — 900 calls reached 43 of a 260-strong pool and the archive grew from 88
+    # distinct players to 96. Neighbours are also who actually play each other on these
+    # circuits, so a neighbour pair is far more likely to return real history than a
+    # random one.
+    by_rating = sorted(pool, key=lambda pid: -(rated.get(pid, {}).get("ratingSc") or 0)
+                       if pid in rated else 0)
+    for i, a in enumerate(by_rating):
+        for b in by_rating[i + 1: i + 1 + args.neighbours]:
+            pairs.append(_pair(a, b))
+
+    fresh, dropped = [], 0
+    for pr in dict.fromkeys(pairs):
+        if pr in asked:
+            dropped += 1
+            continue
+        fresh.append(pr)
+        if len(fresh) >= args.pairs:
+            break
+    pairs = fresh
+    print(f"upcoming fixtures: {len(fixtures)} | rated pool: {len(ranked)} "
+          f"(using {len(pool)}) | already asked: {len(asked)} (skipped {dropped}) | "
+          f"querying: {len(pairs)}")
 
     executor = ThreadPoolExecutor(max_workers=args.workers)
     added = 0
@@ -120,7 +177,12 @@ def main():
                 seen.add(rec["match_id"])
                 added += 1
 
-    print(f"harvested: {added} new matches, {len(seen)} total (was {before})")
+    asked |= set(pairs)
+    with open(args.memo, "w") as f:
+        json.dump(sorted(asked), f)
+
+    print(f"harvested: {added} new matches, {len(seen)} total (was {before}); "
+          f"{len(asked)} pairs asked to date")
     if seen:
         with open(args.out) as f:
             rows = [json.loads(l) for l in f if l.strip()]

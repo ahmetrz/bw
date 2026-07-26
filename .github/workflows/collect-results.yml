@@ -32,12 +32,28 @@ jobs:
       - name: Collect settled table tennis results
         run: python3 tools/collect_tt.py --out data/tt_results.jsonl
 
+      # Arsivi genislet. Harvester her kosuda DAHA ONCE SORULMAMIS ciftlere butcesini
+      # harciyor (data/tt_pairs_seen.json), yani zamanlanmis calismak arsivi tekrar
+      # okumak yerine genisletiyor. Ciftler derece komsulari arasindan seciliyor:
+      # bu devrelerde birbiriyle oynayan oyuncular onlar.
+      - name: Widen the table tennis archive
+        run: |
+          python3 tools/harvest_tt_history.py \
+            --pairs 2500 --pool 2032 --neighbours 10 --workers 8 \
+            || echo "arsiv genisletilemedi"
+
+      - name: Refresh the table tennis results store and model
+        run: |
+          python3 tools/collect_results.py --source setka || echo "toplama atlandi"
+          python3 tools/build_generic_model.py --sport 10 || echo "model kurulamadi"
+
       - name: Commit
         run: |
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/tt_results.jsonl || true
+          git add data/tt_results.jsonl data/tt_history.jsonl data/tt_pairs_seen.json \
+            data/results/10.jsonl data/models/10.json || true
           if git diff --cached --quiet; then
             echo "yeni sonuc yok"
             exit 0
