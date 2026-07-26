@@ -15,8 +15,13 @@ does not place bets.
   DIRECTION → ladder converts it to its safest form → odds gate at 1.10 → confidence
   floor → one selection per match. The composite score still ranks by within-book
   cheapness for the scan path.
-- **Output:** `daily_report.json` + a Turkish Telegram message for the 24h and 48h
-  windows, plus `coupon.html` (phone-friendly deep links) and `report.json` for the scan.
+- **Output:** `daily_report.json` + `picks.html` — a self-contained, filterable page of the
+  numbered selections, sent to Telegram as an attachment with a SHORT notice as its
+  caption. The message used to carry all fifty-odd selections across nine chunks, which
+  could not be sorted, filtered or searched; the list now lives on the page and Telegram
+  only says it exists. The scan path separately writes `report.json` and, on demand,
+  `coupon.html` — that one ranks by within-book cheapness, NOT by the model, so it is
+  deliberately not produced by the daily run.
 
 ## The daily rule, in order (this is the product)
 1. **The model picks the direction.** Never the price. A short price is a probability
@@ -40,14 +45,16 @@ least-bad option available would defeat the whole exercise.
 ## Architecture (Parser → Rule Engine → Reporting)
 ```
 scan.py                entrypoint for the ranked scan
-tools/daily_report.py  the daily run: windows → picks → Telegram
+tools/daily_report.py  the daily run: windows → picks → score → page → Telegram
 tools/fetch_window.py  sports → tournaments → fixtures → markets, budgeted+checkpointed
-tools/make_coupon.py   phone-friendly slip of deep links
+tools/make_picks_page.py  picks.html: the numbered, filterable, sortable day's list
+tools/make_coupon.py   scan-path slip of deep links (NOT the daily product)
 engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
 engine/parser.py       OddsPapi response → the same rows (book-agnostic)
 engine/score.py        hard filters + composite score
 engine/ladder.py       safety laddering; three-way vs two-way read off the payload
 engine/pick.py         direction + ladder + gates → one selection per match
+engine/rating.py       the 0-100 score: 70 model confidence + 30 evidence, no price
 engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
 engine/settlement.py   what a selection actually means when it settles
 engine/telegram.py     daily notification (no-ops without credentials)
@@ -104,7 +111,17 @@ the first real Betwinner fixture.
    or the API 4xx's, STOP and report — never proceed on fallback data.
 6. **Direction never comes from the price.** See "The daily rule" above. This is the one
    invariant most likely to be violated by accident, because sorting by short prices
-   looks like sorting by safety and is not.
+   looks like sorting by safety and is not. The **0-100 score obeys the same rule**:
+   `engine/rating.py` reads model survival and evidence quality only, and a test asserts
+   the score does not move when the odds change. A score that quietly folded the price
+   back in would rank by the book's opinion while looking like analysis — and it would go
+   unnoticed for weeks, because a short price and a confident model agree often enough.
+   The score is 70 points of confidence measured **from the floor upward** (a selection
+   that only scrapes past `MIN_MODEL_SURVIVAL` scores near 0, not near 75, since passing
+   the floor is the entry condition rather than an achievement) plus 30 points of
+   evidence (name-match strength, matches behind the division, sample behind the rating
+   bucket). Selections are numbered 1..N by score, once across the whole card, so a bet
+   keeps the same number in both windows.
 7. **Only emit what settles the same day.** Outrights are dropped structurally (an entry
    with no second participant is not a head-to-head, which also removes tournament
    winners, election questions, novelty bundles and multi-runner races in one rule), and

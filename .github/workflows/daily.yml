@@ -94,18 +94,17 @@ jobs:
             --input data/betwinner_daily.json.gz \
             --windows "${W}" \
             --out daily_report.json \
+            --page picks.html \
             ${FLAG}
 
       - name: Grade yesterday's predictions
         run: python3 tools/grade_predictions.py || echo "notlandirma atlandi"
 
-      - name: Build mobile coupon
-        run: |
-          python3 tools/make_coupon.py \
-            --input data/betwinner_daily.json.gz \
-            --hours 48 \
-            --legs 50 \
-            --out coupon.html || echo "kupon uretilemedi"
+      # NOT: coupon.html artik gunluk kostan uretilmiyor. O sayfa taramanin
+      # "kitap-ici ucuzluk" siralamasini gosteriyordu; gunluk urun ise model yonu +
+      # guvenlik merdiveni. Ayni kosuda iki farkli siralamayla iki HTML uretmek,
+      # hangisinin urun oldugunu belirsizlestiriyordu. Tarama yolu icin arac duruyor:
+      #   python3 tools/make_coupon.py --input <kart> --hours 48 --legs 50
 
       - name: Commit
         if: always()
@@ -113,8 +112,8 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Ham cekim repoya girmiyor; sadece rapor ve kupon versiyonlaniyor.
-          git add daily_report.json coupon.html data/predictions.jsonl data/scoreboard.json || true
+          # Ham cekim repoya girmiyor; sadece rapor, secim sayfasi ve tahmin gunlugu.
+          git add daily_report.json picks.html data/predictions.jsonl data/scoreboard.json || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
           git pull --rebase origin main || true
           git push || echo "push atlandi"

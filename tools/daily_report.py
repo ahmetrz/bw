@@ -27,7 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
 from engine import (bwfeed, mirror, model_elo, model_football, model_tt,  # noqa: E402
-                    parlay, pick, score, setka, settlement, telegram, tr)
+                    parlay, pick, rating, score, setka, settlement, telegram, tr)
+from tools import make_picks_page  # noqa: E402
 
 
 def load(path):
@@ -80,83 +81,87 @@ def analyse(rows, hours, index, elo_model=None, tt=None):
     }
 
 
-def format_window(res, host=None):
-    """Telegram HTML for one window."""
-    h = res["hours"]
-    lines = [f"<b>▸ Önümüzdeki {h} saat</b>"]
-    if not res["matches"]:
-        lines.append("  Bu pencerede maç yok.")
-        return "\n".join(lines)
+def pick_key(p):
+    """Identity of a selection, independent of which window produced it.
 
-    sk = res.get("skipped") or {}
-    lines.append(
-        f"  {res['matches']} maç · {res.get('sports', 0)} spor · "
-        f"<b>{len(res['picks'])} seçim</b>"
-    )
-    if not res["picks"]:
-        lines.append("  <i>Güvenli eşiği geçen seçim çıkmadı.</i>")
-    for p in res["picks"]:
-        surv = p["model_survival"] * 100
-        st = p.get("settlement") or {}
-        warn = " ⚠" if st.get("needs_confirmation") else ""
-        lines.append(
-            f"\n  <b>{html.escape(p['p1'])} - {html.escape(p['p2'])}</b>"
-            f"\n  <i>{html.escape(str(p.get('league') or ''))}</i> · "
-            f"{html.escape((p.get('start') or '')[:16].replace('T', ' '))}"
-            f"\n  ➤ {html.escape(tr.pick(p))} "
-            f"<b>@{p['odds']:.2f}</b>"
-            f"\n  model: %{surv:.1f} tutma · {html.escape(tr.scope(st.get('scope')))}{warn}"
-            + (f"\n  <a href=\"{html.escape(url)}\">🔗 Betwinner'da aç</a>"
-               if (url := parlay.betwinner_url(p, host)) else "")
-        )
-    lines.append(
-        f"\n  <i>modelsiz {sk.get('no_model', 0)} maç · "
-        f"eşiği geçemeyen {sk.get('no_confident_rung', 0)} maç</i>"
-    )
-    return "\n".join(lines)
+    The 24h card is a subset of the 48h card, but the two windows are analysed
+    separately and so produce separate dicts for the same fixture. This is what lets a
+    selection keep ONE number across both.
+    """
+    return (p.get("match_id", p.get("fixture_id")), p["market_key"][1], p.get("outcome_id"))
 
 
-def build_message(results, source_note="", host=None, host_source=""):
+SCORE_FIELDS = ("id", "score", "confidence_points", "evidence_points",
+                "confidence_pct", "evidence_pct")
+
+
+def number(results):
+    """Score every selection out of 100 and number them 1..N, best first.
+
+    Numbered ONCE over the full card rather than per window, so #7 is the same bet
+    whether you are looking at the 24h list or the 48h one. Numbering each window on its
+    own would give two different bets the same number on the same page.
+    """
+    if not results:
+        return results
+    full = max(results, key=lambda r: r["hours"])
+    rating.annotate(full["picks"])
+    known = {pick_key(p): p for p in full["picks"]}
+    for r in results:
+        if r is full:
+            continue
+        for p in r["picks"]:
+            src = known.get(pick_key(p))
+            if src is None:
+                # Cannot normally happen — a shorter window is a subset. Score it anyway
+                # rather than emit a selection with no rating at all.
+                p.update(rating.score(p))
+                continue
+            for k in SCORE_FIELDS:
+                p[k] = src[k]
+        r["picks"].sort(key=lambda p: p.get("id") or 10 ** 6)
+    return results
+
+
+def build_notice(results, page_name, host=None, host_source="", source_note=""):
+    """The short Telegram message. The list itself travels as the attached page.
+
+    Nine messages of selections could not be sorted, filtered or searched, and scrolling
+    them on a phone was the worst way to read a ranked list. So this says only what a
+    notification should: that today's analysis exists, how big it is and how good the
+    top of it looks.
+    """
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    head = [
-        f"<b>🎯 Betwinner günlük analiz</b>  <i>{now}</i>",
-        f"min oran {config.MIN_ODDS:.2f} · model güven eşiği %{config.MIN_MODEL_SURVIVAL * 100:.0f} "
-        f"· maç başına tek seçim",
-        "",
-    ]
-    body = [format_window(r, host) for r in results]
+    by_hours = {r["hours"]: r for r in results}
+    full = max(results, key=lambda r: r["hours"]) if results else None
+    picks = full["picks"] if full else []
 
-    total = sum(len(r["picks"]) for r in results)
-    tail = [""]
-    if total:
-        # Only legs with a measurable hold enter the combined figures — the alternative
-        # is quietly inventing one, and hard rule 4's numbers are the whole point.
-        legs = [p for p in results[-1]["picks"] if p.get("overround") is not None]
-        s = parlay.summarize(legs)
-        if s:
-            tail += [
-                "<b>▸ Kombine (48s seçimleri)</b>",
-                f"  {s['legs']} bacak · oran <b>{s['combined_odds']:,.2f}</b>",
-                f"  kitabın kendi olasılığı {s['combined_book_implied_prob']:.2e} "
-                f"(~1/{s['one_in']:,.0f})",
-                f"  beklenen getiri çarpanı {s['book_expected_return_multiple']:.4f} "
-                f"— tek kitapta kombine <b>yapı gereği</b> pozitif beklenti taşımaz",
-            ]
+    lines = [f"<b>🎯 Betwinner günlük analiz hazır</b>  <i>{now}</i>", ""]
+    if not picks:
+        lines += ["<i>Bugün güvenli eşiği geçen seçim çıkmadı.</i>", ""]
     else:
-        tail += ["<i>Bugün için güvenli seçim üretilemedi.</i>"]
-
-    tail += [
-        "",
-        "<i>Yön modelden gelir, orandan değil. Oran yalnızca 1.10 eşiğinde okunur. "
-        "Uzun vadeli ve aynı gün sonuçlanmayan bahisler kapsam dışıdır.</i>",
-    ]
+        short = by_hours.get(24)
+        lines += [
+            f"<b>{len(picks)} seçim</b> · {full['hours']} saatlik kart"
+            + (f" (24 saat içinde {len(short['picks'])})" if short else ""),
+            f"en yüksek puan <b>{picks[0]['score']:.0f}/100</b> · "
+            f"ortalama {sum(p['score'] for p in picks) / len(picks):.0f}",
+            f"min oran {config.MIN_ODDS:.2f} · model güven eşiği "
+            f"%{config.MIN_MODEL_SURVIVAL * 100:.0f} · maç başına tek seçim",
+            "",
+            f"📄 Liste ekteki <b>{html.escape(page_name)}</b> dosyasında: spora, pencereye, "
+            "puana ve orana göre filtrelenebilir, sütun başlıklarından sıralanabilir, "
+            "her satırda bahsin bağlantısı var.",
+            "",
+        ]
+    lines += ["<i>Yön modelden gelir, orandan değil; oran yalnızca 1.10 eşiğinde okunur. "
+              "Puan tamamen analizden hesaplanır, kitabın fiyatı puana girmez.</i>"]
     if host:
-        tail += [f"<i>bağlantılar {html.escape(host)} üzerinden "
-                 f"({html.escape(host_source)}) — Betwinner erişilebilir alan adını "
-                 f"değiştirdiğinde otomatik güncellenir</i>"]
+        lines += [f"<i>bağlantılar {html.escape(host)} üzerinden "
+                  f"({html.escape(host_source)})</i>"]
     if source_note:
-        tail += [f"<i>{html.escape(source_note)}</i>"]
-    return "\n".join(head + body + tail)
+        lines += [f"<i>{html.escape(source_note)}</i>"]
+    return "\n".join(lines)
 
 
 def log_predictions(results, path, host=None):
@@ -195,6 +200,10 @@ def log_predictions(results, path, host=None):
             f.write(json.dumps({
                 "date": today,
                 "logged_at": stamp,
+                "id": p.get("id"),
+                "score": p.get("score"),
+                "confidence_pct": p.get("confidence_pct"),
+                "evidence_pct": p.get("evidence_pct"),
                 "match_id": p.get("match_id", p.get("fixture_id")),
                 "sport_id": p.get("sport_id"),
                 "division": (p.get("model_probs") or {}).get("_division")
@@ -225,6 +234,7 @@ def main():
     ap.add_argument("--predictions-log", default="data/predictions.jsonl")
     ap.add_argument("--windows", default=",".join(str(h) for h in config.DAILY_WINDOWS_HOURS))
     ap.add_argument("--out", default="daily_report.json")
+    ap.add_argument("--page", default="picks.html")
     ap.add_argument("--no-telegram", action="store_true")
     args = ap.parse_args()
 
@@ -265,7 +275,7 @@ def main():
         index = {}
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = [analyse(rows, h, index, elo_model, tt) for h in windows]
+    results = number([analyse(rows, h, index, elo_model, tt) for h in windows])
 
     for r in results:
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "
@@ -286,7 +296,12 @@ def main():
                 "skipped": r.get("skipped"),
                 "picks": [
                     {
+                        "id": p.get("id"),
+                        "score": p.get("score"),
+                        "confidence_pct": p.get("confidence_pct"),
+                        "evidence_pct": p.get("evidence_pct"),
                         "match": f"{p['p1']} v {p['p2']}",
+                        "p1": p.get("p1"), "p2": p.get("p2"),
                         "league": p.get("league"),
                         "start": p.get("start"),
                         "sport_id": p.get("sport_id"),
@@ -309,18 +324,28 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out}")
 
+    n = make_picks_page.build(payload, args.page)
+    print(f"wrote {args.page} — {n} selections")
 
     logged = log_predictions(results, args.predictions_log, host)
     print(f"prediction log: {logged} new rows in {args.predictions_log}")
 
-    message = build_message(results, source_note=f"kaynak: {os.path.basename(args.input)}",
-                            host=host, host_source=host_source)
+    notice = build_notice(results, os.path.basename(args.page), host=host,
+                          host_source=host_source,
+                          source_note=f"kaynak: {os.path.basename(args.input)}")
     if args.no_telegram:
-        print("\n--- message preview ---\n")
-        print(message)
+        print("\n--- notice preview ---\n")
+        print(notice)
         return 0
 
-    ok, detail = telegram.send(message)
+    # The page goes as the attachment and the notice as its caption, so the whole daily
+    # report arrives as ONE Telegram item instead of nine walls of text.
+    ok, detail = telegram.send_document(args.page, caption=notice, parse_mode="HTML")
+    if not ok and telegram.configured():
+        # An upload can fail for reasons the text message will not — size, MIME, a
+        # transient 5xx. The notice still has to arrive, so fall back to sending it alone.
+        print(f"telegram document: NOT SENT — {detail}", file=sys.stderr)
+        ok, detail = telegram.send(notice)
     print(f"telegram: {'OK' if ok else 'NOT SENT'} — {detail}")
     # A missing token must not fail a scan that otherwise worked.
     return 0

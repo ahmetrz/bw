@@ -87,8 +87,14 @@ def send(text, parse_mode="HTML", disable_preview=True):
     return True, f"sent {len(parts)} message(s)"
 
 
-def send_document(path, caption="", timeout=60):
-    """Upload a file (the coupon page) as a document. Returns (sent, detail)."""
+def send_document(path, caption="", timeout=60, parse_mode=None):
+    """Upload a file (the picks page) as a document. Returns (sent, detail).
+
+    Telegram truncates a caption at 1024 characters and rejects the message outright if
+    the cut lands inside an HTML tag, so the caption is clipped on a LINE boundary — the
+    daily notice is built line by line and losing a whole trailing line is harmless,
+    while losing half of a `<b>` is a 400.
+    """
     token, chat = credentials()
     if not (token and chat):
         return False, "credentials not set"
@@ -100,8 +106,12 @@ def send_document(path, caption="", timeout=60):
         content = f.read()
     name = os.path.basename(path)
 
+    fields = [("chat_id", chat), ("caption", chunks(caption, 1000)[0] if caption else "")]
+    if parse_mode:
+        fields.append(("parse_mode", parse_mode))
+
     parts = []
-    for key, val in (("chat_id", chat), ("caption", caption[:1000])):
+    for key, val in fields:
         parts.append(
             f"--{boundary}\r\nContent-Disposition: form-data; name=\"{key}\"\r\n\r\n{val}\r\n"
             .encode()

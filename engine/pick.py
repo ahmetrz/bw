@@ -207,6 +207,13 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
         chosen["name_match"] = round(name_score, 3)
         chosen["model_source"] = source
         chosen["division"] = probs.get("_division")
+        # How much history stands behind this particular call. Two picks at the same
+        # stated confidence are not equally well founded — one may rest on a division
+        # fitted from 900 matches and the other from 12,000 — and engine/rating.py turns
+        # that difference into the evidence half of the score.
+        chosen["model_n"] = probs.get("_n")
+        div = ((elo_model or {}).get("divisions") or {}).get(probs.get("_division") or "")
+        chosen["division_matches"] = (div or {}).get("matches")
         picks.append(chosen)
 
     picks.sort(key=lambda r: -r["model_survival"])

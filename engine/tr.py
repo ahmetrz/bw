@@ -148,6 +148,22 @@ def settlement(spec):
     return SETTLEMENT.get(sport_general) or spec.get("detail", "")
 
 
+# What a totals line actually COUNTS, per sport. The raw token reads "5.5 Alt", which
+# does not say goals, points, games or sets — and those are four different bets. The
+# ladder only ever reaches the match total (group 17), so this is keyed by sport alone;
+# a sport that is not listed keeps the raw wording rather than being given a unit we have
+# not verified.
+_TOTAL_UNIT = {
+    1: "gol",       # football
+    2: "gol",       # ice hockey
+    3: "sayı",      # basketball
+    4: "oyun",      # tennis — group 17 counts GAMES, not sets
+    10: "sayı",     # table tennis — group 17 counts POINTS, not sets
+    29: "sayı",     # volleyball
+    107: "gol",     # handball
+}
+
+
 def pick(row):
     """The chosen selection in plain Turkish, naming the team and saying what has to happen.
 
@@ -180,7 +196,13 @@ def pick(row):
         if frac == 0:
             return f"{team} +{n:g} handikap ({n:g} farkla kaybederse iade)"
         return f"{team} +{n:g} handikap (yarısı bir alt baremde)"
-    # Totals carry no team; the raw form already reads correctly once localized.
+
+    # Totals carry no team, so the line has to say what is being counted itself.
+    if direction in ("over", "under"):
+        unit = _TOTAL_UNIT.get(row.get("sport_id"))
+        if unit:
+            word = "üstü" if direction == "over" else "altı"
+            return f"Toplam {unit} {body} {word}"
     return selection(row.get("selection"))
 
 

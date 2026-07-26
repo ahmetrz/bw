@@ -19,8 +19,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import (bwfeed, grade, ladder, mirror, parlay, pick, score,  # noqa: E402
-                    settlement, telegram)
+from engine import (bwfeed, grade, ladder, mirror, parlay, pick, rating,  # noqa: E402
+                    score, settlement, telegram)
+from tools import daily_report, make_picks_page  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import grade_predictions  # noqa: E402
@@ -523,6 +524,160 @@ class TestRegression(unittest.TestCase):
             data = json.load(f)
         self.assertTrue(bwfeed.is_bwfeed(data))
         self.assertIn(config.BOOK, bwfeed.books_in(data))
+
+    def test_score_never_reads_the_price(self):
+        """The 0-100 score must be computable without the odds, and blind to them.
+
+        This is hard rule 6 wearing a different hat. A score that folded the price in
+        would rank by the book's own opinion while looking like analysis — and it would
+        do it silently, because a short price and a confident model agree often enough
+        that nobody would notice for weeks.
+        """
+        base = {"model_survival": 0.90, "name_match": 1.0, "division_matches": 6000}
+        want = rating.score(base)["score"]
+        for odds in (1.10, 1.85, 4.40, 17.0):
+            priced = dict(base, odds=odds, implied_prob=1 / odds, overround=0.07)
+            self.assertEqual(rating.score(priced)["score"], want,
+                             "the score moved when only the price changed")
+        # And it must not be silently derivable from the price either: identical odds
+        # with different model confidence have to score differently.
+        a = rating.score({"model_survival": 0.99, "name_match": 1.0, "odds": 1.2})
+        b = rating.score({"model_survival": 0.76, "name_match": 1.0, "odds": 1.2})
+        self.assertGreater(a["score"], b["score"])
+
+    def test_score_is_measured_from_the_floor_not_from_zero(self):
+        """Everything offered has already cleared MIN_MODEL_SURVIVAL, so the interesting
+        question is how far PAST the floor a pick sits. A selection that only just scrapes
+        through must not arrive looking like a 75/100."""
+        floor = config.MIN_MODEL_SURVIVAL
+        just = rating.score({"model_survival": floor + 1e-9, "name_match": 1.0}, floor)
+        self.assertEqual(just["confidence_points"], 0.0)
+        certain = rating.score({"model_survival": 1.0, "name_match": 1.0}, floor)
+        self.assertEqual(certain["confidence_points"], 70.0)
+        self.assertEqual(certain["score"], 100.0)
+
+    def test_evidence_discounts_a_weaker_foundation(self):
+        """Same stated confidence, different backing — the score has to say so."""
+        strong = rating.score({"model_survival": 0.9, "name_match": 1.0,
+                               "division_matches": 12000})
+        weak = rating.score({"model_survival": 0.9, "name_match": 0.83,
+                             "division_matches": 400})
+        self.assertEqual(strong["confidence_points"], weak["confidence_points"])
+        self.assertGreater(strong["evidence_points"], weak["evidence_points"])
+        self.assertGreater(strong["score"], weak["score"])
+
+    def test_numbering_is_best_first_and_shared_across_windows(self):
+        """#1 is the day's best selection, and a bet keeps ONE number in both windows.
+
+        Numbering each window separately would put two different bets at #7 on the same
+        page, which is worse than no number at all.
+        """
+        def leg(mid, surv, line):
+            return {"match_id": mid, "market_key": ("k", line), "outcome_id": 1,
+                    "model_survival": surv, "name_match": 1.0, "division_matches": 9000}
+
+        short = [leg(2, 0.80, "17|2.5"), leg(1, 0.95, "17|5.5")]
+        full = [leg(3, 0.88, "8|"), leg(1, 0.95, "17|5.5"), leg(2, 0.80, "17|2.5")]
+        results = daily_report.number([
+            {"hours": 24, "picks": short}, {"hours": 48, "picks": full},
+        ])
+        by_hours = {r["hours"]: r["picks"] for r in results}
+
+        self.assertEqual([p["id"] for p in by_hours[48]], [1, 2, 3])
+        self.assertEqual([p["match_id"] for p in by_hours[48]], [1, 3, 2])
+        # The 24h window inherits the numbers rather than renumbering from 1.
+        self.assertEqual({p["match_id"]: p["id"] for p in by_hours[24]}, {1: 1, 2: 3})
+        for p in by_hours[24]:
+            self.assertEqual(p["score"], next(q["score"] for q in by_hours[48]
+                                              if q["match_id"] == p["match_id"]))
+
+    def test_picks_page_renders_every_selection_with_its_link(self):
+        """The page IS the deliverable now, so a dropped row is a dropped bet.
+
+        Also asserts the id/score/window data attributes the filters run on: a filter
+        reading an attribute that is not there fails silently by showing everything.
+        """
+        report = {
+            "generated": "2026-07-26T06:10:00+00:00", "link_host": "betwinner2.com",
+            "min_odds": 1.10, "min_model_survival": 0.75,
+            "windows": [
+                {"hours": 24, "matches": 3, "skipped": {"no_model": 1},
+                 "picks": [{"id": 1, "score": 88.0, "confidence_pct": 80.0,
+                            "evidence_pct": 100.0, "p1": "Napoli", "p2": "Carrarese",
+                            "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
+                            "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
+                            "odds": 1.10, "settlement": {"scope": "regulation"},
+                            "url": "https://betwinner2.com/en/line/1/1/2"}]},
+                {"hours": 48, "matches": 5, "skipped": {"no_model": 2},
+                 "picks": [{"id": 1, "score": 88.0, "confidence_pct": 80.0,
+                            "evidence_pct": 100.0, "p1": "Napoli", "p2": "Carrarese",
+                            "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
+                            "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
+                            "odds": 1.10, "settlement": {"scope": "regulation"},
+                            "url": "https://betwinner2.com/en/line/1/1/2"},
+                           {"id": 2, "score": 51.0, "confidence_pct": 30.0,
+                            "evidence_pct": 100.0, "p1": "Anna Lapa", "p2": "V. Shevchuk",
+                            "league": "Setka Cup", "start": "2026-07-27T09:00:00+00:00",
+                            "sport_id": 10, "selection_tr": "Anna Lapa +2.5 set handikap",
+                            "odds": 1.24, "settlement": {"scope": "match",
+                                                         "needs_confirmation": True},
+                            "url": "https://betwinner2.com/en/line/10/3/4"}]},
+            ],
+        }
+        out = os.path.join(ROOT, "fixtures", "_tmp_picks.html")
+        try:
+            n = make_picks_page.build(report, out)
+            with open(out, encoding="utf-8") as f:
+                page = f.read()
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
+
+        self.assertEqual(n, 2)
+        self.assertEqual(page.count('<tr data-sport='), 2)
+        # The 24h pick is tagged with the window it first appears in, so "24 saat" is a
+        # real filter rather than a duplicate of the full list.
+        self.assertIn('data-window="24"', page)
+        self.assertIn('data-window="48"', page)
+        for needle in ('data-id="1"', 'data-score="88.0"', 'data-odds="1.24"',
+                       "Napoli - Carrarese", "Masa Tenisi", "Futbol",
+                       "https://betwinner2.com/en/line/10/3/4"):
+            self.assertIn(needle, page)
+        # The count the model could NOT reach is on the page, not quietly left off it.
+        self.assertIn("modelsiz 2", page)
+        # Self-contained: it is opened from a Telegram attachment, often offline.
+        for external in ("http://", "src=", "<link"):
+            self.assertNotIn(external, page.replace("https://betwinner2.com", ""))
+
+    def test_picks_page_escapes_hostile_text(self):
+        """Team names come from the feed. One containing a quote or a tag must not be
+        able to break out of an attribute — the page is opened on the operator's phone."""
+        report = {"windows": [{"hours": 48, "matches": 1, "picks": [{
+            "id": 1, "score": 50.0, "confidence_pct": 1.0, "evidence_pct": 1.0,
+            "p1": '<script>alert("x")</script>', "p2": 'O"Brien & Sons',
+            "league": "<b>x</b>", "start": "2026-07-26T16:00:00+00:00", "sport_id": 1,
+            "selection_tr": "5.5 altı", "odds": 1.5, "settlement": {},
+            "url": 'https://x.test/"onerror="alert(1)'}]}]}
+        out = os.path.join(ROOT, "fixtures", "_tmp_escape.html")
+        try:
+            make_picks_page.build(report, out)
+            with open(out, encoding="utf-8") as f:
+                page = f.read()
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
+        self.assertNotIn("<script>alert", page)
+        self.assertNotIn('"onerror="', page)
+        self.assertIn("&lt;script&gt;", page)
+
+    def test_telegram_caption_never_splits_a_tag(self):
+        """Telegram caps a caption at 1024 characters and rejects the whole upload if the
+        cut lands inside an HTML tag. Clipping on a line boundary is what prevents a
+        working report from failing to send over a formatting detail."""
+        notice = "\n".join(f"<b>satır {i}</b> uzun bir açıklama metni" for i in range(60))
+        clipped = telegram.chunks(notice, 1000)[0]
+        self.assertLessEqual(len(clipped), 1000)
+        self.assertEqual(clipped.count("<b>"), clipped.count("</b>"))
 
 
 if __name__ == "__main__":
