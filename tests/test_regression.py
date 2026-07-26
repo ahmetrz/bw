@@ -770,6 +770,45 @@ class TestRegression(unittest.TestCase):
                                 f"sport {sid} admitted with +{c['line']} off by "
                                 f"{c['predicted'] - c['observed']:+.3f}")
 
+    def test_a_provisional_rating_never_prices_a_fixture(self):
+        """A side seen twice still sits at the 1500 it started from, and 1500 means
+        "we have not measured this", not "average". Pricing from it makes every mismatch
+        look like a coin flip — which is exactly how tennis first failed its calibration
+        by 7.4 points, the tour being full of qualifiers who appear once."""
+        model = {"pools": {"": {"A": 1700.0, "B": 1300.0}},
+                 "appearances": {"": {"A": 500, "B": 3}},
+                 "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
+                                         "mean_abs_margin": 1.0},
+                 "bands": [{"lo": -9, "hi": 9, "n": 900, "margin": {"0": 1}}],
+                 "_margin": [{0.0: 1.0}], "_total": [{2.0: 1.0}]}
+        self.assertIsNone(model_generic.lookup(model, "A", "B")[0])
+        model["appearances"][""]["B"] = model_generic.MIN_APPEARANCES
+        self.assertIsNotNone(model_generic.lookup(model, "A", "B")[0])
+
+    def test_ratings_are_taken_as_they_stood_before_the_match(self):
+        """Hindsight ratings describe a match by how good the two sides turned out to be
+        over the WHOLE history — including that match and everything after it.
+
+        Fitting on them was the single largest error in this model. Football, basketball
+        and tennis all systematically over-rated the underdog at the tightest line until
+        the pre-match gap was separated out; football went from a 0.043 calibration gap to
+        0.010 on the same data, with nothing else changed.
+        """
+        rows = [
+            {"date": "2025-01-01", "home": "A", "away": "B", "home_score": 5, "away_score": 0},
+            {"date": "2025-01-02", "home": "A", "away": "B", "home_score": 5, "away_score": 0},
+            {"date": "2025-01-03", "home": "A", "away": "B", "home_score": 5, "away_score": 0},
+        ]
+        final, gaps = model_generic.fit_ratings(rows, record=True)
+        self.assertEqual(len(gaps), len(rows))
+        # The first meeting is priced from equal ratings plus the home term, and each
+        # later one from a gap that has widened. A final-rating fit would have used the
+        # widest gap for all three, including the one played before anyone knew it.
+        self.assertAlmostEqual(gaps[0], model_generic.HOME_ELO)
+        self.assertLess(gaps[0], gaps[1])
+        self.assertLess(gaps[1], gaps[2])
+        self.assertGreater(final[("", "A")], final[("", "B")])
+
     def test_a_sport_with_too_little_history_is_refused(self):
         """Refusing is a feature. A thin sample will happily report 100% cover rates."""
         thin = {"games": 40, "calibration": [{"line": 1.5, "predicted": 0.9,
@@ -822,6 +861,11 @@ class TestRegression(unittest.TestCase):
         self.assertIn(("bottom", "C"), rating)
         model = {"pools": {"top": {"A": 1600.0, "B": 1400.0},
                            "bottom": {"C": 1600.0, "D": 1400.0}},
+                 # Both sides need enough matches behind them to be priced at all: a
+                 # provisional rating sits at the 1500 it started from, and 1500 means
+                 # "not measured", not "average".
+                 "appearances": {"top": {"A": 99, "B": 99},
+                                 "bottom": {"C": 99, "D": 99}},
                  "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
                                          "mean_abs_margin": 1.0},
                  "bands": [{"lo": -9, "hi": 9, "n": 500, "margin": {"0": 1}}],

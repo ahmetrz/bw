@@ -39,7 +39,16 @@ def scale_of(rows):
     return "high" if avg > 5.0 else "low"
 
 
-def calibrate(rows, rating, fit, bands, lines):
+def _appearances(rows):
+    seen = {}
+    for r in rows:
+        for side in ("home", "away"):
+            k = (mg.pool_of(r), mg.team_key(r, side))
+            seen[k] = seen.get(k, 0) + 1
+    return seen
+
+
+def calibrate(rows, gaps, fit, bands, lines, seen=None):
     """Predicted cover rate against observed, on the lines the ladder selects.
 
     HELD OUT, and that word is the whole point. The first version counted the predictions
@@ -52,13 +61,17 @@ def calibrate(rows, rating, fit, bands, lines):
     fitted = {"line": fit, "bands": bands,
               "_margin": [mg._pmf(b["margin"]) for b in bands]}
     out = []
+    rows = sorted(rows, key=lambda x: x["date"])
     for line in lines:
         pred, hit, n = 0.0, 0, 0
-        for r in rows:
+        for r, eff in zip(rows, gaps):
             pool = mg.pool_of(r)
-            rh = rating.get((pool, mg.team_key(r, "home")), mg.START_RATING)
-            ra = rating.get((pool, mg.team_key(r, "away")), mg.START_RATING)
-            eff = rh - ra + (0.0 if r.get("neutral") else mg.HOME_ELO)
+            # Calibrate on the fixtures the model would ACTUALLY price. Including matches
+            # it refuses would measure a model nobody runs.
+            if seen is not None and min(
+                    seen.get((pool, mg.team_key(r, "home")), 0),
+                    seen.get((pool, mg.team_key(r, "away")), 0)) < mg.MIN_APPEARANCES:
+                continue
             pmf, mu, _ = mg.margin_pmf(fitted, eff)
             # The UNDERDOG taking the points — the rung a safety ladder actually offers.
             dog = {-m: p for m, p in pmf.items()} if mu >= 0 else pmf
@@ -67,6 +80,8 @@ def calibrate(rows, rating, fit, bands, lines):
             dog_margin = margin if mu < 0 else -margin
             hit += 1 if dog_margin + line > 0 else 0
             n += 1
+        if not n:
+            continue
         out.append({"line": line, "predicted": round(pred / n, 4),
                     "observed": round(hit / n, 4), "n": n})
     return out
@@ -90,12 +105,19 @@ def _aliases_by_pool(aliases, latest):
     return out
 
 
+def _appearances_by_pool(seen, latest):
+    out = {}
+    for (pool, key), n in seen.items():
+        out.setdefault(pool, {})[latest.get((pool, key), key)] = n
+    return out
+
+
 def build(sport_id, out_dir=mg.MODELS):
     rows = results_store.load(sport_id)
     if not rows:
         return None, "no results stored"
     rows.sort(key=lambda r: r["date"])
-    rating = mg.fit_ratings(rows)
+    rating, gaps = mg.fit_ratings(rows, record=True)
     lines = LADDER_LINES[scale_of(rows)]
 
     # Hold out the most recent fifth for the check, fit the check's distributions on the
@@ -103,13 +125,16 @@ def build(sport_id, out_dir=mg.MODELS):
     # keep a test tidy would make the product worse to make the report prettier.
     cut = max(1, int(len(rows) * 0.8))
     train, test = rows[:cut], rows[cut:]
+    train_gaps, test_gaps = gaps[:cut], gaps[cut:]
     if len(test) >= 100:
-        tr_fit = mg.fit_line(train, rating)
-        cal = calibrate(test, rating, tr_fit, mg.fit_bands(train, rating, tr_fit), lines)
+        tr_fit = mg.fit_line(train, train_gaps)
+        cal = calibrate(test, test_gaps, tr_fit,
+                        mg.fit_bands(train, train_gaps, tr_fit),
+                        lines, _appearances(train))
     else:
         cal = []
-    fit = mg.fit_line(rows, rating)
-    bands = mg.fit_bands(rows, rating, fit)
+    fit = mg.fit_line(rows, gaps)
+    bands = mg.fit_bands(rows, gaps, fit)
 
     # Aliases: every other name a team has appeared under, so an older spelling on the
     # book's card still resolves. Built from the store rather than hand-maintained.
@@ -132,6 +157,7 @@ def build(sport_id, out_dir=mg.MODELS):
         "calibration_holdout": {"train": len(train), "test": len(test),
                                 "from": test[0]["date"] if test else None,
                                 "to": test[-1]["date"] if test else None},
+        "appearances": _appearances_by_pool(_appearances(rows), latest),
         "pools": _by_pool(rating, latest),
         "aliases": _aliases_by_pool(aliases, latest),
     }
@@ -161,6 +187,10 @@ def report(model):
     for c in model["calibration"]:
         print(f"  +{c['line']:<6} {c['predicted']:>8.3f} {c['observed']:>8.3f} "
               f"{c['predicted'] - c['observed']:>+8.3f}")
+    rated = sum(1 for pool in model["appearances"].values()
+                for n in pool.values() if n >= mg.MIN_APPEARANCES)
+    print(f"  {rated} takım/oyuncu {mg.MIN_APPEARANCES}+ maçla derecelendirildi "
+          f"({model['teams']} içinden) — geri kalanı fiyatlanmaz")
     print(f"  -> {'KULLANILABİLİR' if ok else 'REDDEDİLDİ'}: {why}")
     return ok
 

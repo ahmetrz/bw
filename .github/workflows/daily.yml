@@ -97,6 +97,13 @@ jobs:
             --page picks.html \
             ${FLAG}
 
+      # Sonuc deposunu ve modelleri her gun tazele. Adapter basina birkac saniye;
+      # yeni sonuclar geldikce dereceler ve kalibrasyon kendiliginden guncellenir.
+      - name: Refresh the results store and rebuild every model
+        run: |
+          python3 tools/collect_results.py --all || echo "toplama kismen basarisiz"
+          python3 tools/build_generic_model.py --all || echo "model kurulamadi"
+
       - name: Grade yesterday's predictions
         run: python3 tools/grade_predictions.py || echo "notlandirma atlandi"
 
@@ -118,7 +125,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Ham cekim repoya girmiyor; sadece rapor, secim sayfasi ve tahmin gunlugu.
-          git add daily_report.json picks.html method.html data/predictions.jsonl data/scoreboard.json || true
+          git add daily_report.json picks.html method.html data/predictions.jsonl \
+            data/scoreboard.json data/results data/models || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
           git pull --rebase origin main || true
           git push || echo "push atlandi"

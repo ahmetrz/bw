@@ -184,9 +184,130 @@ def table_tennis(path="data/tt_results.jsonl"):
             }
 
 
+# ----------------------------------------------------------------- tennis (sport 4)
+
+TML = "https://raw.githubusercontent.com/Tennismylife/TML-Database/master/{year}.csv"
+
+
+def _sets_from_score(text):
+    """(winner sets, loser sets) from an ATP score string, or None.
+
+    "6-2 6-1" -> (2, 0). "7-6(5) 4-6 6-3" -> (2, 1). A retirement, walkover or default
+    returns None: the match did not run its course, so it is not a result about who is
+    better at winning sets, and feeding it to the model would teach it that the stronger
+    player sometimes loses in one.
+    """
+    if not text:
+        return None
+    low = str(text).lower()
+    if any(w in low for w in ("ret", "w/o", "walkover", "def", "abd", "abandoned")):
+        return None
+    w = l = 0
+    for chunk in str(text).split():
+        chunk = chunk.split("(")[0]
+        if "-" not in chunk:
+            continue
+        a, _, b = chunk.partition("-")
+        try:
+            a, b = int(a), int(b)
+        except ValueError:
+            continue
+        if a > b:
+            w += 1
+        elif b > a:
+            l += 1
+    return (w, l) if w + l else None
+
+
+def tennis(start=2015, end=2026):
+    """Tennismylife's TML-Database on raw.githubusercontent.com — one CSV per year of ATP
+    main-tour and challenger matches, with the set-by-set score.
+
+    robots.txt on raw.githubusercontent.com: 404, so nothing is disallowed (checked
+    2026-07-26). Jeff Sackmann's archive was the obvious alternative and is NOT used: it
+    is CC BY-NC-SA, and this is a betting model, so the non-commercial clause is a real
+    question rather than a formality.
+
+    THE ORIENTATION MATTERS AND IT IS NOT OBVIOUS. This source lists the WINNER first, so
+    emitting it as-is makes "home" the winner of every single match: the model then learns
+    that the home side always wins, the expected margin never goes negative, and the whole
+    thing fails its calibration — which is exactly what happened on the first run, at
+    0.038. The two players are therefore ordered by their player id, which is decided
+    before the match and cannot know who won.
+
+    There is no home advantage on tour, so every row is marked neutral and the model's
+    home term is switched off for tennis entirely.
+    """
+    for year in range(start, end + 1):
+        raw = fetch(TML.format(year=year), accept="text/csv")
+        if not raw:
+            continue
+        for rec in csv.DictReader(io.StringIO(raw.decode("utf-8", "replace"))):
+            sets = _sets_from_score(rec.get("score"))
+            if not sets or not rec.get("winner_name") or not rec.get("loser_name"):
+                continue
+            date = str(rec.get("tourney_date") or "")
+            if len(date) != 8 or not date.isdigit():
+                continue
+            win = (rec["winner_name"], rec.get("winner_id") or rec["winner_name"], sets[0])
+            los = (rec["loser_name"], rec.get("loser_id") or rec["loser_name"], sets[1])
+            first, second = sorted((win, los), key=lambda x: str(x[1]))
+            yield {
+                "date": f"{date[:4]}-{date[4:6]}-{date[6:]}",
+                "home": first[0], "away": second[0],
+                "home_id": first[1], "away_id": second[1],
+                "home_score": first[2], "away_score": second[2],
+                "league": rec.get("tourney_name"), "season": year,
+                "neutral": True,          # no home court on tour
+                "source": "tml",
+            }
+        time.sleep(0.3)
+
+
+# --------------------------------------------------------------- baseball (sport 5)
+
+MLB = ("https://statsapi.mlb.com/api/v1/schedule"
+       "?sportId=1&startDate={start}-01-01&endDate={start}-12-31&gameType=R")
+
+
+def baseball(start=2016, end=2026):
+    """MLB's own statsapi. Keyless, and statsapi.mlb.com serves no robots.txt (404,
+    checked 2026-07-26). Regular season only — spring training and exhibition games are
+    played by rosters that do not describe the team that turns up in the season."""
+    for year in range(start, end + 1):
+        raw = fetch(MLB.format(start=year))
+        if not raw:
+            continue
+        try:
+            payload = json.loads(raw.decode("utf-8", "replace"))
+        except json.JSONDecodeError:
+            continue
+        for day in payload.get("dates") or []:
+            for g in day.get("games") or []:
+                state = ((g.get("status") or {}).get("abstractGameState") or "")
+                if state != "Final":
+                    continue
+                teams = g.get("teams") or {}
+                home, away = teams.get("home") or {}, teams.get("away") or {}
+                if home.get("score") is None or away.get("score") is None:
+                    continue
+                yield {
+                    "date": (g.get("officialDate") or g.get("gameDate") or "")[:10],
+                    "home": (home.get("team") or {}).get("name"),
+                    "away": (away.get("team") or {}).get("name"),
+                    "home_id": (home.get("team") or {}).get("id"),
+                    "away_id": (away.get("team") or {}).get("id"),
+                    "home_score": home.get("score"), "away_score": away.get("score"),
+                    "league": "MLB", "season": year, "source": "mlb",
+                }
+        time.sleep(0.4)
+
+
 ADAPTERS = {
     "football": (1, football),
     "euroleague": (3, basketball),
+    "tml": (4, tennis),
+    "mlb": (5, baseball),
     "setka": (10, table_tennis),
 }
 

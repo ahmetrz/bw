@@ -56,6 +56,14 @@ N_BANDS = 12
 # time, and that is exactly the shape of claim a confidence floor waves through.
 MIN_BAND = 400
 
+# How many matches a team or player must have behind its rating before that rating is
+# allowed to price anything. A side seen twice still sits near the 1500 it started at, and
+# 1500 does not mean "average" for that side — it means "we have not measured it". Pricing
+# from it makes every mismatch look like a coin flip, which is precisely how tennis first
+# failed its calibration by 7.4 points at +0.5: the tour is full of qualifiers who appear
+# once, and each of them was being treated as a solid mid-table player.
+MIN_APPEARANCES = 20
+
 # The market groups this can price, which is every group the safety ladder walks.
 G_1X2, G_MONEYLINE_2WAY, G_DOUBLE_CHANCE = 1, 101, 8
 G_HANDICAP, G_ASIAN_HANDICAP, G_TOTAL = 2, 2854, 17
@@ -104,8 +112,16 @@ def pool_of(row):
     return row.get("pool") or ""
 
 
-def fit_ratings(rows):
-    """Chained Elo, PER RATING POOL.
+def fit_ratings(rows, record=False):
+    """Chained Elo, PER RATING POOL. Returns the final ratings, or (final, pre-match gaps).
+
+    `record` gives back the effective rating gap AS IT STOOD BEFORE each match, which is
+    the only gap a model could ever have had at prediction time. Fitting the distributions
+    on final ratings instead is hindsight: every match is then described by how good the
+    two sides turned out to be over the whole history, including that match and everything
+    after it. It flatters the fit and, worse, it distorts it — the model was systematically
+    over-rating underdogs at the tightest line in football, basketball and tennis alike
+    until this was separated out.
 
     Pooling everything was tried first and football failed its own calibration by 4.8
     points at +0.5 — 22 divisions had been averaged onto one scale, so a mid-table
@@ -113,7 +129,7 @@ def fit_ratings(rows):
     calibration gate caught it, which is the entire reason the gate exists: generalizing a
     model is exactly the moment a sport's real structure gets dropped.
     """
-    rating, year = {}, None
+    rating, year, gaps = {}, None, []
     for r in sorted(rows, key=lambda x: x["date"]):
         y = r["date"][:4]
         if year is not None and y != year:
@@ -126,22 +142,24 @@ def fit_ratings(rows):
         rating.setdefault(a, START_RATING)
         margin = r["home_score"] - r["away_score"]
         diff = rating[h] - rating[a] + (0.0 if r.get("neutral") else HOME_ELO)
+        if record:
+            gaps.append(diff)
         actual = 1.0 if margin > 0 else (0.5 if margin == 0 else 0.0)
         mov = math.log(abs(margin) + 1.0) * (2.2 / (abs(diff) * 0.001 + 2.2))
         delta = K * mov * (actual - _expected(diff))
         rating[h] += delta
         rating[a] -= delta
-    return rating
+    return (rating, gaps) if record else rating
 
 
-def fit_line(rows, rating):
-    """expected margin = a + b x effective rating gap, by least squares. Universal."""
-    xs, ys = [], []
-    for r in rows:
-        pool = pool_of(r)
-        rh = rating.get((pool, team_key(r, "home")), START_RATING)
-        ra = rating.get((pool, team_key(r, "away")), START_RATING)
-        xs.append(rh - ra + (0.0 if r.get("neutral") else HOME_ELO))
+def fit_line(rows, gaps):
+    """expected margin = a + b x effective rating gap, by least squares. Universal.
+
+    `gaps` are the PRE-MATCH gaps from fit_ratings(record=True), in the same order as the
+    date-sorted rows they came from.
+    """
+    xs, ys = list(gaps), []
+    for r in sorted(rows, key=lambda x: x["date"]):
         ys.append(float(r["home_score"] - r["away_score"]))
     n = len(xs) or 1
     mx, my = sum(xs) / n, sum(ys) / n
@@ -156,18 +174,7 @@ def expected_margin(line, gap):
     return line["slope"] * gap + line["intercept"]
 
 
-def _expected_margins(rows, rating, line):
-    out = []
-    for r in rows:
-        pool = pool_of(r)
-        rh = rating.get((pool, team_key(r, "home")), START_RATING)
-        ra = rating.get((pool, team_key(r, "away")), START_RATING)
-        gap = rh - ra + (0.0 if r.get("neutral") else HOME_ELO)
-        out.append(expected_margin(line, gap))
-    return out
-
-
-def fit_bands(rows, rating, line):
+def fit_bands(rows, gaps, line):
     """Counted margin and total distributions, per band of EXPECTED margin.
 
     The actual integer margins are counted, never a residual that gets shifted back. That
@@ -180,7 +187,8 @@ def fit_bands(rows, rating, line):
     work across sports: the expected margin is already in the sport's own units, so one
     band count covers goals, points and sets with no scale set by hand.
     """
-    mus = _expected_margins(rows, rating, line)
+    rows = sorted(rows, key=lambda x: x["date"])
+    mus = [expected_margin(line, g) for g in gaps]
     order = sorted(range(len(rows)), key=lambda i: mus[i])
     n_bands = N_BANDS
     while n_bands > 1 and len(rows) / n_bands < MIN_BAND:
@@ -274,6 +282,10 @@ def usable(model, max_gap=0.03):
     return True, f"{model['games']} results, worst calibration gap {worst:.3f}"
 
 
+def appearances(model, pool, team):
+    return ((model.get("appearances") or {}).get(pool) or {}).get(team, 0)
+
+
 def lookup(model, home, away, matcher=None):
     """Probabilities for one fixture, or (None, 0.0) when it cannot be priced honestly.
 
@@ -289,6 +301,10 @@ def lookup(model, home, away, matcher=None):
         h, hs = match(home, pool)
         a, asc = match(away, pool)
         if h is None or a is None or h == a:
+            continue
+        # A provisional rating is not a rating. Refusing here costs a selection; pricing
+        # from it costs a wrong one, presented with the same confidence as a right one.
+        if min(appearances(model, pool, h), appearances(model, pool, a)) < MIN_APPEARANCES:
             continue
         score = (hs + asc) / 2.0
         if best is None or score > best[0]:

@@ -130,7 +130,17 @@ work with the same code. Basketball now runs on it; its bespoke model was delete
 than kept alongside.
 
 `MODELLED_SPORTS` in `engine/pick.py` is the list of HAND-WRITTEN models and is meant to
-stop growing. Coverage is `data/results/` plus whatever passes its calibration.
+stop growing. Coverage is `data/results/` plus whatever passes its calibration. Today the
+generic gate admits football (0.010), basketball (0.028) and baseball (0.014), and refuses
+tennis (0.030) and table tennis (27 results). Football and table tennis still run on their
+hand-written models in production; the generic football model now out-evidences the
+bespoke one — it has a held-out calibration and the bespoke one does not — so replacing it
+is the next thing to do, after a side-by-side on one card.
+
+Sources checked and REFUSED on robots grounds while doing this, all by our crawler's name:
+NHL (`api-web.nhle.com`, `api.nhle.com`), OpenDota, Liquipedia, bo3.gg's `/api/`, ESPN,
+cbv.com.br. Allowed and used: football-data.co.uk, api-live.euroleague.net,
+raw.githubusercontent.com (TML tennis), statsapi.mlb.com.
 
 ## Hard rules (engineering invariants — do not violate)
 1. **Every emitted selection carries:** odds, implied_prob, market_overround,
@@ -182,8 +192,13 @@ stop growing. Coverage is `data/results/` plus whatever passes its calibration.
    predictions and outcomes from the same matches and reported a gap of 0.000 on every
    line, which is an arithmetic identity dressed as a test. `model_generic.usable()` is the
    gate — under 400 results, no calibration table, or a gap over 0.03 and the sport is
-   refused. Football's own generic model is refused today at 0.043; that is the gate
-   working, not a failure to be tuned away.
+   refused. Ratings must be taken AS THEY STOOD BEFORE the match: fitting on final
+   ratings describes a fixture by how good both sides turned out to be over the whole
+   history, including that match and everything after it. That single leak was the largest
+   error in the generic model — football went from a 0.043 gap to 0.010 with nothing else
+   changed. A rating with fewer than `MIN_APPEARANCES` matches behind it prices nothing:
+   1500 means "not measured", not "average", and treating it as average made every
+   mismatch look like a coin flip.
 9. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
    football's 8.65%, so left in they head every run. No model can ever justify one.
    `config.EXCLUDED_SPORTS`.
