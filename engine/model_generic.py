@@ -411,10 +411,38 @@ def exact_matcher(model):
     def match(name, pool):
         idx = indexes.get(pool) or {}
         key = _norm(name)
-        if key in idx:
+        want = variant(name)
+        if key in idx and variant(idx[key]) == want:
             return idx[key], 1.0
-        return _fuzzy(idx, key)
+        return _fuzzy(idx, key, want=want)
     return match
+
+
+# Markers that make a team a DIFFERENT team from the senior side. This guard exists in
+# engine/model_elo.py and was dropped when the matcher was generalized, which is exactly
+# the kind of thing generalizing loses. The cost was visible immediately: the generic
+# football model priced "Corinthians Paulista (Women)" from the MEN'S Brazilian Serie A
+# ratings and called a +6.5 handicap 99.78%, and did the same for three Danish, Scottish
+# and Brazilian U20 fixtures. That is not an approximation, it is the wrong team — and the
+# book puts these on the same card as the senior fixtures, so it happens constantly.
+_VARIANT = frozenset((
+    "u16", "u17", "u18", "u19", "u20", "u21", "u23", "youth", "juniors", "junior",
+    "women", "woman", "ladies", "feminine", "femenino", "feminino", "femminile", "w",
+    "reserves", "reserve", "ii", "b", "amateur", "academy", "development",
+))
+
+
+def variant(name):
+    """The age or gender variant of a team, or "" for the senior side.
+
+    Two names only describe the same team if their variants AGREE. "Palmeiras" and
+    "Palmeiras U20" share every meaningful token, so any similarity measure will call them
+    a match — and the ratings attached would be the senior side's.
+    """
+    for token in _norm(name).split():
+        if token in _VARIANT:
+            return token
+    return ""
 
 
 def _norm(name):
@@ -424,22 +452,27 @@ def _norm(name):
     return " ".join(s.split())
 
 
-def _fuzzy(index, key, cutoff=0.86):
+def _fuzzy(index, key, cutoff=0.86, want=""):
     """Containment on tokens, refusing a tie. Same rule as the football matcher.
 
     Refusing is the point. Attaching a neighbouring team's rating is worse than declining
     to price the fixture, because a wrong rating produces a confident wrong answer.
+
+    `want` is the variant the fixture asked for. A candidate whose variant differs is not
+    a worse match, it is a different team, so it is dropped rather than scored.
     """
-    want = set(key.split())
-    if not want:
+    tokens = set(key.split())
+    if not tokens:
         return None, 0.0
     best = []
     for norm, team in index.items():
+        if variant(team) != want:
+            continue
         have = set(norm.split())
-        shared = want & have
+        shared = tokens & have
         if not shared:
             continue
-        score = len(shared) / min(len(want), len(have))
+        score = len(shared) / min(len(tokens), len(have))
         if len(shared) == 1 and max(len(t) for t in shared) <= 3:
             score *= 0.6
         if score >= cutoff:

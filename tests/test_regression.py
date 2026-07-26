@@ -826,6 +826,35 @@ class TestRegression(unittest.TestCase):
         self.assertGreater(wider, win)
         self.assertLess(wider, 1.0)
 
+    def test_a_womens_or_youth_side_is_never_priced_from_the_senior_team(self):
+        """A variant marker makes it a DIFFERENT team, not a fuzzier match.
+
+        This guard exists in engine/model_elo.py and was dropped when the matcher was
+        generalized. The cost showed up immediately: the generic football model priced
+        "Corinthians Paulista (Women)" from the MEN'S Brazilian Serie A ratings and called
+        a +6.5 handicap 99.78%, and did the same for Danish, Scottish and Brazilian U20
+        fixtures. The book puts these on the same card as the senior games, so it is not a
+        rare edge — it was four of the model's most confident selections of the day.
+        """
+        model = {"pools": {"": {"Corinthians": 1700.0, "Vitoria": 1400.0}},
+                 "appearances": {"": {"Corinthians": 500, "Vitoria": 500}},
+                 "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
+                                         "mean_abs_margin": 1.0},
+                 "bands": {"": [{"lo": -9, "hi": 9, "n": 900, "margin": {"0": 1}}]},
+                 "_margin": {"": [{0.0: 1.0}]}, "_total": {"": [{2.0: 1.0}]}}
+        # The senior fixture prices.
+        self.assertIsNotNone(model_generic.lookup(model, "Corinthians", "Vitoria")[0])
+        # Every variant of it does not, in either position.
+        for a, b in (("Corinthians (Women)", "Vitoria (Women)"),
+                     ("Corinthians U20", "Vitoria U20"),
+                     ("Corinthians", "Vitoria (Women)"),
+                     ("Corinthians B", "Vitoria")):
+            self.assertIsNone(model_generic.lookup(model, a, b)[0],
+                              f"{a} v {b} was priced from the senior ratings")
+        for name, want in (("Palmeiras", ""), ("Palmeiras U20", "u20"),
+                           ("Nordsjaelland (Women)", "women"), ("Real Madrid", "")):
+            self.assertEqual(model_generic.variant(name), want)
+
     def test_a_provisional_rating_never_prices_a_fixture(self):
         """A side seen twice still sits at the 1500 it started from, and 1500 means
         "we have not measured this", not "average". Pricing from it makes every mismatch

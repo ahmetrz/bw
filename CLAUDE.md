@@ -134,7 +134,11 @@ work with the same code. Basketball now runs on it; its bespoke model was delete
 than kept alongside.
 
 `MODELLED_SPORTS` in `engine/pick.py` is the list of HAND-WRITTEN models and is meant to
-stop growing. Coverage is `data/results/` plus whatever passes its calibration. The generic gate now
+SHRINK. Football left it: the hand-written Elo model is fitted on more history and reaches
+18 more fixtures, but its accuracy has never been measured against matches it did not see,
+and hard rule 8 says a model is wired in on its calibration rather than its reach. Table
+tennis stays hand-written — its generic store holds 88 players against the 2,007 on
+Setka's live index. Coverage is `data/results/` plus whatever passes its calibration. The generic gate now
 admits ALL FIVE sports that have an adapter: football 0.012, basketball 0.028, tennis
 0.012, baseball 0.014, table tennis 0.011. Football and table tennis still run their
 hand-written models in production; both generic versions now out-evidence them, because
@@ -213,7 +217,11 @@ raw.githubusercontent.com (TML tennis), statsapi.mlb.com.
    error in the generic model — football went from a 0.043 gap to 0.010 with nothing else
    changed. A rating with fewer than `MIN_APPEARANCES` matches behind it prices nothing:
    1500 means "not measured", not "average", and treating it as average made every
-   mismatch look like a coin flip.
+   mismatch look like a coin flip. A variant marker — U20, (Women), B, reserves — makes a
+   side a DIFFERENT team, not a fuzzier match: the generic matcher dropped that guard when
+   it was generalized and immediately priced "Corinthians Paulista (Women)" off the MEN'S
+   Brazilian Serie A, calling a +6.5 handicap 99.78%. Four of the model's most confident
+   selections that day were the wrong team.
 9. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
    football's 8.65%, so left in they head every run. No model can ever justify one.
    `config.EXCLUDED_SPORTS`.

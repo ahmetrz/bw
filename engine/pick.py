@@ -23,13 +23,23 @@ from engine import ladder, model_football
 
 # Sports with a calibrated model. Everything else is counted as unmodelled rather than
 # guessed at, and that count is reported.
-#   1  football     — Elo + goal supremacy + Poisson scoreline matrix
 #   10 table tennis — Setka ratings + a measured set-score distribution
 # Everything else goes through engine/model_generic.py, which admits a sport only when its
 # own held-out calibration says the model works. So this set is no longer the list of
 # sports the product covers — it is the list of sports with a HAND-WRITTEN model, and it
-# is meant to stop growing.
-MODELLED_SPORTS = {1, 10}
+# is meant to shrink.
+#
+# FOOTBALL LEFT IT. The hand-written Elo model is fitted on more history (298,950 results
+# against 138,823) and finds 18 selections the generic one does not, but its accuracy has
+# never been measured against matches it did not see. Hard rule 8 says a model is wired in
+# on its calibration, not on its reach, and by that rule the generic model is the one that
+# qualifies: 0.011 held out on 27,764 unseen fixtures. It offers fewer selections — 52
+# against 57 — and fewer, better-evidenced selections is what this product is.
+#
+# TABLE TENNIS HAS NOT. Its generic store holds 88 players against the 2,007 on Setka's
+# live rating index, so the generic model reaches almost nothing on a real card. The
+# hand-written one stays until the store catches up.
+MODELLED_SPORTS = {10}
 
 # Directions to consider, in the order they are tried. Sides first: a side view is what
 # the ladder can soften most, since double chance and the handicap family both exist.
