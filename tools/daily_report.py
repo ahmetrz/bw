@@ -26,8 +26,9 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, mirror, model_elo, model_football, model_tt,  # noqa: E402
-                    parlay, pick, rating, score, setka, settlement, telegram, tr)
+from engine import (bwfeed, mirror, model_basketball, model_elo,  # noqa: E402
+                    model_football, model_tt, parlay, pick, rating, score, setka,
+                    settlement, telegram, tr)
 from tools import make_picks_page  # noqa: E402
 
 
@@ -56,7 +57,7 @@ def within(rows, hours, now=None):
     return out
 
 
-def analyse(rows, hours, index, elo_model=None, tt=None):
+def analyse(rows, hours, index, elo_model=None, tt=None, basketball=None):
     """One window's worth of analysis."""
     windowed = within(rows, hours)
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
@@ -65,7 +66,8 @@ def analyse(rows, hours, index, elo_model=None, tt=None):
     if not windowed:
         return {"hours": hours, "matches": 0, "picks": [], "skipped": {}}
 
-    picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model, tt=tt)
+    picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model,
+                                       tt=tt, basketball=basketball)
     settlement.annotate(picks)
     # Picks come from the unfiltered rows, so they carry no hold yet. Attach it here so
     # the parlay's hard-rule-4 figures can be computed from the same numbers as the scan.
@@ -269,6 +271,15 @@ def main():
     else:
         print("Table tennis model absent — run tools/build_tt_model.py", file=sys.stderr)
 
+    basketball = model_basketball.load()
+    if basketball:
+        m = basketball["margin"]
+        worst = max(abs(c["predicted"] - c["observed"]) for c in basketball["calibration"])
+        print(f"Basketball model: {basketball['games']} games, {basketball['teams']} teams; "
+              f"margin sd {m['residual_sd']} pts, worst calibration gap {worst:.3f}")
+    else:
+        print("Basketball model absent — run tools/build_basketball_model.py", file=sys.stderr)
+
     try:
         index = model_football.build_index()
         print(f"ClubElo fixtures indexed: {len(index)}")
@@ -277,7 +288,8 @@ def main():
         index = {}
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = number([analyse(rows, h, index, elo_model, tt) for h in windows])
+    results = number([analyse(rows, h, index, elo_model, tt, basketball)
+                      for h in windows])
 
     for r in results:
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "

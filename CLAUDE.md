@@ -61,6 +61,8 @@ tools/fetch_window.py  sports → tournaments → fixtures → markets, budgeted
 tools/make_picks_page.py  ONE template for picks.html and results.html
 tools/daily_results.py    settles a logged day, rebuilds the page as a scorecard
 tools/make_coupon.py   scan-path slip of deep links (NOT the daily product)
+tools/harvest_basketball.py + build_basketball_model.py  EuroLeague/EuroCup -> the margin model
+tools/make_method_page.py  method.html, generated from signals/pick/ladder/config/research
 engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
 engine/parser.py       OddsPapi response → the same rows (book-agnostic)
 engine/score.py        hard filters + composite score
@@ -68,6 +70,7 @@ engine/ladder.py       safety laddering; three-way vs two-way read off the paylo
 engine/pick.py         direction + ladder + gates → one selection per match
 engine/rating.py       the 0-100 score = model probability, discounted by evidence
 engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
+engine/model_basketball.py  Elo -> a NORMAL margin, calibrated against observed cover rates
 engine/settlement.py   what a selection actually means when it settles
 engine/telegram.py     daily notification (no-ops without credentials)
 engine/tr.py           Turkish labels for everything user-facing
@@ -145,14 +148,22 @@ the first real Betwinner fixture.
    sports whose head-to-heads span days sit in `config.MULTI_DAY_SPORTS`. Do NOT filter
    on the start timestamp for this: long-dated markets carry a near-term start. The 2026
    Senate markets are stamped 5–16 days out because that is when the LINE runs.
-8. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
+8. **A model that is confident is not a model that is right.** Every sport's model must be
+   CALIBRATED against observed outcomes before it is wired in — predicted rate against
+   realised rate, at the lines the ladder actually selects. Basketball's first fit had a
+   sign error and claimed 90.4% for a +12.5 handicap where the real rate was 74.9%. Nothing
+   about that number looks wrong, and it clears `MIN_MODEL_SURVIVAL` comfortably: the
+   confidence floor CANNOT catch this class of error, because the floor trusts the model.
+   Table tennis was caught the same way (extrapolating a logistic past its fitted range to
+   97% on a 3.30 shot). A calibration table ships with each model and a test asserts it.
+9. **RNG markets never enter the ranking.** Lottery measured a 3.09% median hold against
    football's 8.65%, so left in they head every run. No model can ever justify one.
    `config.EXCLUDED_SPORTS`.
-9. **Qualify a source on its BODY, never its status code.** Learned repeatedly and the
+10. **Qualify a source on its BODY, never its status code.** Learned repeatedly and the
    hard way: a 200 has been a Cloudflare block page, an Incapsula interstitial, a
    proof-of-work challenge, an empty array, a "we're renovating" placeholder and a 404
    page with a 257 KB body. Read the bytes.
-10. **Check robots.txt for OUR crawler by name before fetching.** ESPN disallows
+11. **Check robots.txt for OUR crawler by name before fetching.** ESPN disallows
     `anthropic-ai`; FIVB, Natural Stat Trick, Tapology, CueTracker and others name
     `ClaudeBot`. A source already recorded as verified can become disallowed — FIVB did.
 

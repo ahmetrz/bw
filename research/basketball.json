@@ -1,172 +1,172 @@
 {
-  "sport": "basketball",
-  "researched": "2026-07-25",
-  "verified_free_sources": [
-    {
-      "id": "espn_core",
-      "url": "https://sports.core.api.espn.com/v2/sports/basketball/leagues/{lg}/seasons/{yr}/types/2/teams/{id}/statistics",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "nba, wnba, fiba, nbl, college, nba-development; possessions, eFG%, TS%, offReboundRate, turnoverRatio, assistRatio",
-      "rate_limit": "unpublished; self-throttle ~1/s"
-    },
-    {
-      "id": "espn_site",
-      "url": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "scoreboard, summary (boxscore+injuries+odds+winprobability), /injuries",
-      "note": "NO EuroLeague slug"
-    },
-    {
-      "id": "bbref",
-      "url": "https://www.basketball-reference.com/leagues/NBA_{yr}.html",
-      "auth": "scraping",
-      "api": false,
-      "verified": true,
-      "coverage": "NBA 1947- four factors, pace, ORtg/DRtg",
-      "rate_limit": "20/min, enforced by ban"
-    },
-    {
-      "id": "bbref_refs",
-      "url": "https://www.basketball-reference.com/referees/",
-      "auth": "scraping",
-      "api": false,
-      "verified": true,
-      "coverage": "per-referee diff_pts_per_g, diff_pf_per_g, diff_fta_per_g"
-    },
-    {
-      "id": "euroleague_live",
-      "url": "https://live.euroleague.net/api/Boxscore?gamecode={n}&seasoncode=E{yr}",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "EuroLeague + EuroCup; Referees, Attendance, ByQuarter"
-    },
-    {
-      "id": "euroleague_v2",
-      "url": "https://api-live.euroleague.net/v2/competitions/E/seasons/E{yr}/games",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "games list + /games/{n}/stats box scores"
-    },
-    {
-      "id": "fiba_livestats",
-      "url": "https://fibalivestats.dcd.shared.geniussports.com/data/{gameId}/data.json",
-      "auth": "none",
-      "api": true,
-      "verified": true,
-      "coverage": "most FIBA domestic leagues + BCL; full team/player box, pbp, officials"
-    },
-    {
-      "id": "nba_injury_pdf",
-      "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_{date}_{hh}{AMPM}.pdf",
-      "auth": "none",
-      "api": false,
-      "verified": true,
-      "coverage": "official NBA injury report; 5PM day-before, gameday updates"
-    }
-  ],
-  "blocked_or_unverified": [
-    {
-      "id": "nba_stats",
-      "status": "BLOCKED FROM DATACENTER",
-      "detail": "stats.nba.com timed out, cdn.nba.com 403. GitHub Actions runners are datacenter IPs so a scheduled job will fail the same way. Use espn_core instead."
-    },
-    {
-      "id": "sofascore",
-      "status": "BLOCKED",
-      "detail": "403 on every header combination"
-    },
-    {
-      "id": "realgm",
-      "status": "BLOCKED",
-      "detail": "403"
-    },
-    {
-      "id": "balldontlie",
-      "status": "LIMITED",
-      "detail": "free tier 5 req/min, basic only; advanced stats/odds/injuries are paid"
-    }
-  ],
-  "stat_to_bet": {
-    "moneyline": [
-      "sos_adj_net",
-      "home_away_split",
-      "injuries",
-      "rest_days"
-    ],
-    "spread": [
-      "sos_adj_net",
-      "home_away_split",
-      "injuries",
-      "b2b",
-      "rest_days",
-      "travel",
-      "altitude",
-      "form_window",
-      "garbage_time_rate"
-    ],
-    "over_under_points": [
-      "pace",
-      "off_rating",
-      "def_rating",
-      "three_rate",
-      "oreb_rate",
-      "tov_rate",
-      "ft_rate",
-      "referee_crew",
-      "altitude",
-      "b2b"
-    ],
-    "team_total": [
-      "off_rating",
-      "def_rating",
-      "opp_shot_profile",
-      "pace",
-      "injuries",
-      "usage_concentration"
-    ],
-    "half": [
-      "quarter_pattern",
-      "starter_minutes_load",
-      "bench_scoring",
-      "garbage_time_rate",
-      "b2b"
-    ],
-    "quarter": [
-      "quarter_pattern",
-      "bench_scoring",
-      "three_rate",
-      "referee_crew"
-    ],
-    "winning_margin": [
-      "usage_concentration",
-      "three_rate",
-      "pace",
-      "garbage_time_rate"
-    ],
-    "race_to_n": [
-      "pace",
-      "three_rate",
-      "off_rating",
-      "tov_rate"
-    ],
-    "overtime": [
-      "ft_pct",
-      "pace"
-    ]
+ "sport": "basketball",
+ "researched": "2026-07-25",
+ "verified_free_sources": [
+  {
+   "id": "bbref",
+   "url": "https://www.basketball-reference.com/leagues/NBA_{yr}.html",
+   "auth": "scraping",
+   "api": false,
+   "verified": true,
+   "coverage": "NBA 1947- four factors, pace, ORtg/DRtg",
+   "rate_limit": "20/min, enforced by ban"
   },
-  "key_findings": [
-    "NBA.com blocks datacenter IPs - GitHub Actions cannot use it. ESPN core API is the no-key substitute and carries possessions/eFG%/TS%.",
-    "eFG% is the largest Four Factor, ~40% of win variance.",
-    "Team 3P% and opponent 3P% are the two most over-fit stats - near-noise short-run, regress hard to league mean.",
-    "Injuries dominate every basketball market; a stale injury feed is worse than none.",
-    "FIBA/EuroLeague play 40 minutes, NBA 48 - never mix per-40 and per-48 rates.",
-    "Q1 is the cleanest quarter market: pure starters, no fatigue, no garbage time.",
-    "pace must be computed from possessions, not points, or it inherits efficiency."
+  {
+   "id": "bbref_refs",
+   "url": "https://www.basketball-reference.com/referees/",
+   "auth": "scraping",
+   "api": false,
+   "verified": true,
+   "coverage": "per-referee diff_pts_per_g, diff_pf_per_g, diff_fta_per_g"
+  },
+  {
+   "id": "euroleague_live",
+   "url": "https://live.euroleague.net/api/Boxscore?gamecode={n}&seasoncode=E{yr}",
+   "auth": "none",
+   "api": true,
+   "verified": true,
+   "coverage": "EuroLeague + EuroCup; Referees, Attendance, ByQuarter"
+  },
+  {
+   "id": "euroleague_v2",
+   "url": "https://api-live.euroleague.net/v2/competitions/E/seasons/E{yr}/games",
+   "auth": "none",
+   "api": true,
+   "verified": true,
+   "coverage": "games list + /games/{n}/stats box scores"
+  },
+  {
+   "id": "fiba_livestats",
+   "url": "https://fibalivestats.dcd.shared.geniussports.com/data/{gameId}/data.json",
+   "auth": "none",
+   "api": true,
+   "verified": true,
+   "coverage": "most FIBA domestic leagues + BCL; full team/player box, pbp, officials"
+  },
+  {
+   "id": "nba_injury_pdf",
+   "url": "https://ak-static.cms.nba.com/referee/injury/Injury-Report_{date}_{hh}{AMPM}.pdf",
+   "auth": "none",
+   "api": false,
+   "verified": true,
+   "coverage": "official NBA injury report; 5PM day-before, gameday updates"
+  }
+ ],
+ "blocked_or_unverified": [
+  {
+   "id": "nba_stats",
+   "status": "BLOCKED FROM DATACENTER",
+   "detail": "stats.nba.com timed out, cdn.nba.com 403. GitHub Actions runners are datacenter IPs so a scheduled job will fail the same way. Use espn_core instead."
+  },
+  {
+   "id": "sofascore",
+   "status": "BLOCKED",
+   "detail": "403 on every header combination"
+  },
+  {
+   "id": "realgm",
+   "status": "BLOCKED",
+   "detail": "403"
+  },
+  {
+   "id": "balldontlie",
+   "status": "LIMITED",
+   "detail": "free tier 5 req/min, basic only; advanced stats/odds/injuries are paid"
+  },
+  {
+   "id": "espn_core",
+   "status": "ROBOTS-DISALLOWED FOR US",
+   "detail": "www.espn.com/robots.txt names 'anthropic-ai' with 'Disallow: /'. The sports.core.api and site.api subdomains return 403 on robots.txt, which RFC 9309 would read as 'no restrictions' — but reading a separate hostname as permission when the same organisation states the opposite on its main site is reading it dishonestly. Not used. euroleague + fibalivestats cover the same ground with no such question."
+  },
+  {
+   "id": "espn_site",
+   "status": "ROBOTS-DISALLOWED FOR US",
+   "detail": "www.espn.com/robots.txt names 'anthropic-ai' with 'Disallow: /'. The sports.core.api and site.api subdomains return 403 on robots.txt, which RFC 9309 would read as 'no restrictions' — but reading a separate hostname as permission when the same organisation states the opposite on its main site is reading it dishonestly. Not used. euroleague + fibalivestats cover the same ground with no such question."
+  }
+ ],
+ "stat_to_bet": {
+  "moneyline": [
+   "sos_adj_net",
+   "home_away_split",
+   "injuries",
+   "rest_days"
+  ],
+  "spread": [
+   "sos_adj_net",
+   "home_away_split",
+   "injuries",
+   "b2b",
+   "rest_days",
+   "travel",
+   "altitude",
+   "form_window",
+   "garbage_time_rate"
+  ],
+  "over_under_points": [
+   "pace",
+   "off_rating",
+   "def_rating",
+   "three_rate",
+   "oreb_rate",
+   "tov_rate",
+   "ft_rate",
+   "referee_crew",
+   "altitude",
+   "b2b"
+  ],
+  "team_total": [
+   "off_rating",
+   "def_rating",
+   "opp_shot_profile",
+   "pace",
+   "injuries",
+   "usage_concentration"
+  ],
+  "half": [
+   "quarter_pattern",
+   "starter_minutes_load",
+   "bench_scoring",
+   "garbage_time_rate",
+   "b2b"
+  ],
+  "quarter": [
+   "quarter_pattern",
+   "bench_scoring",
+   "three_rate",
+   "referee_crew"
+  ],
+  "winning_margin": [
+   "usage_concentration",
+   "three_rate",
+   "pace",
+   "garbage_time_rate"
+  ],
+  "race_to_n": [
+   "pace",
+   "three_rate",
+   "off_rating",
+   "tov_rate"
+  ],
+  "overtime": [
+   "ft_pct",
+   "pace"
   ]
+ },
+ "key_findings": [
+  "NBA.com blocks datacenter IPs - GitHub Actions cannot use it. ESPN core API is the no-key substitute and carries possessions/eFG%/TS%.",
+  "eFG% is the largest Four Factor, ~40% of win variance.",
+  "Team 3P% and opponent 3P% are the two most over-fit stats - near-noise short-run, regress hard to league mean.",
+  "Injuries dominate every basketball market; a stale injury feed is worse than none.",
+  "FIBA/EuroLeague play 40 minutes, NBA 48 - never mix per-40 and per-48 rates.",
+  "Q1 is the cleanest quarter market: pure starters, no fatigue, no garbage time.",
+  "pace must be computed from possessions, not points, or it inherits efficiency."
+ ],
+ "built_2026_07_26": {
+  "model": "data/model_basketball.json via tools/harvest_basketball.py + build_basketball_model.py",
+  "source": "api-live.euroleague.net/v2 — keyless JSON, no robots.txt on that host",
+  "sample": "8,959 EuroLeague + EuroCup games, 19 seasons, 167 clubs by code",
+  "fit": "margin ~ Normal(0.0202 x elo_diff + 3.46, sd 12.62); total 163.4 +/- 18.4",
+  "calibration": "predicted vs observed cover rate: worst gap 0.030 at +2.5, <=0.011 from +6.5 upward. The first fit had a sign error and claimed 0.904 at +12.5 against an observed 0.749 — plausible enough to pass unnoticed, and the confidence floor could not have caught it because the floor trusts the model.",
+  "coverage_limit": "EuroLeague and EuroCup clubs only. On a late-July card that is ZERO matches: the 48h basketball list is 3x3, Chile, Uruguay, Uganda, BIG3, Puerto Rico and the like. The model refuses them rather than guessing. Its value starts when the European season resumes in October; fibalivestats.dcd.shared.geniussports.com is the route to domestic leagues and is robots-clean."
+ }
 }

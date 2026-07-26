@@ -1,79 +1,85 @@
 {
-  "sport": "volleyball",
-  "researched": "2026-07-25",
-  "verified": [
-    {
-      "id": "tvf",
-      "url": "https://tvf.org.tr/lig/efeler-ligi",
-      "auth": "scraping",
-      "verified": true,
-      "coverage": "Efeler, Sultanlar, 1./2. Lig; per-set scores + XLSX fixtures"
-    },
-    {
-      "id": "plusliga",
-      "url": "https://www.plusliga.pl/games/id/{id}.html",
-      "auth": "scraping",
-      "verified": true,
-      "coverage": "per-set set1..set5pointsTeamA/B",
-      "note": "Scrape by MATCH ID, not index - list URLs 301 to tauronliga.pl"
-    },
-    {
-      "id": "legavolley",
-      "url": "https://www.legavolley.it/wp-json/",
-      "auth": "none",
-      "verified": true,
-      "coverage": "SuperLega + A2/A3, WordPress REST JSON"
-    },
-    {
-      "id": "cev",
-      "url": "https://www.cev.eu/match-centres/",
-      "auth": "scraping",
-      "verified": true,
-      "coverage": "CL, CEV Cup, Challenge, Euros; archives from 2019"
-    },
-    {
-      "id": "cbv",
-      "url": "https://cbv.com.br/volei-de-quadra/superliga-a-feminina",
-      "auth": "scraping",
-      "verified": true,
-      "coverage": "Brazilian Superliga A M/W"
-    }
-  ],
-  "blocked": [
-    {
-      "id": "fivb_vis",
-      "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
-      "detail": "ROBOTS-DISALLOWED FOR US, and this entry previously said verified:true. www.fivb.org/robots.txt names our crawler explicitly — 'User-agent: ClaudeBot / Disallow: /' — alongside GPTBot, CCBot, Google-Extended and others, and the wildcard block carries a Content-Signal reservation of ai-train=no, use=reference. Re-read directly on 2026-07-25 to confirm rather than taking it second-hand. The endpoint itself works and its coverage was real (1530 indoor + 9256 beach tournaments; per-set points and set duration; no PlusLiga or Turkish leagues), which is exactly why the restriction matters: this was the primary source for BOTH indoor per-set markets and essentially all of beach volleyball, and there is no comparable free replacement for beach. Do not fetch it. Any use needs written permission from FIVB."
-    },
-    {
-      "id": "dataproject",
-      "detail": "RICHEST FREE SOURCE (per-set + per-skill team/player stats for SuperLega, PlusLiga, many federations). Blocked by OUR egress proxy (502 to CONNECT), NOT by the site - www.dataproject.com returned 200. HIGHEST-VALUE RETEST from a GitHub Actions runner."
-    },
-    {
-      "id": "volleybox",
-      "detail": "403 + Cloudflare"
-    },
-    {
-      "id": "sofascore",
-      "detail": "403 JSON"
-    },
-    {
-      "id": "bvbinfo",
-      "detail": "TLS connection reset"
-    },
-    {
-      "id": "thesportsdb",
-      "detail": "USELESS here: only sets-won, NO per-set scores, so it cannot serve set handicap / total sets / correct set score"
-    }
-  ],
-  "key_findings": [
-    "COMPLIANCE CORRECTION 2026-07-25: FIVB is robots-disallowed for our crawler by name. It was the single best source here and is now off-limits, so the usable per-set sources are TVF, PlusLiga, legavolley and CEV - all national or continental, none global. Beach volleyball loses its only substantial free archive outright.",
-    "Per-set scores confirmed in TVF, PlusLiga, legavolley, CEV. Absent in TheSportsDB - which makes it unusable for the set-based markets that dominate volleyball.",
-    "The 5th set is played to 15, which compresses the favourite's edge to near coin-flip (~50-53%). Total-sets and correct-set-score need a rally-level simulator, not a match-win probability.",
-    "Total sets O/U 3.5 is a function of the strength GAP, not team quality: evenly matched strong teams go long, a mismatch ends 3-0. Never feed it raw team ratings.",
-    "Side-out % is the master metric (65-72% in top leagues); break-point % is the scarcer skill that separates title teams.",
-    "Setter absence is the highest-leverage single injury, then opposite, then libero.",
-    "Home advantage is large: 55-62% in European leagues, higher in TUR/POL/BRA arenas.",
-    "Beach volleyball shares market names but nothing else - best-of-3, sets to 21, no rotation/libero stats, big wind effects. Separate model entirely."
-  ]
+ "sport": "volleyball",
+ "researched": "2026-07-25",
+ "verified": [
+  {
+   "id": "tvf",
+   "url": "https://tvf.org.tr/lig/efeler-ligi",
+   "auth": "scraping",
+   "verified": true,
+   "coverage": "Efeler, Sultanlar, 1./2. Lig; per-set scores + XLSX fixtures"
+  },
+  {
+   "id": "plusliga",
+   "url": "https://www.plusliga.pl/games/id/{id}.html",
+   "auth": "scraping",
+   "verified": true,
+   "coverage": "per-set set1..set5pointsTeamA/B",
+   "note": "Scrape by MATCH ID, not index - list URLs 301 to tauronliga.pl"
+  },
+  {
+   "id": "cev",
+   "url": "https://www.cev.eu/match-centres/",
+   "auth": "scraping",
+   "verified": true,
+   "coverage": "CL, CEV Cup, Challenge, Euros; archives from 2019"
+  }
+ ],
+ "blocked": [
+  {
+   "id": "fivb_vis",
+   "url": "https://www.fivb.org/Vis2009/XmlRequest.asmx",
+   "detail": "ROBOTS-DISALLOWED FOR US, and this entry previously said verified:true. www.fivb.org/robots.txt names our crawler explicitly — 'User-agent: ClaudeBot / Disallow: /' — alongside GPTBot, CCBot, Google-Extended and others, and the wildcard block carries a Content-Signal reservation of ai-train=no, use=reference. Re-read directly on 2026-07-25 to confirm rather than taking it second-hand. The endpoint itself works and its coverage was real (1530 indoor + 9256 beach tournaments; per-set points and set duration; no PlusLiga or Turkish leagues), which is exactly why the restriction matters: this was the primary source for BOTH indoor per-set markets and essentially all of beach volleyball, and there is no comparable free replacement for beach. Do not fetch it. Any use needs written permission from FIVB."
+  },
+  {
+   "id": "dataproject",
+   "detail": "RICHEST FREE SOURCE (per-set + per-skill team/player stats for SuperLega, PlusLiga, many federations). Blocked by OUR egress proxy (502 to CONNECT), NOT by the site - www.dataproject.com returned 200. HIGHEST-VALUE RETEST from a GitHub Actions runner."
+  },
+  {
+   "id": "volleybox",
+   "detail": "403 + Cloudflare"
+  },
+  {
+   "id": "sofascore",
+   "detail": "403 JSON"
+  },
+  {
+   "id": "bvbinfo",
+   "detail": "TLS connection reset"
+  },
+  {
+   "id": "thesportsdb",
+   "detail": "USELESS here: only sets-won, NO per-set scores, so it cannot serve set handicap / total sets / correct set score"
+  },
+  {
+   "id": "legavolley",
+   "detail": "CLAIM DOES NOT HOLD. This entry said 'SuperLega + A2/A3, WordPress REST JSON'. www.legavolley.it/wp-json/ was re-read on 2026-07-26 and is a stock WordPress install: namespaces are oembed, contact-form-7, wordfence, import-users and wp/v2, with 47 routes and NOT ONE of them match, game, result or calendar. It serves the site's news, not its scores. robots.txt does allow /wp-json/, so this is a coverage failure and not a compliance one — the source was recorded on its existence rather than on its BODY, which is rule 9 in reverse."
+  },
+  {
+   "id": "cbv",
+   "detail": "ROBOTS-DISALLOWED FOR US, and this entry previously said verified:true. cbv.com.br/robots.txt names our crawler explicitly — 'User-agent: ClaudeBot / Disallow: /' — alongside GPTBot, CCBot, Bytespider, Amazonbot, Google-Extended and meta-externalagent. Re-read directly on 2026-07-26. Same failure mode as FIVB: a source recorded as verified became disallowed, which is why rule 10 says to check by name BEFORE fetching rather than trusting the record."
+  }
+ ],
+ "key_findings": [
+  "COMPLIANCE CORRECTION 2026-07-25: FIVB is robots-disallowed for our crawler by name. It was the single best source here and is now off-limits, so the usable per-set sources are TVF, PlusLiga, legavolley and CEV - all national or continental, none global. Beach volleyball loses its only substantial free archive outright.",
+  "Per-set scores confirmed in TVF, PlusLiga, legavolley, CEV. Absent in TheSportsDB - which makes it unusable for the set-based markets that dominate volleyball.",
+  "The 5th set is played to 15, which compresses the favourite's edge to near coin-flip (~50-53%). Total-sets and correct-set-score need a rally-level simulator, not a match-win probability.",
+  "Total sets O/U 3.5 is a function of the strength GAP, not team quality: evenly matched strong teams go long, a mismatch ends 3-0. Never feed it raw team ratings.",
+  "Side-out % is the master metric (65-72% in top leagues); break-point % is the scarcer skill that separates title teams.",
+  "Setter absence is the highest-leverage single injury, then opposite, then libero.",
+  "Home advantage is large: 55-62% in European leagues, higher in TUR/POL/BRA arenas.",
+  "Beach volleyball shares market names but nothing else - best-of-3, sets to 21, no rotation/libero stats, big wind effects. Separate model entirely."
+ ],
+ "recheck_2026_07_26": {
+  "why": "Volleyball was picked as the next sport to model because the real FIVB Nations League fixture on the card carries a set handicap (group 109) and total sets (group 182) — the same structure that makes table tennis work. Re-checking the sources before building is what stopped it.",
+  "outcome": "Of five sources recorded as verified, TWO do not survive: cbv is robots-disallowed for us by name, and legavolley carries no match data at all. Of the three that remain, none is a structured feed: plusliga.pl/games.html 301s to tauronliga.pl (a different competition), tvf.org.tr renders its fixtures client-side with no XLSX or fixture links in the delivered HTML, and cev.eu is season-indexed pages rather than an API. Each is a separate scraper against a JS-driven site, and none of them covers NATIONAL TEAM volleyball at all — FIVB was that source and it is off-limits.",
+  "decision": "Basketball was modelled first instead. api-live.euroleague.net/v2 is keyless structured JSON with no robots.txt on that host, and it returned 8,959 EuroLeague and EuroCup games with per-quarter scores in one afternoon. Volleyball is still the better STRUCTURAL fit for the safety ladder; it is simply four scrapers away rather than one API call, and that is a scheduling decision, not a change of mind.",
+  "robots_checked": {
+   "www.legavolley.it": "allows /wp-json/; disallows /statistiche/ /rendimento/ /confronti/ /matchdaily",
+   "www.plusliga.pl": "robots.txt 301s to tauronliga.pl -> 'User-agent: * / Allow: /'",
+   "tvf.org.tr": "'User-agent: *' with no Disallow — everything allowed",
+   "www.cev.eu": "no robots.txt (404) — allowed by default",
+   "cbv.com.br": "User-agent: ClaudeBot / Disallow: / — OFF LIMITS"
+  }
+ }
 }

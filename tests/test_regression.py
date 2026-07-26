@@ -19,8 +19,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import (bwfeed, grade, ladder, mirror, parlay, pick, rating,  # noqa: E402
-                    score, settlement, signals, telegram)
+from engine import (bwfeed, grade, ladder, mirror, model_basketball,  # noqa: E402
+                    parlay, pick, rating, score, settlement, signals, telegram)
 from tools import daily_report, daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
@@ -739,6 +739,66 @@ class TestRegression(unittest.TestCase):
         self.assertEqual((s["win"], s["loss"], s["push"], s["graded"]), (3, 1, 1, 5))
         self.assertAlmostEqual(s["hit_rate"], 0.75)
         self.assertIn("%75.0", page)
+
+    def test_basketball_model_is_calibrated_where_the_ladder_works(self):
+        """The fitted normal must match the OBSERVED cover rate, not merely look plausible.
+
+        The first fit had the sign of the fitted mean flipped in both branches and claimed
+        90.4% for a +12.5 line against a real 74.9%. Nothing about "90% for +12.5" invites
+        suspicion, and it clears MIN_MODEL_SURVIVAL with room to spare — the floor cannot
+        catch this, because the floor trusts the model. Only this comparison can.
+        """
+        model = model_basketball.load()
+        if not model:
+            self.skipTest("basketball model not built")
+        cal = model["calibration"]
+        self.assertGreaterEqual(len(cal), 6)
+        # The ladder only ever selects lines the model is confident about, so the fit has
+        # to be tight exactly there — a wide line, not a coin-flip one.
+        for c in cal:
+            gap = abs(c["predicted"] - c["observed"])
+            limit = 0.05 if c["line"] < 6.5 else 0.02
+            self.assertLess(gap, limit,
+                            f"+{c['line']}: model {c['predicted']} vs observed {c['observed']}")
+        # And it must be monotone: a bigger head start cannot be less likely to cover.
+        rates = [c["observed"] for c in sorted(cal, key=lambda x: x["line"])]
+        self.assertEqual(rates, sorted(rates))
+
+    def test_basketball_names_resolve_across_sponsor_renames(self):
+        """One club is ONE rating, whatever it was called that season.
+
+        Keyed by name, 167 clubs became 343 rating entries each holding a fragment of one
+        club's history. Keyed by code with the old names as aliases, the book's older
+        spellings still resolve and the rating is whole.
+        """
+        model = model_basketball.load()
+        if not model:
+            self.skipTest("basketball model not built")
+        for a, b in (("Fenerbahce Beko", "Olympiacos Piraeus"),
+                     ("Efes Pilsen", "Panathinaikos"),      # a sponsor era ago
+                     ("Real Madrid", "Barcelona")):
+            probs, score = model_basketball.lookup(model, a, b)
+            self.assertIsNotNone(probs, f"{a} v {b} did not resolve")
+            self.assertGreaterEqual(score, 0.86)
+        # A club outside the pool must produce nothing rather than a neighbour's rating.
+        probs, _ = model_basketball.lookup(model, "Some Random BC", "Other BC")
+        self.assertIsNone(probs)
+
+    def test_basketball_handicap_probability_moves_the_right_way(self):
+        """A bigger head start is safer, and the two sides of one line must sum to 1."""
+        probs = {"margin_mu": 6.0, "margin_sd": 12.6, "total_mu": 163.0,
+                 "total_sd": 15.0, "_source": "basketball"}
+        last = 0.0
+        for line in (2.5, 6.5, 10.5, 14.5, 20.5):
+            row = {"market_key": ("k", f"2|{-line}"), "outcome_id": 8}   # away +line
+            win, push = model_basketball.rung_probs(row, probs)
+            self.assertGreater(win, last, f"+{line} came out no safer than the line below")
+            last = win
+        home = model_basketball.rung_probs(
+            {"market_key": ("k", "2|-10.5"), "outcome_id": 7}, probs)[0]
+        away = model_basketball.rung_probs(
+            {"market_key": ("k", "2|-10.5"), "outcome_id": 8}, probs)[0]
+        self.assertAlmostEqual(home + away, 1.0, places=6)
 
     def test_every_modelled_sport_has_a_live_signal(self):
         """A sport that produces selections must have something marked live behind it.

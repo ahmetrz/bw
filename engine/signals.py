@@ -178,6 +178,69 @@ _TABLE_TENNIS = {
     ],
 }
 
+_BASKETBALL = {
+    1: [   # match winner
+        S("elo_rating", "higher rating -> higher win probability; the rating DIFFERENCE is "
+                        "what every other basketball number here is built on",
+          "live", "api-live.euroleague.net, 8,959 EuroLeague + EuroCup games over 19 seasons",
+          tr="Takımın gücü. İki derecenin FARKI, basketboldaki her tahminin çıkış noktası."),
+        S("home_advantage", "worth a measured 5.5 points, and zero on a neutral court",
+          "live", "measured on non-neutral games only",
+          tr="Ev sahipliği. Ölçülen değeri 5.5 SAYI — varsayım değil, veriden. Tarafsız "
+             "sahada oynanan maçlarda sıfır alınır; yoksa nötr sahadaki bir final tüm ev "
+             "çizgilerini aşağı çekerdi."),
+        S("club_identity_by_code", "European clubs rename after their sponsor, so a rating "
+                                   "keyed by name splits one club's history into fragments",
+          "live", "78 of 167 club codes carry more than one name",
+          tr="Kulüp kimliği. Avrupa kulüpleri sponsoruna göre ad değiştirir. Derece "
+             "sponsor adına göre tutulunca 167 kulüp 343 parçaya bölünmüştü ve her parça "
+             "tarihin yalnızca bir kesitini taşıyordu; kod bazlı derece bunu birleştirdi."),
+    ],
+    2: [   # handicap — where the basketball ladder actually works
+        S("margin_distribution", "the margin is close to NORMAL, so P(covers +12.5) is one "
+                                 "CDF rather than a sum over a scoreline matrix",
+          "live", "residual sd 12.6 points, fitted on 4,039 recent games",
+          tr="Fark dağılımı. Basketbolda fark normale yakın, ölçülen sapma 12.6 sayı — bu "
+             "yüzden '+12.5 tutar mı' sorusu tek bir hesapla cevaplanıyor. Futbolda aynı "
+             "soru için skor matrisi gerekiyor."),
+        S("overtime_rate", "the book settles full-game basketball INCLUDING overtime, so "
+                           "the fit uses FINAL margins",
+          "live", "4.7% of games went to overtime",
+          tr="Uzatma oranı (%4.7). Kitap basketbolu uzatmalar DAHİL sonuçlandırdığı için "
+             "model normal süreye değil final farkına fit edildi. Normal süreye fit etmek, "
+             "handikabın karara bağlandığı yakın maçları tam da yanlış fiyatlamak olurdu."),
+        S("cover_rate_calibration", "the predicted cover rate is checked against the "
+                                    "observed one, line by line",
+          "live", "worst gap 0.030 at +2.5 and at or under 0.011 from +6.5 upward",
+          tr="Kapanma oranı kalibrasyonu. Modelin iddiası gerçekleşenle çizgi çizgi "
+             "karşılaştırılıyor. İlk fitte model +12.5 için %90.4 diyordu, gerçek %74.9'du "
+             "— güven tabanı bunu ASLA yakalayamazdı, çünkü taban modele güvenir."),
+        S("pace_and_efficiency", "possessions and points per possession sharpen the margin "
+                                 "beyond what one rating carries",
+          "available", "the EuroLeague boxscore API exposes both; not yet extracted",
+          tr="Tempo ve verimlilik. Hücum başına sayı ve maç temposu, tek bir derecenin "
+             "taşıyamadığı ayrıntıyı ekler. EuroLeague kutu skoru API'sinde mevcut, henüz "
+             "çıkarılmadı."),
+        S("injuries", "short rotations make one absence move a basketball line more than "
+                      "in any other team sport",
+          "missing", "no free structured feed for European leagues",
+          tr="Sakatlıklar. Rotasyon dar olduğu için eksik bir oyuncu çizgiyi diğer takım "
+             "sporlarından daha çok oynatır. Avrupa ligleri için ücretsiz ve yapılandırılmış "
+             "bir kaynak bulunamadı."),
+    ],
+    17: [  # totals
+        S("league_mean_total", "the base rate the totals ladder starts from",
+          "live", "163.4 points, sd 18.4",
+          tr="Ortalama toplam sayı: 163.4, sapma 18.4. Alt/üst merdiveninin çıkış noktası."),
+        S("rating_gap_effect", "a mismatch moves the expected total; an even game and a "
+                               "blowout do not score alike",
+          "live", "fitted against the absolute rating gap",
+          tr="Derece farkının totale etkisi. Denk bir maçla tek taraflı bir maçın toplam "
+             "sayısı aynı değildir; fark beklenen totali kaydırır."),
+    ],
+}
+
+
 _TENNIS = {
     1: [
         S("elo_by_surface", "surface-specific rating; a clay rating misprices a hard court",
@@ -193,6 +256,7 @@ _TENNIS = {
 
 _BY_SPORT = {
     FOOTBALL: _FOOTBALL,
+    BASKETBALL: _BASKETBALL,
     TABLE_TENNIS: _TABLE_TENNIS,
     TENNIS: _TENNIS,
 }
