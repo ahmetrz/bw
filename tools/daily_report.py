@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, model_elo, model_football, model_tt, parlay,  # noqa: E402
-                    pick, score, setka, settlement, telegram, tr)
+from engine import (bwfeed, mirror, model_elo, model_football, model_tt,  # noqa: E402
+                    parlay, pick, score, setka, settlement, telegram, tr)
 
 
 def load(path):
@@ -80,7 +80,7 @@ def analyse(rows, hours, index, elo_model=None, tt=None):
     }
 
 
-def format_window(res):
+def format_window(res, host=None):
     """Telegram HTML for one window."""
     h = res["hours"]
     lines = [f"<b>▸ Önümüzdeki {h} saat</b>"]
@@ -106,6 +106,8 @@ def format_window(res):
             f"\n  ➤ {html.escape(tr.pick(p))} "
             f"<b>@{p['odds']:.2f}</b>"
             f"\n  model: %{surv:.1f} tutma · {html.escape(tr.scope(st.get('scope')))}{warn}"
+            + (f"\n  <a href=\"{html.escape(url)}\">🔗 Betwinner'da aç</a>"
+               if (url := parlay.betwinner_url(p, host)) else "")
         )
     lines.append(
         f"\n  <i>modelsiz {sk.get('no_model', 0)} maç · "
@@ -114,7 +116,7 @@ def format_window(res):
     return "\n".join(lines)
 
 
-def build_message(results, source_note=""):
+def build_message(results, source_note="", host=None, host_source=""):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     head = [
         f"<b>🎯 Betwinner günlük analiz</b>  <i>{now}</i>",
@@ -122,7 +124,7 @@ def build_message(results, source_note=""):
         f"· maç başına tek seçim",
         "",
     ]
-    body = [format_window(r) for r in results]
+    body = [format_window(r, host) for r in results]
 
     total = sum(len(r["picks"]) for r in results)
     tail = [""]
@@ -148,12 +150,16 @@ def build_message(results, source_note=""):
         "<i>Yön modelden gelir, orandan değil. Oran yalnızca 1.10 eşiğinde okunur. "
         "Uzun vadeli ve aynı gün sonuçlanmayan bahisler kapsam dışıdır.</i>",
     ]
+    if host:
+        tail += [f"<i>bağlantılar {html.escape(host)} üzerinden "
+                 f"({html.escape(host_source)}) — Betwinner erişilebilir alan adını "
+                 f"değiştirdiğinde otomatik güncellenir</i>"]
     if source_note:
         tail += [f"<i>{html.escape(source_note)}</i>"]
     return "\n".join(head + body + tail)
 
 
-def log_predictions(results, path):
+def log_predictions(results, path, host=None):
     """Append every selection to the permanent prediction log, for later grading.
 
     Written the moment the pick is made, never reconstructed afterwards. A record built
@@ -205,6 +211,7 @@ def log_predictions(results, path):
                 "odds": p.get("odds"),
                 "model_survival": p.get("model_survival"),
                 "model_source": p.get("model_source"),
+                "url": parlay.betwinner_url(p, host),
                 "result": None,
             }, ensure_ascii=False) + "\n")
         seen.add(key)
@@ -264,8 +271,12 @@ def main():
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "
               f"(skipped: {r.get('skipped')})")
 
+    host, host_source = mirror.current(getattr(config, "REFERRAL_URL", None))
+    print(f"link host: {host} ({host_source})")
+
     payload = {
         "generated": datetime.now(timezone.utc).isoformat(),
+        "link_host": host,
         "min_odds": config.MIN_ODDS,
         "min_model_survival": config.MIN_MODEL_SURVIVAL,
         "windows": [
@@ -286,7 +297,7 @@ def main():
                         "odds": p["odds"],
                         "model_survival": p["model_survival"],
                         "settlement": p.get("settlement"),
-                        "url": parlay.betwinner_url(p),
+                        "url": parlay.betwinner_url(p, host),
                     }
                     for p in r["picks"]
                 ],
@@ -298,10 +309,12 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out}")
 
-    logged = log_predictions(results, args.predictions_log)
+
+    logged = log_predictions(results, args.predictions_log, host)
     print(f"prediction log: {logged} new rows in {args.predictions_log}")
 
-    message = build_message(results, source_note=f"kaynak: {os.path.basename(args.input)}")
+    message = build_message(results, source_note=f"kaynak: {os.path.basename(args.input)}",
+                            host=host, host_source=host_source)
     if args.no_telegram:
         print("\n--- message preview ---\n")
         print(message)

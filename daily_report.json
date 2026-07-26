@@ -1,1165 +1,15 @@
 {
-  "generated": "2026-07-26T07:57:18.528238+00:00",
+  "generated": "2026-07-26T08:05:35.134176+00:00",
+  "link_host": "betwinner2.com",
   "min_odds": 1.1,
   "min_model_survival": 0.75,
   "windows": [
     {
-      "hours": 24,
-      "matches": 595,
-      "skipped": {
-        "no_model": 498,
-        "no_confident_rung": 37,
-        "unmodelled_sport": 0
-      },
-      "picks": [
-        {
-          "match": "Napoli v Carrarese Calcio",
-          "league": "Club Friendlies",
-          "start": "2026-07-26T16:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 5.5",
-          "selection_tr": "5.5 Alt",
-          "ladder_rung": "under 5.5",
-          "direction": "under",
-          "odds": 1.104,
-          "model_survival": 0.9614,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/67559/354178770"
-        },
-        {
-          "match": "Hobro v Aarhus Fremad",
-          "league": "Denmark. 1st Division",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "Aarhus Fremad +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.109,
-          "model_survival": 0.9411,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/39969/349215074"
-        },
-        {
-          "match": "Yunnan Yukun v Shenzhen Peng City",
-          "league": "China. Super League",
-          "start": "2026-07-26T11:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Yunnan Yukun kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.246,
-          "model_survival": 0.9385,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/58043/352403168"
-        },
-        {
-          "match": "Frosinone Calcio v Ascoli Calcio 1898",
-          "league": "Club Friendlies",
-          "start": "2026-07-26T16:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Ascoli Calcio 1898 +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.16,
-          "model_survival": 0.9206,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/67559/354217238"
-        },
-        {
-          "match": "Sogndal v Ranheim",
-          "league": "Norway. Adeccoligaen",
-          "start": "2026-07-26T15:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 5.5",
-          "selection_tr": "5.5 Alt",
-          "ladder_rung": "under 5.5",
-          "direction": "under",
-          "odds": 1.156,
-          "model_survival": 0.9084,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/31508/349223122"
-        },
-        {
-          "match": "Eduardo Villegas Sanchez v Ivan Perez Martin",
-          "league": "Masters. Spain",
-          "start": "2026-07-26T22:10:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 2.5",
-          "selection_tr": "Eduardo Villegas Sanchez +2.5 set handikap",
-          "ladder_rung": "home +2.5 sets",
-          "direction": "home",
-          "odds": 1.17,
-          "model_survival": 0.8967,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2685660/354248544"
-        },
-        {
-          "match": "Olga Melnik v Victoria Kurtenko",
-          "league": "Setka Cup. Women",
-          "start": "2026-07-26T08:00:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 2.5",
-          "selection_tr": "Olga Melnik +2.5 set handikap",
-          "ladder_rung": "home +2.5 sets",
-          "direction": "home",
-          "odds": 1.39,
-          "model_survival": 0.896,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/1734759/354299294"
-        },
-        {
-          "match": "Ondrej Mezera v Lukas Rulc",
-          "league": "Setka Cup. Czech Republic",
-          "start": "2026-07-26T14:15:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 2.5",
-          "selection_tr": "Ondrej Mezera +2.5 set handikap",
-          "ladder_rung": "home +2.5 sets",
-          "direction": "home",
-          "odds": 1.285,
-          "model_survival": 0.896,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2187287/354271554"
-        },
-        {
-          "match": "Aalesunds v Viking",
-          "league": "Norway. Eliteserien",
-          "start": "2026-07-26T17:15:00+00:00",
-          "sport_id": 1,
-          "selection": "X2",
-          "selection_tr": "Viking kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "away does not lose",
-          "direction": "away",
-          "odds": 1.154,
-          "model_survival": 0.889,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/1793471/352354732"
-        },
-        {
-          "match": "Paksi v Ferencvarosi",
-          "league": "Hungary. NB I",
-          "start": "2026-07-26T18:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 2.5",
-          "selection_tr": "Paksi +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "home +2.5 (does not lose by 2.5)",
-          "direction": "home",
-          "odds": 1.122,
-          "model_survival": 0.8889,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/30213/352989476"
-        },
-        {
-          "match": "GAIS v Halmstads",
-          "league": "Sweden. Allsvenskan",
-          "start": "2026-07-26T14:30:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.141,
-          "model_survival": 0.886,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/212425/352369320"
-        },
-        {
-          "match": "Rangers v West Ham United",
-          "league": "Club Friendlies",
-          "start": "2026-07-26T15:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "West Ham United +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.1,
-          "model_survival": 0.8741,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/67559/353584236"
-        },
-        {
-          "match": "Sundsvall v Falkenbergs",
-          "league": "Sweden. Superettan",
-          "start": "2026-07-26T11:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 1.5",
-          "selection_tr": "Sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "home +1.5 (does not lose by 1.5)",
-          "direction": "home",
-          "odds": 1.23,
-          "model_survival": 0.8717,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1371789/352432698"
-        },
-        {
-          "match": "Lokomotiv Moscow v Akhmat",
-          "league": "Russia. Premier League",
-          "start": "2026-07-26T14:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Lokomotiv Moscow kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.215,
-          "model_survival": 0.8717,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/225733/345132778"
-        },
-        {
-          "match": "Red Bull Bragantino v Coritiba",
-          "league": "Brazil. Campeonato Brasileiro. Serie A",
-          "start": "2026-07-26T21:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.107,
-          "model_survival": 0.8693,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1268397/351856466"
-        },
-        {
-          "match": "Gremio Porto Alegrense v Fluminense",
-          "league": "Brazil. Campeonato Brasileiro. Serie A",
-          "start": "2026-07-26T21:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 1.5",
-          "selection_tr": "Gremio Porto Alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "home +1.5 (does not lose by 1.5)",
-          "direction": "home",
-          "odds": 1.1,
-          "model_survival": 0.8678,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1268397/351856478"
-        },
-        {
-          "match": "All Boys v Defensores de Belgrano",
-          "league": "Argentina. Primera B Nacional",
-          "start": "2026-07-26T18:00:00+00:00",
-          "sport_id": 1,
-          "selection": "over 0.5",
-          "selection_tr": "0.5 Üst",
-          "ladder_rung": "over 0.5",
-          "direction": "over",
-          "odds": 1.123,
-          "model_survival": 0.8651,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/2922491/353076068"
-        },
-        {
-          "match": "Sarpsborg 08 v HamKam",
-          "league": "Norway. Eliteserien",
-          "start": "2026-07-26T15:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "HamKam +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.102,
-          "model_survival": 0.8647,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1793471/352354726"
-        },
-        {
-          "match": "St. Mirren v Dunfermline Athletic",
-          "league": "Scotland. League Cup",
-          "start": "2026-07-26T14:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.21,
-          "model_survival": 0.8617,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/120443/353211984"
-        },
-        {
-          "match": "Wisla Krakow v Katowice",
-          "league": "Poland. Ekstraklasa",
-          "start": "2026-07-26T18:15:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "Katowice +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.144,
-          "model_survival": 0.8592,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/27731/352993838"
-        },
-        {
-          "match": "Club Necaxa v Monterrey",
-          "league": "Mexico. Liga MX",
-          "start": "2026-07-26T23:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.169,
-          "model_survival": 0.8584,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/2306111/350474842"
-        },
-        {
-          "match": "Pachuca v Queretaro",
-          "league": "Mexico. Liga MX",
-          "start": "2026-07-27T01:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.143,
-          "model_survival": 0.8584,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/2306111/350474838"
-        },
-        {
-          "match": "Brommapojkarna v Hammarby",
-          "league": "Sweden. Allsvenskan",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 2.5",
-          "selection_tr": "Brommapojkarna +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "home +2.5 (does not lose by 2.5)",
-          "direction": "home",
-          "odds": 1.197,
-          "model_survival": 0.8569,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/212425/352369316"
-        },
-        {
-          "match": "Rakow Czestochowa v Wisla PLock",
-          "league": "Poland. Ekstraklasa",
-          "start": "2026-07-26T12:45:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Wisla PLock +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.106,
-          "model_survival": 0.8527,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/27731/352427756"
-        },
-        {
-          "match": "Sirius v Goteborg",
-          "league": "Sweden. Allsvenskan",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Goteborg +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.222,
-          "model_survival": 0.8502,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/212425/352369318"
-        },
-        {
-          "match": "Orenburg v Rostov",
-          "league": "Russia. Premier League",
-          "start": "2026-07-26T16:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "Rostov +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.124,
-          "model_survival": 0.8496,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/225733/345133294"
-        },
-        {
-          "match": "SonderjyskE v Midtjylland",
-          "league": "Denmark. Superliga",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 2.5",
-          "selection_tr": "SonderjyskE +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "home +2.5 (does not lose by 2.5)",
-          "direction": "home",
-          "odds": 1.159,
-          "model_survival": 0.8486,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/8773/346875616"
-        },
-        {
-          "match": "Malmo v Elfsborg",
-          "league": "Sweden. Allsvenskan",
-          "start": "2026-07-26T14:30:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.134,
-          "model_survival": 0.846,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/212425/352369326"
-        },
-        {
-          "match": "Ilves v Lahti",
-          "league": "Finland. Veikkausliiga",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.121,
-          "model_survival": 0.8431,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/1554897/352415840"
-        },
-        {
-          "match": "Horsens v Nordsjaelland",
-          "league": "Denmark. Superliga",
-          "start": "2026-07-26T16:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.128,
-          "model_survival": 0.8368,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/8773/346875612"
-        },
-        {
-          "match": "Copenhagen v Lyngby",
-          "league": "Denmark. Superliga",
-          "start": "2026-07-26T14:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.29,
-          "model_survival": 0.8366,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/8773/346875614"
-        },
-        {
-          "match": "Puszcza Niepolomice v KSP Polonia Warszawa",
-          "league": "Poland Championship. Liga 1",
-          "start": "2026-07-26T17:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "KSP Polonia Warszawa +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.109,
-          "model_survival": 0.8311,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/30693/352490936"
-        },
-        {
-          "match": "Zhejiang Professional v Dalian Yingbo",
-          "league": "China. Super League",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.275,
-          "model_survival": 0.8306,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/58043/352415900"
-        },
-        {
-          "match": "Chengdu Rongcheng v Beijing Guoan",
-          "league": "China. Super League",
-          "start": "2026-07-26T11:35:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.217,
-          "model_survival": 0.8305,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/58043/352410162"
-        },
-        {
-          "match": "Shandong Taishan v Henan",
-          "league": "China. Super League",
-          "start": "2026-07-26T11:35:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.297,
-          "model_survival": 0.8305,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/58043/352410168"
-        },
-        {
-          "match": "Brann v Valerenga",
-          "league": "Norway. Eliteserien",
-          "start": "2026-07-26T12:30:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Brann kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.228,
-          "model_survival": 0.8249,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/1793471/352354736"
-        },
-        {
-          "match": "St. Gallen v Zurich",
-          "league": "Switzerland. SuperLeague",
-          "start": "2026-07-26T14:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Zurich +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.143,
-          "model_survival": 0.8246,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/27695/346887890"
-        },
-        {
-          "match": "Flamengo v Sao Paulo",
-          "league": "Brazil. Campeonato Brasileiro. Serie A",
-          "start": "2026-07-26T21:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "Sao Paulo +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.145,
-          "model_survival": 0.8216,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1268397/351853172"
-        },
-        {
-          "match": "Martin Kocvara v Radovan Pisa",
-          "league": "Setka Cup. Czech Republic",
-          "start": "2026-07-26T10:45:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 1.5",
-          "selection_tr": "Martin Kocvara +1.5 set handikap",
-          "ladder_rung": "home +1.5 sets",
-          "direction": "home",
-          "odds": 1.27,
-          "model_survival": 0.8201,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2187287/354271572"
-        },
-        {
-          "match": "Stepan Rejent v Adam Radkovsky",
-          "league": "Setka Cup. Czech Republic",
-          "start": "2026-07-26T14:45:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 1.5",
-          "selection_tr": "Stepan Rejent +1.5 set handikap",
-          "ladder_rung": "home +1.5 sets",
-          "direction": "home",
-          "odds": 1.35,
-          "model_survival": 0.8201,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2187287/354328196"
-        },
-        {
-          "match": "Leon Kolman v Ondrej Chadima",
-          "league": "Setka Cup. Czech Republic",
-          "start": "2026-07-26T18:15:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 1.5",
-          "selection_tr": "Leon Kolman +1.5 set handikap",
-          "ladder_rung": "home +1.5 sets",
-          "direction": "home",
-          "odds": 1.31,
-          "model_survival": 0.8201,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2187287/354271552"
-        },
-        {
-          "match": "Leon Kolman v Jan Botka",
-          "league": "Setka Cup. Czech Republic",
-          "start": "2026-07-26T19:15:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 1.5",
-          "selection_tr": "Leon Kolman +1.5 set handikap",
-          "ladder_rung": "home +1.5 sets",
-          "direction": "home",
-          "odds": 1.21,
-          "model_survival": 0.8201,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/2187287/354303630"
-        },
-        {
-          "match": "Inter Turku v Gnistan",
-          "league": "Finland. Veikkausliiga",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Inter Turku kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.181,
-          "model_survival": 0.8198,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/1554897/352432196"
-        },
-        {
-          "match": "Sandefjord v Bodo-Glimt",
-          "league": "Norway. Eliteserien",
-          "start": "2026-07-26T15:00:00+00:00",
-          "sport_id": 1,
-          "selection": "H1 2.5",
-          "selection_tr": "Sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "home +2.5 (does not lose by 2.5)",
-          "direction": "home",
-          "odds": 1.32,
-          "model_survival": 0.8123,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1793471/352354738"
-        },
-        {
-          "match": "Young Boys v Sion",
-          "league": "Switzerland. SuperLeague",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.26,
-          "model_survival": 0.8104,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/27695/346887898"
-        },
-        {
-          "match": "Lugano v Vaduz",
-          "league": "Switzerland. SuperLeague",
-          "start": "2026-07-26T14:30:00+00:00",
-          "sport_id": 1,
-          "selection": "under 4.5",
-          "selection_tr": "4.5 Alt",
-          "ladder_rung": "under 4.5",
-          "direction": "under",
-          "odds": 1.197,
-          "model_survival": 0.8104,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/27695/346887886"
-        },
-        {
-          "match": "Criciuma v Clube Nautico Capibaribe",
-          "league": "Brazil. Campeonato Brasileiro. Serie B",
-          "start": "2026-07-26T19:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Criciuma kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.152,
-          "model_survival": 0.8099,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/57265/353437212"
-        },
-        {
-          "match": "Hradec Kralove v Pardubice",
-          "league": "Czech Republic. Chance Liga",
-          "start": "2026-07-26T18:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Hradec Kralove kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.3,
-          "model_survival": 0.8077,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/27707/351619946"
-        },
-        {
-          "match": "Clube do Remo v EC Vitoria Salvador",
-          "league": "Brazil. Campeonato Brasileiro. Serie A",
-          "start": "2026-07-26T22:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "EC Vitoria Salvador +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.162,
-          "model_survival": 0.8034,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/1268397/351856472"
-        },
-        {
-          "match": "Sevilla v AD Ceuta",
-          "league": "Club Friendlies",
-          "start": "2026-07-26T19:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Sevilla kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.285,
-          "model_survival": 0.8012,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/67559/354217540"
-        },
-        {
-          "match": "Ufa v SKA-Khabarovsk",
-          "league": "Russian Championship. League 1",
-          "start": "2026-07-26T12:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Ufa kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.277,
-          "model_survival": 0.7974,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/2421233/352628072"
-        },
-        {
-          "match": "Widzew Lodz v Motor Lublin",
-          "league": "Poland. Ekstraklasa",
-          "start": "2026-07-26T15:30:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 1.5",
-          "selection_tr": "Motor Lublin +1.5 handikap (en fazla 1 farkla kaybedebilir)",
-          "ladder_rung": "away +1.5 (does not lose by 1.5)",
-          "direction": "away",
-          "odds": 1.37,
-          "model_survival": 0.7941,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/27731/352458912"
-        },
-        {
-          "match": "Rubin Kazan v Krasnodar",
-          "league": "Russia. Premier League",
-          "start": "2026-07-26T16:30:00+00:00",
-          "sport_id": 1,
-          "selection": "X2",
-          "selection_tr": "Krasnodar kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "away does not lose",
-          "direction": "away",
-          "odds": 1.284,
-          "model_survival": 0.7933,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/225733/345133304"
-        },
-        {
-          "match": "Yanbian Longding v Meizhou Hakka",
-          "league": "China. League One",
-          "start": "2026-07-26T10:00:00+00:00",
-          "sport_id": 1,
-          "selection": "over 1.5",
-          "selection_tr": "1.5 Üst",
-          "ladder_rung": "over 1.5",
-          "direction": "over",
-          "odds": 1.22,
-          "model_survival": 0.7901,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/202305/353732972"
-        },
-        {
-          "match": "Mladost Lucani v Novi Pazar",
-          "league": "Serbia. SuperLiga",
-          "start": "2026-07-26T18:30:00+00:00",
-          "sport_id": 1,
-          "selection": "under 3.5",
-          "selection_tr": "3.5 Alt",
-          "ladder_rung": "under 3.5",
-          "direction": "under",
-          "odds": 1.23,
-          "model_survival": 0.7788,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/30035/353231470"
-        },
-        {
-          "match": "Jablonec v Sigma Olomouc",
-          "league": "Czech Republic. Chance Liga",
-          "start": "2026-07-26T15:30:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Jablonec kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.38,
-          "model_survival": 0.7777,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/27707/351580732"
-        },
-        {
-          "match": "Bahia v Corinthians Paulista",
-          "league": "Brazil. Campeonato Brasileiro. Serie A",
-          "start": "2026-07-26T19:00:00+00:00",
-          "sport_id": 1,
-          "selection": "under 3.5",
-          "selection_tr": "3.5 Alt",
-          "ladder_rung": "under 3.5",
-          "direction": "under",
-          "odds": 1.25,
-          "model_survival": 0.7722,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
-            "needs_confirmation": false,
-            "key": "1.17"
-          },
-          "url": "https://betwinner.com/en/line/1/1268397/351856464"
-        },
-        {
-          "match": "Koper v NK Radomlje",
-          "league": "Slovenia. League 1",
-          "start": "2026-07-26T18:15:00+00:00",
-          "sport_id": 1,
-          "selection": "H2 2.5",
-          "selection_tr": "NK Radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir)",
-          "ladder_rung": "away +2.5 (does not lose by 2.5)",
-          "direction": "away",
-          "odds": 1.21,
-          "model_survival": 0.7698,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Handicap settles at 90', extra time excluded.",
-            "needs_confirmation": false,
-            "key": "1.2"
-          },
-          "url": "https://betwinner.com/en/line/1/30049/352502212"
-        },
-        {
-          "match": "Anna Lapa v Viktoria Shevchuk",
-          "league": "Setka Cup. Women",
-          "start": "2026-07-26T14:05:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 2.5",
-          "selection_tr": "Anna Lapa +2.5 set handikap",
-          "ladder_rung": "home +2.5 sets",
-          "direction": "home",
-          "odds": 1.24,
-          "model_survival": 0.766,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/1734759/354270604"
-        },
-        {
-          "match": "Sochi v Arsenal Tula",
-          "league": "Russian Championship. League 1",
-          "start": "2026-07-26T15:00:00+00:00",
-          "sport_id": 1,
-          "selection": "1X",
-          "selection_tr": "Sochi kaybetmez (beraberlik de kazandırır)",
-          "ladder_rung": "home does not lose",
-          "direction": "home",
-          "odds": 1.272,
-          "model_survival": 0.7585,
-          "settlement": {
-            "scope": "regulation",
-            "detail": "Double chance settles at 90'. 'Does not lose' WINS even if the team loses in extra time.",
-            "needs_confirmation": false,
-            "key": "1.8"
-          },
-          "url": "https://betwinner.com/en/line/1/2421233/352626170"
-        }
-      ]
-    },
-    {
       "hours": 48,
-      "matches": 651,
+      "matches": 636,
       "skipped": {
-        "no_model": 545,
-        "no_confident_rung": 37,
+        "no_model": 532,
+        "no_confident_rung": 36,
         "unmodelled_sport": 0
       },
       "picks": [
@@ -1180,7 +30,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/67559/354178770"
+          "url": "https://betwinner2.com/en/line/1/67559/354178770"
         },
         {
           "match": "Hobro v Aarhus Fremad",
@@ -1199,7 +49,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/39969/349215074"
+          "url": "https://betwinner2.com/en/line/1/39969/349215074"
         },
         {
           "match": "Yunnan Yukun v Shenzhen Peng City",
@@ -1218,7 +68,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/58043/352403168"
+          "url": "https://betwinner2.com/en/line/1/58043/352403168"
         },
         {
           "match": "Frosinone Calcio v Ascoli Calcio 1898",
@@ -1237,7 +87,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/67559/354217238"
+          "url": "https://betwinner2.com/en/line/1/67559/354217238"
         },
         {
           "match": "Sogndal v Ranheim",
@@ -1256,7 +106,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/31508/349223122"
+          "url": "https://betwinner2.com/en/line/1/31508/349223122"
         },
         {
           "match": "Eduardo Villegas Sanchez v Ivan Perez Martin",
@@ -1275,26 +125,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2685660/354248544"
-        },
-        {
-          "match": "Olga Melnik v Victoria Kurtenko",
-          "league": "Setka Cup. Women",
-          "start": "2026-07-26T08:00:00+00:00",
-          "sport_id": 10,
-          "selection": "SH1 2.5",
-          "selection_tr": "Olga Melnik +2.5 set handikap",
-          "ladder_rung": "home +2.5 sets",
-          "direction": "home",
-          "odds": 1.39,
-          "model_survival": 0.896,
-          "settlement": {
-            "scope": "match",
-            "detail": "SET handicap. Over best-of-5 the 'wins a set' rung is +2.5; +1.5 means winning at least two.",
-            "needs_confirmation": true,
-            "key": "10.7099"
-          },
-          "url": "https://betwinner.com/en/line/10/1734759/354299294"
+          "url": "https://betwinner2.com/en/line/10/2685660/354248544"
         },
         {
           "match": "Ondrej Mezera v Lukas Rulc",
@@ -1313,7 +144,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2187287/354271554"
+          "url": "https://betwinner2.com/en/line/10/2187287/354271554"
         },
         {
           "match": "Aalesunds v Viking",
@@ -1332,7 +163,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/1793471/352354732"
+          "url": "https://betwinner2.com/en/line/1/1793471/352354732"
         },
         {
           "match": "Paksi v Ferencvarosi",
@@ -1351,7 +182,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/30213/352989476"
+          "url": "https://betwinner2.com/en/line/1/30213/352989476"
         },
         {
           "match": "GAIS v Halmstads",
@@ -1370,7 +201,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/212425/352369320"
+          "url": "https://betwinner2.com/en/line/1/212425/352369320"
         },
         {
           "match": "Zaglebie Lubin v Piast Gliwice",
@@ -1389,7 +220,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/27731/352758412"
+          "url": "https://betwinner2.com/en/line/1/27731/352758412"
         },
         {
           "match": "Rangers v West Ham United",
@@ -1408,7 +239,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/67559/353584236"
+          "url": "https://betwinner2.com/en/line/1/67559/353584236"
         },
         {
           "match": "Sundsvall v Falkenbergs",
@@ -1427,7 +258,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1371789/352432698"
+          "url": "https://betwinner2.com/en/line/1/1371789/352432698"
         },
         {
           "match": "Lokomotiv Moscow v Akhmat",
@@ -1446,7 +277,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/225733/345132778"
+          "url": "https://betwinner2.com/en/line/1/225733/345132778"
         },
         {
           "match": "Miedz Legnica v Podbeskidzie Bielsko-Biala",
@@ -1465,7 +296,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/30693/353001870"
+          "url": "https://betwinner2.com/en/line/1/30693/353001870"
         },
         {
           "match": "Red Bull Bragantino v Coritiba",
@@ -1484,7 +315,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1268397/351856466"
+          "url": "https://betwinner2.com/en/line/1/1268397/351856466"
         },
         {
           "match": "Gremio Porto Alegrense v Fluminense",
@@ -1503,7 +334,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1268397/351856478"
+          "url": "https://betwinner2.com/en/line/1/1268397/351856478"
         },
         {
           "match": "All Boys v Defensores de Belgrano",
@@ -1522,7 +353,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/2922491/353076068"
+          "url": "https://betwinner2.com/en/line/1/2922491/353076068"
         },
         {
           "match": "Sarpsborg 08 v HamKam",
@@ -1541,7 +372,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1793471/352354726"
+          "url": "https://betwinner2.com/en/line/1/1793471/352354726"
         },
         {
           "match": "St. Mirren v Dunfermline Athletic",
@@ -1560,7 +391,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/120443/353211984"
+          "url": "https://betwinner2.com/en/line/1/120443/353211984"
         },
         {
           "match": "Wisla Krakow v Katowice",
@@ -1579,7 +410,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/27731/352993838"
+          "url": "https://betwinner2.com/en/line/1/27731/352993838"
         },
         {
           "match": "Club Necaxa v Monterrey",
@@ -1598,7 +429,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/2306111/350474842"
+          "url": "https://betwinner2.com/en/line/1/2306111/350474842"
         },
         {
           "match": "Pachuca v Queretaro",
@@ -1617,7 +448,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/2306111/350474838"
+          "url": "https://betwinner2.com/en/line/1/2306111/350474838"
         },
         {
           "match": "Brommapojkarna v Hammarby",
@@ -1636,7 +467,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/212425/352369316"
+          "url": "https://betwinner2.com/en/line/1/212425/352369316"
         },
         {
           "match": "Rakow Czestochowa v Wisla PLock",
@@ -1655,7 +486,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/27731/352427756"
+          "url": "https://betwinner2.com/en/line/1/27731/352427756"
         },
         {
           "match": "Botosani v Rapid Bucuresti",
@@ -1674,7 +505,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/11121/349893554"
+          "url": "https://betwinner2.com/en/line/1/11121/349893554"
         },
         {
           "match": "Sport Club do Recife v Cuiaba",
@@ -1693,7 +524,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/57265/353616514"
+          "url": "https://betwinner2.com/en/line/1/57265/353616514"
         },
         {
           "match": "Sirius v Goteborg",
@@ -1712,7 +543,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/212425/352369318"
+          "url": "https://betwinner2.com/en/line/1/212425/352369318"
         },
         {
           "match": "Orenburg v Rostov",
@@ -1731,7 +562,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/225733/345133294"
+          "url": "https://betwinner2.com/en/line/1/225733/345133294"
         },
         {
           "match": "SonderjyskE v Midtjylland",
@@ -1750,7 +581,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/8773/346875616"
+          "url": "https://betwinner2.com/en/line/1/8773/346875616"
         },
         {
           "match": "Malmo v Elfsborg",
@@ -1769,7 +600,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/212425/352369326"
+          "url": "https://betwinner2.com/en/line/1/212425/352369326"
         },
         {
           "match": "Hacken v AIK",
@@ -1788,7 +619,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/212425/352369322"
+          "url": "https://betwinner2.com/en/line/1/212425/352369322"
         },
         {
           "match": "CFR Cluj v Voluntari",
@@ -1807,7 +638,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/11121/349893510"
+          "url": "https://betwinner2.com/en/line/1/11121/349893510"
         },
         {
           "match": "Ilves v Lahti",
@@ -1826,7 +657,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/1554897/352415840"
+          "url": "https://betwinner2.com/en/line/1/1554897/352415840"
         },
         {
           "match": "Horsens v Nordsjaelland",
@@ -1845,7 +676,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/8773/346875612"
+          "url": "https://betwinner2.com/en/line/1/8773/346875612"
         },
         {
           "match": "Randers v Silkeborg",
@@ -1864,7 +695,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/8773/346875644"
+          "url": "https://betwinner2.com/en/line/1/8773/346875644"
         },
         {
           "match": "Copenhagen v Lyngby",
@@ -1883,7 +714,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/8773/346875614"
+          "url": "https://betwinner2.com/en/line/1/8773/346875614"
         },
         {
           "match": "Puszcza Niepolomice v KSP Polonia Warszawa",
@@ -1902,7 +733,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/30693/352490936"
+          "url": "https://betwinner2.com/en/line/1/30693/352490936"
         },
         {
           "match": "Zhejiang Professional v Dalian Yingbo",
@@ -1921,7 +752,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/58043/352415900"
+          "url": "https://betwinner2.com/en/line/1/58043/352415900"
         },
         {
           "match": "Chengdu Rongcheng v Beijing Guoan",
@@ -1940,7 +771,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/58043/352410162"
+          "url": "https://betwinner2.com/en/line/1/58043/352410162"
         },
         {
           "match": "Shandong Taishan v Henan",
@@ -1959,7 +790,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/58043/352410168"
+          "url": "https://betwinner2.com/en/line/1/58043/352410168"
         },
         {
           "match": "Brann v Valerenga",
@@ -1978,7 +809,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/1793471/352354736"
+          "url": "https://betwinner2.com/en/line/1/1793471/352354736"
         },
         {
           "match": "St. Gallen v Zurich",
@@ -1997,7 +828,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/27695/346887890"
+          "url": "https://betwinner2.com/en/line/1/27695/346887890"
         },
         {
           "match": "Flamengo v Sao Paulo",
@@ -2016,7 +847,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1268397/351853172"
+          "url": "https://betwinner2.com/en/line/1/1268397/351853172"
         },
         {
           "match": "Martin Kocvara v Radovan Pisa",
@@ -2035,7 +866,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2187287/354271572"
+          "url": "https://betwinner2.com/en/line/10/2187287/354271572"
         },
         {
           "match": "Stepan Rejent v Adam Radkovsky",
@@ -2054,7 +885,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2187287/354328196"
+          "url": "https://betwinner2.com/en/line/10/2187287/354328196"
         },
         {
           "match": "Leon Kolman v Ondrej Chadima",
@@ -2073,7 +904,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2187287/354271552"
+          "url": "https://betwinner2.com/en/line/10/2187287/354271552"
         },
         {
           "match": "Leon Kolman v Jan Botka",
@@ -2092,7 +923,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/2187287/354303630"
+          "url": "https://betwinner2.com/en/line/10/2187287/354303630"
         },
         {
           "match": "Inter Turku v Gnistan",
@@ -2111,7 +942,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/1554897/352432196"
+          "url": "https://betwinner2.com/en/line/1/1554897/352432196"
         },
         {
           "match": "CSKA Sofia v Botev Plovdiv",
@@ -2130,7 +961,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/2924971/352415894"
+          "url": "https://betwinner2.com/en/line/1/2924971/352415894"
         },
         {
           "match": "Sandefjord v Bodo-Glimt",
@@ -2149,7 +980,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1793471/352354738"
+          "url": "https://betwinner2.com/en/line/1/1793471/352354738"
         },
         {
           "match": "Rosenborg v Fredrikstad",
@@ -2168,7 +999,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/1793471/352354730"
+          "url": "https://betwinner2.com/en/line/1/1793471/352354730"
         },
         {
           "match": "Young Boys v Sion",
@@ -2187,7 +1018,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/27695/346887898"
+          "url": "https://betwinner2.com/en/line/1/27695/346887898"
         },
         {
           "match": "Lugano v Vaduz",
@@ -2206,7 +1037,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/27695/346887886"
+          "url": "https://betwinner2.com/en/line/1/27695/346887886"
         },
         {
           "match": "Criciuma v Clube Nautico Capibaribe",
@@ -2225,7 +1056,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/57265/353437212"
+          "url": "https://betwinner2.com/en/line/1/57265/353437212"
         },
         {
           "match": "Hradec Kralove v Pardubice",
@@ -2244,7 +1075,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/27707/351619946"
+          "url": "https://betwinner2.com/en/line/1/27707/351619946"
         },
         {
           "match": "Clube do Remo v EC Vitoria Salvador",
@@ -2263,7 +1094,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/1268397/351856472"
+          "url": "https://betwinner2.com/en/line/1/1268397/351856472"
         },
         {
           "match": "Sevilla v AD Ceuta",
@@ -2282,7 +1113,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/67559/354217540"
+          "url": "https://betwinner2.com/en/line/1/67559/354217540"
         },
         {
           "match": "Ufa v SKA-Khabarovsk",
@@ -2301,7 +1132,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/2421233/352628072"
+          "url": "https://betwinner2.com/en/line/1/2421233/352628072"
         },
         {
           "match": "Widzew Lodz v Motor Lublin",
@@ -2320,7 +1151,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/27731/352458912"
+          "url": "https://betwinner2.com/en/line/1/27731/352458912"
         },
         {
           "match": "Rubin Kazan v Krasnodar",
@@ -2339,7 +1170,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/225733/345133304"
+          "url": "https://betwinner2.com/en/line/1/225733/345133304"
         },
         {
           "match": "Yanbian Longding v Meizhou Hakka",
@@ -2358,7 +1189,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/202305/353732972"
+          "url": "https://betwinner2.com/en/line/1/202305/353732972"
         },
         {
           "match": "Mladost Lucani v Novi Pazar",
@@ -2377,7 +1208,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/30035/353231470"
+          "url": "https://betwinner2.com/en/line/1/30035/353231470"
         },
         {
           "match": "Jablonec v Sigma Olomouc",
@@ -2396,7 +1227,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/27707/351580732"
+          "url": "https://betwinner2.com/en/line/1/27707/351580732"
         },
         {
           "match": "Bahia v Corinthians Paulista",
@@ -2415,7 +1246,7 @@
             "needs_confirmation": false,
             "key": "1.17"
           },
-          "url": "https://betwinner.com/en/line/1/1268397/351856464"
+          "url": "https://betwinner2.com/en/line/1/1268397/351856464"
         },
         {
           "match": "Koper v NK Radomlje",
@@ -2434,7 +1265,7 @@
             "needs_confirmation": false,
             "key": "1.2"
           },
-          "url": "https://betwinner.com/en/line/1/30049/352502212"
+          "url": "https://betwinner2.com/en/line/1/30049/352502212"
         },
         {
           "match": "Anna Lapa v Viktoria Shevchuk",
@@ -2453,7 +1284,7 @@
             "needs_confirmation": true,
             "key": "10.7099"
           },
-          "url": "https://betwinner.com/en/line/10/1734759/354270604"
+          "url": "https://betwinner2.com/en/line/10/1734759/354270604"
         },
         {
           "match": "Sochi v Arsenal Tula",
@@ -2472,7 +1303,7 @@
             "needs_confirmation": false,
             "key": "1.8"
           },
-          "url": "https://betwinner.com/en/line/1/2421233/352626170"
+          "url": "https://betwinner2.com/en/line/1/2421233/352626170"
         }
       ]
     }

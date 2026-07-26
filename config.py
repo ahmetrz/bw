@@ -146,6 +146,13 @@ MULTI_DAY_SPORTS = {
     11,   # Chess — classical matches run over days or weeks.
 }
 
+# --- Link resolution --------------------------------------------------------
+# Betwinner is blocked in Turkey and rotates its public domain, so a hardcoded host is a
+# link that eventually stops opening. This referral link is the stable entry point: it
+# always lands on whichever mirror is currently live, and engine/mirror.py follows it to
+# extract the host that the daily report's links are built on.
+REFERRAL_URL = "https://bwref-l4ftkntp.com/13KD"
+
 # --- Output -----------------------------------------------------------------
 TOP_N = 50
 REPORT_PATH = "report.json"

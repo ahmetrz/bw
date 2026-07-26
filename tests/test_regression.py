@@ -19,7 +19,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import bwfeed, grade, ladder, pick, score, settlement, telegram  # noqa: E402
+from engine import (bwfeed, grade, ladder, mirror, parlay, pick, score,  # noqa: E402
+                    settlement, telegram)
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import grade_predictions  # noqa: E402
@@ -494,6 +495,26 @@ class TestRegression(unittest.TestCase):
                 self.assertEqual(got.get("model_push"), 0.0,
                                  f"offered a leg with push mass: {got.get('ladder_rung')}")
         self.assertGreater(offered, 5, "not enough selections produced to test")
+
+    def test_links_are_built_on_the_resolved_mirror(self):
+        """Links must use the host that is currently reachable, not a hardcoded one.
+
+        The book is blocked in Turkey and rotates its public domain, so a fixed host
+        produces links that quietly stop opening — the failure is invisible until someone
+        taps one. The numeric path is deliberate too: the book redirects it to its own
+        slugged form, so the link resolves without us guessing a competition slug.
+        """
+        row = {"sport_id": 1, "champ_id": 67559, "fixture_id": 354178770}
+        self.assertEqual(
+            parlay.betwinner_url(row, host="betwinner2.com"),
+            "https://betwinner2.com/en/line/1/67559/354178770")
+        # A different mirror must change every link, with nothing else hardcoded.
+        self.assertEqual(
+            parlay.betwinner_url(row, host="example-mirror.com"),
+            "https://example-mirror.com/en/line/1/67559/354178770")
+        # Missing ids yield no link rather than a broken one.
+        self.assertIsNone(parlay.betwinner_url({"sport_id": 1}, host="betwinner2.com"))
+        self.assertIsNone(mirror.event_url("betwinner2.com", 1, None, 5))
 
     def test_book_is_betwinner(self):
         """A direct pull is Betwinner by construction, so the mismatch banner must

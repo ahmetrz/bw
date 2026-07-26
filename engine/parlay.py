@@ -62,13 +62,21 @@ def summarize(legs):
     }
 
 
-def betwinner_url(row):
-    """Deep link to the fixture on Betwinner. The numeric path is used because it
-    resolves without knowing the competition's URL slug."""
+def betwinner_url(row, host=None):
+    """Deep link to the fixture, on the mirror that is currently reachable.
+
+    The host is resolved at run time (engine/mirror.py) rather than hardcoded: the book is
+    blocked in Turkey and rotates its public domain, so a fixed host produces links that
+    quietly stop opening. The numeric path is used because the book redirects it to its
+    own slugged form, so the link resolves without us guessing a competition slug.
+    """
+    from engine import mirror
+
     sid, cid, fid = row.get("sport_id"), row.get("champ_id"), row.get("fixture_id")
-    if sid and cid and fid:
-        return f"https://betwinner.com/en/line/{sid}/{cid}/{fid}"
-    return None
+    if not host:
+        import config
+        host, _ = mirror.current(getattr(config, "REFERRAL_URL", None))
+    return mirror.event_url(host, sid, cid, fid)
 
 
 def format_summary(s):
