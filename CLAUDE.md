@@ -167,13 +167,28 @@ crawler's name, 2026-07-26:
   * `volleybox.net`, `hltv.org`, `shl.se` — **403 to us on robots.txt itself**. Blocked
     before any question of permission arises.
 
-Betwinner has a results SERVICE as well, and it is worth another look but is not a blocker:
-`service-api/result/web/api/v3/games` is the live version (v1/v2/v4+ answer
-UnsupportedApiVersion; v3 answers a clean 400, so the route and version are right and only
-the parameter names are unknown). Eight parameter shapes were tried, the app bundle does
-not carry the path as a string, and `/en/results/` 302s to `betwinner2.com`, whose
-robots.txt is `Disallow: /`. Finding those parameters would replace hourly polling with one
-call a day AND backfill history.
+Betwinner has a results SERVICE as well. It would replace polling with one call a day AND
+backfill history, so it is worth returning to — here is exactly how far it has been taken,
+so the next attempt starts from the end of this one rather than the beginning.
+
+  * `service-api/result/web/api/v3/games` is the live route. v1, v2 and v4-v7 answer
+    `UnsupportedApiVersion`; **v3 answers a clean 400**, so route and version are right.
+  * **`dateFrom` and `dateTo` are real parameter names.** They are the only two that bind:
+    with `dateFrom` alone the service switches from the generic `bad-request` to
+    `invalidvalidationexception`, which is the model binder succeeding and validation then
+    failing. Unknown names are ignored entirely (`zzzunknown=1` changes nothing), so that
+    difference is the tell.
+  * **They are in MILLISECONDS.** In seconds the pair is rejected; in milliseconds both
+    bind. ISO strings are rejected.
+  * Something REQUIRED is still missing and the `errors` object comes back empty. 42 more
+    names were swept against a bound `dateFrom`/`dateTo` pair — sportId, champId, gr, ref,
+    partner, country, lng, page, take, mode, platform, brandId and the rest — and not one
+    changed the answer. So the missing field is either outside that vocabulary, or it is
+    not a query parameter at all: a header, or a body the route accepts despite advertising
+    `allow: GET`.
+  * The app bundle does not carry the path as a string, and `/en/results/` 302s to
+    `betwinner2.com`, whose robots.txt is `Disallow: /` — so the real request cannot be
+    read off the site.
 
 **Cost is a design constraint here, not an afterthought.** The repo is private, so Actions
 minutes are finite, and the daily fetch was most of the spend. `watch-live.yml` opens three
