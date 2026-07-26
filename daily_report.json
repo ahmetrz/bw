@@ -1,14 +1,14 @@
 {
-  "generated": "2026-07-26T08:42:00.342698+00:00",
+  "generated": "2026-07-26T08:47:15.971536+00:00",
   "link_host": "betwinner2.com",
   "min_odds": 1.1,
   "min_model_survival": 0.75,
   "windows": [
     {
       "hours": 24,
-      "matches": 562,
+      "matches": 559,
       "skipped": {
-        "no_model": 468,
+        "no_model": 465,
         "no_confident_rung": 35,
         "unmodelled_sport": 0
       },
@@ -1492,9 +1492,9 @@
     },
     {
       "hours": 48,
-      "matches": 617,
+      "matches": 614,
       "skipped": {
-        "no_model": 514,
+        "no_model": 511,
         "no_confident_rung": 35,
         "unmodelled_sport": 0
       },
