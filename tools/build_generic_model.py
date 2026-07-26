@@ -151,6 +151,9 @@ def build(sport_id, out_dir=mg.MODELS):
         "leagues": sorted({r.get("league") for r in rows if r.get("league")})[:60],
         "sources": sorted({r.get("source") or "?" for r in rows}),
         "scale": scale_of(rows),
+        # Declared by the adapter. Without it the model would answer questions asked in a
+        # unit it does not measure — see engine/model_generic.HANDICAP_GROUPS.
+        "unit": next((r["unit"] for r in rows if r.get("unit")), None),
         "line": {k: round(v, 6) if isinstance(v, float) else v
                  for k, v in fit.items()},
         "bands": bands,
@@ -172,6 +175,7 @@ def report(model):
     ok, why = mg.usable(model)
     name = model.get("sport") or model["sport_id"]
     print(f"\n=== {name} (spor {model['sport_id']}) ===")
+    print(f"  birim: {model.get('unit') or '(beyan edilmedi, çıkarılacak)'}")
     print(f"  {model['games']} maç · {model['teams']} takım · "
           f"{len(model['pools'])} derece havuzu · "
           f"{model['first']} → {model['last']} · kaynak {', '.join(model['sources'])}")

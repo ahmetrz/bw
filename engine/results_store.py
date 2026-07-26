@@ -69,6 +69,13 @@ def clean(row):
     # of those two situations its sport is in, and says so. Absent means one pool.
     if row.get("pool") not in (None, ""):
         out["pool"] = str(row["pool"])
+    # WHAT THE SCORE COUNTS. Goals, points, runs or sets — and it is not decoration: the
+    # book's "total 76.5" is a POINTS market, and pricing it from a distribution of SETS
+    # says "under 76.5" is certain, because the sets recorded here never exceed 5. That is
+    # exactly what happened, at 100.00% on a 1.79 shot. A distribution only answers
+    # questions asked in its own unit.
+    if row.get("unit"):
+        out["unit"] = str(row["unit"])
     for k in ("league", "source", "season", "neutral", "extra_periods"):
         if row.get(k) is not None:
             out[k] = row[k]

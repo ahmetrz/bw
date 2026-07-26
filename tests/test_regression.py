@@ -770,6 +770,62 @@ class TestRegression(unittest.TestCase):
                                 f"sport {sid} admitted with +{c['line']} off by "
                                 f"{c['predicted'] - c['observed']:+.3f}")
 
+    def test_a_distribution_only_answers_questions_in_its_own_unit(self):
+        """The store records table tennis in SETS, so it must refuse a POINTS market.
+
+        This is not hypothetical. The generic model priced "Toplam sayı 76.5 altı" — total
+        points under 76.5 — from a distribution whose totals are the number of sets played,
+        every one of them between 3 and 5. "Under 76.5" came back at 100.00% on a 1.79
+        shot, and it would have gone onto a live slip. A distribution answers questions
+        asked in its own unit and no others.
+        """
+        sets = {"margin_pmf": {-3.0: 0.2, -1.0: 0.3, 1.0: 0.3, 3.0: 0.2},
+                "total_pmf": {3.0: 0.4, 4.0: 0.35, 5.0: 0.25},
+                "sample_n": 900, "unit": "sets", "_source": "generic"}
+        # Group 17 counts POINTS in table tennis. Refused outright.
+        self.assertIsNone(model_generic.rung_probs(
+            {"market_key": ("k", "17|76.5"), "outcome_id": 10}, sets))
+        # Group 2 is a POINT handicap in a set-scored sport. Also refused.
+        self.assertIsNone(model_generic.rung_probs(
+            {"market_key": ("k", "2|-4.5"), "outcome_id": 8}, sets))
+        # The markets it DOES measure are priced: set handicap and total sets.
+        self.assertIsNotNone(model_generic.rung_probs(
+            {"market_key": ("k", "7099|-1.5"), "outcome_id": 5750}, sets))
+        self.assertIsNotNone(model_generic.rung_probs(
+            {"market_key": ("k", "2604|3.5"), "outcome_id": 9}, sets))
+        # And a goals-scored sport is the mirror image.
+        goals = dict(sets, unit="goals")
+        self.assertIsNotNone(model_generic.rung_probs(
+            {"market_key": ("k", "17|2.5"), "outcome_id": 9}, goals))
+        self.assertIsNone(model_generic.rung_probs(
+            {"market_key": ("k", "7099|-1.5"), "outcome_id": 5750}, goals))
+
+    def test_a_counted_probability_is_never_certain(self):
+        """"Never observed in 900 matches" is not "impossible".
+
+        A 1.000 clears every gate in this product, so the counted probability is held
+        inside what the sample can support. On a large band the correction is invisible;
+        on a small one it is the entire point.
+        """
+        probs = {"margin_pmf": {1.0: 0.5, 3.0: 0.5},     # the home side never loses here
+                 "total_pmf": {4.0: 1.0}, "sample_n": 30,
+                 "unit": "goals", "_source": "generic"}
+        win, _ = model_generic.rung_probs(
+            {"market_key": ("k", "2|0.5"), "outcome_id": 7}, probs)
+        self.assertLess(win, 1.0)
+        self.assertGreater(win, 0.9)
+        # And the mirror side keeps the pair summing to one: a cap applied to only one
+        # end produces two numbers that are not a probability pair.
+        loss, _ = model_generic.rung_probs(
+            {"market_key": ("k", "2|0.5"), "outcome_id": 8}, probs)
+        self.assertAlmostEqual(win + loss, 1.0, places=9)
+        # A bigger sample earns a claim closer to certainty, but never reaches it.
+        big = dict(probs, sample_n=100_000)
+        wider, _ = model_generic.rung_probs(
+            {"market_key": ("k", "2|0.5"), "outcome_id": 7}, big)
+        self.assertGreater(wider, win)
+        self.assertLess(wider, 1.0)
+
     def test_a_provisional_rating_never_prices_a_fixture(self):
         """A side seen twice still sits at the 1500 it started from, and 1500 means
         "we have not measured this", not "average". Pricing from it makes every mismatch
@@ -829,7 +885,8 @@ class TestRegression(unittest.TestCase):
         the structural reason the basketball sign error cannot recur here.
         """
         pmf = {-3.0: 0.1, -1.0: 0.2, 0.0: 0.2, 1.0: 0.2, 4.0: 0.2, 9.0: 0.1}
-        probs = {"margin_pmf": pmf, "total_pmf": {5.0: 1.0}, "_source": "generic"}
+        probs = {"margin_pmf": pmf, "total_pmf": {5.0: 1.0}, "sample_n": 5000,
+                 "unit": "goals", "_source": "generic"}
         last = 0.0
         for line in (0.5, 1.5, 2.5, 3.5, 5.5):
             row = {"market_key": ("k", f"2|{-line}"), "outcome_id": 8}   # away +line

@@ -76,7 +76,7 @@ def football(seasons=("2324", "2425", "2526")):
                     "home": rec["HomeTeam"], "away": rec.get("AwayTeam"),
                     "home_score": rec.get("FTHG"), "away_score": rec.get("FTAG"),
                     "league": div, "pool": div, "season": season,
-                    "source": "football-data",
+                    "unit": "goals", "source": "football-data",
                 }
             time.sleep(0.2)
     for country in FD_EXTRA:
@@ -92,7 +92,7 @@ def football(seasons=("2324", "2425", "2526")):
                 "home_score": rec.get("HG"), "away_score": rec.get("AG"),
                 "league": f"{country}:{rec.get('League') or ''}".strip(":"),
                 "pool": f"{country}:{rec.get('League') or ''}".strip(":"),
-                "season": rec.get("Season"), "source": "football-data",
+                "season": rec.get("Season"), "unit": "goals", "source": "football-data",
             }
         time.sleep(0.2)
 
@@ -140,7 +140,7 @@ def basketball(start=2007, end=2025):
                     "home": lc.get("name"), "away": rc.get("name"),
                     "home_score": loc.get("score"), "away_score": road.get("score"),
                     "home_id": lc.get("code"), "away_id": rc.get("code"),
-                    "league": name, "season": year, "source": "euroleague",
+                    "league": name, "season": year, "unit": "points", "source": "euroleague",
                     "neutral": bool(g.get("isNeutralVenue")),
                 }
             time.sleep(0.3)
@@ -191,7 +191,7 @@ def _tt_file(path):
                 "away": r.get("p2_name") or r.get("p2"),
                 "home_id": r.get("p1_id"), "away_id": r.get("p2_id"),
                 "home_score": s1, "away_score": s2,
-                "league": r.get("tournament") or "Setka", "source": "setka",
+                "league": r.get("tournament") or "Setka", "unit": "sets", "source": "setka",
             }
 
 
@@ -276,7 +276,7 @@ def tennis(start=2015, end=2026):
                 "pool": f"bo{rec.get('best_of') or 3}",
                 "league": rec.get("tourney_name"), "season": year,
                 "neutral": True,          # no home court on tour
-                "source": "tml",
+                "unit": "sets", "source": "tml",
             }
         time.sleep(0.3)
 
@@ -315,7 +315,7 @@ def baseball(start=2016, end=2026):
                     "home_id": (home.get("team") or {}).get("id"),
                     "away_id": (away.get("team") or {}).get("id"),
                     "home_score": home.get("score"), "away_score": away.get("score"),
-                    "league": "MLB", "season": year, "source": "mlb",
+                    "league": "MLB", "season": year, "unit": "runs", "source": "mlb",
                 }
         time.sleep(0.4)
 

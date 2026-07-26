@@ -113,7 +113,11 @@ the first real Betwinner fixture.
 
 ## Adding a sport (this is the whole procedure now)
 1. Write an adapter in `tools/collect_results.py` that yields `{date, home, away,
-   home_score, away_score}`. Check robots.txt for OUR crawler by name FIRST and record
+   home_score, away_score, unit}`. `unit` is what the score COUNTS — goals, points, runs
+   or sets — and it decides which market groups the model is allowed to answer. Get it
+   wrong and the model prices a points market off a distribution of sets: "total 76.5
+   under" came back at 100.00% on a 1.79 shot, because every set total ever recorded is
+   between 3 and 5. Check robots.txt for OUR crawler by name FIRST and record
    the check next to the adapter. Supply `pool` when the sport's competitions do NOT play
    each other (football divisions), and a stable `home_id`/`away_id` when the source has
    one (a name does not survive a sponsor rename; an id does).

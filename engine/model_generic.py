@@ -64,15 +64,53 @@ MIN_BAND = 400
 # once, and each of them was being treated as a solid mid-table player.
 MIN_APPEARANCES = 20
 
-# The market groups this can price, which is every group the safety ladder walks.
+# The result markets, which mean the same thing in every sport.
 G_1X2, G_MONEYLINE_2WAY, G_DOUBLE_CHANCE = 1, 101, 8
-G_HANDICAP, G_ASIAN_HANDICAP, G_TOTAL = 2, 2854, 17
 O_DC_HOME_OR_DRAW, O_DRAW, O_DC_DRAW_OR_AWAY = 4, 2, 6
 O_WIN_2WAY = {1: "home", 3: "away"}
 O_ML2 = {401: "home", 402: "away"}
-O_HANDICAP = {7: "home", 8: "away"}
-O_ASIAN = {3829: "home", 3830: "away"}
 O_OVER, O_UNDER = 9, 10
+
+# THE UNIT MATTERS AND IT IS NOT COSMETIC. A distribution answers questions asked in its
+# own unit and no others. The store records table tennis and tennis in SETS, so the book's
+# group 17 — "total 76.5", a POINTS market — must never be priced from it: every set total
+# ever recorded is between 3 and 5, so "under 76.5" comes back certain. That is not a
+# rounding error, it is a 100.00% claim on a 1.79 shot, and it happened.
+#
+# So each unit declares which market groups it is allowed to answer. A group that is not
+# listed for the sport's unit is refused, not approximated.
+HANDICAP_GROUPS = {
+    "goals":  {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
+    "points": {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
+    "runs":   {2: {7: "home", 8: "away"}, 2854: {3829: "home", 3830: "away"}},
+    # Set handicaps: 109 is tennis, 7099 table tennis. The POINT handicap (group 2) is a
+    # different bet in these sports and is deliberately absent.
+    "sets":   {109: {732: "home", 733: "away"}, 7099: {5749: "home", 5750: "away"}},
+}
+TOTAL_GROUPS = {
+    "goals": {17}, "points": {17}, "runs": {17},
+    # 182 is total sets in tennis, 2604 in table tennis. Group 17 for these sports counts
+    # points or games and is NOT what this distribution measures.
+    "sets": {182, 2604},
+}
+
+
+def unit_of(model):
+    """What the stored scores count. Declared by the adapter; inferred only as a backstop.
+
+    The inference is deliberately crude and conservative: a sport whose biggest observed
+    total is 8 or fewer is scored in sets. Football reaches double figures, basketball the
+    high two hundreds; nothing scored in goals or points sits down there.
+    """
+    unit = model.get("unit")
+    if unit:
+        return unit
+    biggest = 0
+    for bands in (model.get("bands") or {}).values():
+        for b in bands:
+            for t in b.get("total") or {}:
+                biggest = max(biggest, abs(float(t)))
+    return "sets" if biggest <= 8 else "points"
 
 
 def model_path(sport_id):
@@ -353,6 +391,7 @@ def lookup(model, home, away, matcher=None):
         "band": band[1],
         "_elo_diff": round(eff, 1),
         "_teams": (h, a),
+        "unit": unit_of(model),
         "_pool": pool,
         "_pool_n": len(ratings),
         "_sport": model.get("sport_id"),
@@ -427,9 +466,26 @@ def rung_probs(row, probs):
         return None
     oid = row.get("outcome_id")
     pmf = probs["margin_pmf"]          # always from the HOME side
+    unit = probs.get("unit") or "points"
+    n = max(1, probs.get("sample_n") or 1)
 
     def side_pmf(side):
         return pmf if side == "home" else {-m: p for m, p in pmf.items()}
+
+    def cap(p):
+        """A counted probability may never be exactly 0 or 1.
+
+        "Never observed in 621 matches" is not "impossible", and a 1.000 sails through
+        every gate this product has. Laplace's rule keeps the claim inside what the sample
+        can actually support; on a large band the correction is invisible, on a small one
+        it is the whole point.
+
+        Clamped at BOTH ends, symmetrically, because the two sides of a half-line have to
+        keep summing to 1. Capping only the top broke that: one side came back at 0.967
+        and its mirror at 0.000, which is not a probability pair, it is two numbers.
+        """
+        floor = 1.0 / (n + 2.0)
+        return min(max(p, floor), 1.0 - floor)
 
     if group in (G_1X2, G_MONEYLINE_2WAY):
         side = O_WIN_2WAY.get(oid) if group == G_1X2 else O_ML2.get(oid)
@@ -438,17 +494,17 @@ def rung_probs(row, probs):
                 return (sum(p for m, p in pmf.items() if abs(m) < 1e-9), 0.0)
             return None
         sp = side_pmf(side)
-        return (p_margin_over(sp, 0.0), 0.0)
+        return (cap(p_margin_over(sp, 0.0)), 0.0)
 
     if group == G_DOUBLE_CHANCE:
         side = {O_DC_HOME_OR_DRAW: "home", O_DC_DRAW_OR_AWAY: "away"}.get(oid)
         if side is None:
             return None
         sp = side_pmf(side)
-        return (p_margin_over(sp, -0.5), 0.0)      # wins or draws
+        return (cap(p_margin_over(sp, -0.5)), 0.0)      # wins or draws
 
-    if group in (G_HANDICAP, G_ASIAN_HANDICAP):
-        side = (O_HANDICAP if group == G_HANDICAP else O_ASIAN).get(oid)
+    if group in HANDICAP_GROUPS.get(unit, {}):
+        side = HANDICAP_GROUPS[unit][group].get(oid)
         if side is None:
             return None
         try:
@@ -459,19 +515,21 @@ def rung_probs(row, probs):
         sp = side_pmf(side)
         win = sum(p for m, p in sp.items() if m + own > 0)
         push = sum(p for m, p in sp.items() if abs(m + own) < 1e-9)
-        return (win, push)
+        return (cap(win), push)
 
-    if group == G_TOTAL:
+    if group in TOTAL_GROUPS.get(unit, set()):
         try:
             line = float(line_txt)
         except (TypeError, ValueError):
             return None
         over = p_total_over(probs["total_pmf"], line)
         if oid == O_OVER:
-            return (over, 0.0)
+            return (cap(over), 0.0)
         if oid == O_UNDER:
             push = probs["total_pmf"].get(line, 0.0)
-            return (1.0 - over - push, push)
+            return (cap(1.0 - over - push), push)
         return None
 
+    # Anything else — a points handicap in a set-scored sport, a corner market, a market
+    # this record simply does not describe — is refused rather than approximated.
     return None
