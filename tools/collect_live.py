@@ -68,10 +68,15 @@ STATE = "data/live_state.json"
 #   unit    what the score counts, which decides the markets the model may price
 #           (engine/model_generic.HANDICAP_GROUPS keys off exactly this word)
 #   kind    "target"  a race to N sets/frames/maps/legs; the winner must REACH N
-#           "periods" a fixed number of scheduled periods; the last one must be reached
+#           "periods" a fixed number of scheduled periods
 #   n       the default for that rule, or None where the sport runs SEVERAL formats on the
 #           same card and the note must be read instead. Tennis (Bo3 and Bo5) and table
 #           tennis (Bo5 and Bo7) are the two that must be read.
+#
+# For a PERIOD sport `n` documents the format and nothing more: `looks_finished` refuses
+# that whole class, so those sports are recorded only when the feed states the match is
+# over. The number is kept because it is the sentence that admitted the sport, and the
+# next person to touch the vanish path needs to see it.
 SPORTS = {
     1:   ("goals",  "periods", 2),      # football — two halves
     2:   ("goals",  "periods", 3),      # ice hockey — three periods
@@ -81,6 +86,8 @@ SPORTS = {
     6:   ("sets",   "target",  3),      # volleyball, indoor — best of five
     8:   ("goals",  "periods", 2),      # handball — two halves
     10:  ("sets",   "target",  None),   # table tennis — Bo5 and Bo7 share a card
+    12:  ("frames", "target",  None),   # billiards — pyramid, a race to frames
+    13:  ("points", "periods", 4),      # american football — four quarters
     14:  ("goals",  "periods", 2),      # futsal — two halves
     16:  ("sets",   "target",  2),      # badminton — best of three
     17:  ("goals",  "periods", 4),      # water polo — four quarters
@@ -89,20 +96,35 @@ SPORTS = {
     29:  ("sets",   "target",  2),      # beach volleyball — best of three
     30:  ("frames", "target",  None),   # snooker — frame count is always noted
     40:  ("maps",   "target",  None),   # esports — best of N maps, always noted
+    48:  ("points", "periods", 4),      # lacrosse — four quarters
     49:  ("points", "periods", 4),      # netball — four quarters
+    60:  ("points", "target",  None),   # fencing — a bout is a race to 15 hits
+    66:  ("runs",   "periods", 2),      # cricket — two innings a side in a limited match
     83:  ("runs",   "periods", 7),      # softball — seven innings
     86:  ("maps",   "target",  None),   # counter strike
     97:  ("maps",   "target",  None),   # dota
     109: ("maps",   "target",  None),   # rocket league
     125: ("maps",   "target",  None),   # call of duty
     150: ("maps",   "target",  None),   # starcraft 2
+    282: ("sets",   "target",  None),   # padel — "5 Sets Match to 11 points", so it is read
+    283: ("sets",   "target",  None),   # pickleball
     298: ("maps",   "target",  None),   # overwatch
     180: ("points", "periods", 2),      # kabaddi — two halves
 }
 
+# NOT watched, and each for a reason rather than an omission:
+#   9   Boxing, 189 UFC — settled by decision or stoppage. There is no score PAIR, so
+#       there is no margin, and engine/model_generic fits a distribution of margins.
+#       Fifty fights on the card and not one of them is a number this model can read.
+#   11  Chess — scored 1 / 0.5 / 0 over a match that runs for days. Same problem.
+#   18, 37, 41, 44, 57, 68, 102 — motorsport, swimming, golf, racing, athletics. Fields,
+#       not head-to-heads; hard rule 7 drops them from the card anyway.
+#   85 FIFA, 103 Mortal Kombat, 144 PES and the marble, card and lotto ladders — a
+#       template, not a contest. Hard rule 9.
+
 # Sports that can legitimately finish level. Everywhere else a tie in the last seen score
 # means we caught the match mid-flight, not that it ended that way.
-CAN_DRAW = {1, 8, 14, 27, 17, 66}
+CAN_DRAW = {1, 8, 13, 14, 17, 27, 66}
 
 # What the feed says when a match is over. Checked case-folded and as a substring, because
 # the wording varies by sport ("Match finished", "Ended").
@@ -165,11 +187,7 @@ def format_of(game, sport):
     runs several, the default is None and an unreadable note means the fixture is refused.
     """
     unit, kind, default = SPORTS[sport]
-    note = ""
-    for item in game.get("MIS") or []:
-        if item.get("K") == 3:
-            note = str(item.get("V") or "")
-            break
+    note = note_of(game)
 
     if note:
         m = _UP_TO_WIN.search(note)
@@ -185,6 +203,22 @@ def format_of(game, sport):
             return "periods", int(m.group(1))
 
     return (kind, default) if default else (kind, None)
+
+
+# Sports where the FORMAT NOTE itself is the rating scale, because the same two sides
+# playing a different format produce a different distribution entirely. A Test innings
+# runs to three hundred and a T20 innings to a hundred and eighty; pooled, the model would
+# price a T20 run handicap off scores no T20 can reach. Race sports get this for free —
+# their pool comes from the target — so this is only for the period sports that need it.
+POOL_BY_FORMAT = {66}
+
+
+def note_of(game):
+    """The book's format note for this fixture, e.g. "T20", "7 Games Match", "4x10"."""
+    for item in game.get("MIS") or []:
+        if item.get("K") == 3:
+            return str(item.get("V") or "").strip()
+    return ""
 
 
 def snapshot(game, sport):
@@ -204,7 +238,7 @@ def snapshot(game, sport):
         "id1": str(game.get("O1I") or ""), "id2": str(game.get("O2I") or ""),
         "s1": int(fs.get("S1") or 0), "s2": int(fs.get("S2") or 0),
         "start": int(game.get("S") or 0),
-        "kind": kind, "n": n,
+        "kind": kind, "n": n, "note": note_of(game),
         # How far the match has got. `CP` is the current period; `PS` is the list of
         # periods that have a score, and one of the two is present for every sport.
         "period": int(sc.get("CP") or len(sc.get("PS") or []) or 0),
@@ -228,7 +262,11 @@ def placeable(rec):
     one where the feed stated the match was over. Knowing the score is not enough; we also
     have to know what it was a race to.
     """
-    return rec["kind"] != "target" or bool(rec.get("n"))
+    if rec["kind"] != "target":
+        # A period sport is placed by its format note where the format changes the
+        # distribution, and by nothing where it does not.
+        return rec["sport"] not in POOL_BY_FORMAT or bool(rec.get("note"))
+    return bool(rec.get("n"))
 
 
 def settle_target(rec):
@@ -299,6 +337,8 @@ def to_result(rec, now):
     # rating scale. Same reason tennis is split into bo3 and bo5.
     if rec["kind"] == "target" and rec.get("n"):
         row["pool"] = f"bo{rec['n'] * 2 - 1}"
+    elif rec["sport"] in POOL_BY_FORMAT and rec.get("note"):
+        row["pool"] = rec["note"][:32]
     return row
 
 

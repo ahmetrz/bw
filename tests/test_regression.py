@@ -1113,6 +1113,17 @@ class TestRegression(unittest.TestCase):
         self.assertNotIn("pool", collect_live.to_result(
             {"sport": 1, "p1": "A", "p2": "B", "s1": 1, "s2": 0, "start": 1_753_500_000,
              "kind": "periods", "n": 2, "league": "E0"}, 1_753_500_000))
+        # Except where the FORMAT is the scale. A Test innings runs to three hundred and a
+        # T20 innings to a hundred and eighty; pooled, the model would price a T20 run
+        # handicap off scores no T20 can reach. So cricket is placed by its format note,
+        # and a fixture without one is refused rather than dropped into the wrong pool.
+        crick = {"sport": 66, "p1": "A", "p2": "B", "s1": 180, "s2": 175,
+                 "start": 1_753_500_000, "kind": "periods", "n": 2, "note": "T20"}
+        self.assertEqual(collect_live.to_result(crick, 0)["pool"], "T20")
+        self.assertEqual(
+            collect_live.to_result({**crick, "note": "Test Match"}, 0)["pool"], "Test Match")
+        self.assertTrue(collect_live.placeable(crick))
+        self.assertFalse(collect_live.placeable({**crick, "note": ""}))
 
     def test_the_watch_list_is_a_list_of_finish_conditions(self):
         """A sport is watched only when we can say what finishing it looks like.
