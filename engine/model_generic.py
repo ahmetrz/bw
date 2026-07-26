@@ -174,7 +174,29 @@ def expected_margin(line, gap):
     return line["slope"] * gap + line["intercept"]
 
 
-def fit_bands(rows, gaps, line):
+def fit_bands(rows, gaps, line, by_pool=True):
+    """Bands PER POOL, with the sport-wide set as the fallback for thin pools.
+
+    A pool is not only a rating scale, it is usually a different game. Tennis mixes
+    best-of-3 and best-of-5: a Bo5 match can end 3-0 in sets and a Bo3 one never can, so
+    pooling their margins puts outcomes into a distribution that cannot produce them, and
+    "+2.5 sets" means two different bets in the two formats. Football divisions score at
+    2.37 to 3.18 goals a game, which moves every totals line. Splitting the bands costs
+    nothing where a pool is thick and falls back to the sport-wide record where it is not.
+    """
+    if not by_pool:
+        return _bands_from(rows, gaps, line)
+    by = {}
+    for r, g in zip(sorted(rows, key=lambda x: x["date"]), gaps):
+        by.setdefault(pool_of(r), []).append((r, g))
+    out = {"": _bands_from(rows, gaps, line)}
+    for pool, items in by.items():
+        if len(items) >= MIN_BAND * 2:
+            out[pool] = _bands_from([r for r, _ in items], [g for _, g in items], line)
+    return out
+
+
+def _bands_from(rows, gaps, line):
     """Counted margin and total distributions, per band of EXPECTED margin.
 
     The actual integer margins are counted, never a residual that gets shifted back. That
@@ -245,12 +267,16 @@ def load(sport_id):
         return None
     with open(p) as f:
         model = json.load(f)
-    model["_margin"] = [_pmf(b["margin"]) for b in model["bands"]]
-    model["_total"] = [_pmf(b["total"]) for b in model["bands"]]
+    bands = model["bands"]
+    if isinstance(bands, list):          # models written before bands were pooled
+        bands = {"": bands}
+        model["bands"] = bands
+    model["_margin"] = {k: [_pmf(b["margin"]) for b in v] for k, v in bands.items()}
+    model["_total"] = {k: [_pmf(b["total"]) for b in v] for k, v in bands.items()}
     return model
 
 
-def margin_pmf(model, gap):
+def margin_pmf(model, gap, pool=""):
     """The margin distribution for one fixture, from the HOME side.
 
     The whole model in two steps: the rating gap says what margin to expect, and the band
@@ -258,8 +284,9 @@ def margin_pmf(model, gap):
     get backwards — P(covers +12.5) is the share of those matches that covered +12.5.
     """
     mu = expected_margin(model["line"], gap)
-    i = band_index(model["bands"], mu)
-    return model["_margin"][i], mu, i
+    key = pool if pool in model["bands"] else ""
+    i = band_index(model["bands"][key], mu)
+    return model["_margin"][key][i], mu, (key, i)
 
 
 def usable(model, max_gap=0.03):
@@ -314,16 +341,16 @@ def lookup(model, home, away, matcher=None):
     score, pool, h, a = best
     ratings = model["pools"][pool]
     eff = ratings[h] - ratings[a] + HOME_ELO
-    pmf, mu, band = margin_pmf(model, eff)
+    pmf, mu, band = margin_pmf(model, eff, pool)
     return {
         # From the HOME side, always. The old version stored it from the favourite's view
         # and every caller then had to remember which side that was — a flip waiting to
         # happen, and this project has already shipped one.
         "margin_pmf": pmf,
-        "total_pmf": model["_total"][band],
+        "total_pmf": model["_total"][band[0]][band[1]],
         "expected_margin": round(mu, 3),
-        "sample_n": model["bands"][band]["n"],
-        "band": band,
+        "sample_n": model["bands"][band[0]][band[1]]["n"],
+        "band": band[1],
         "_elo_diff": round(eff, 1),
         "_teams": (h, a),
         "_pool": pool,

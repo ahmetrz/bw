@@ -148,12 +148,23 @@ def basketball(start=2007, end=2025):
 
 # ----------------------------------------------------------- table tennis (sport 10)
 
-def table_tennis(path="data/tt_results.jsonl"):
-    """Whatever tools/collect_tt.py has accumulated from the Setka scoreboard.
+def table_tennis(paths=("data/tt_history.jsonl", "data/tt_results.jsonl")):
+    """Setka: the harvested BACK CATALOGUE plus whatever the two-hourly collector adds.
 
-    Setka's robots.txt allows everything (checked, Allow: /). The scoreboard is a rolling
-    window rather than an archive, which is why a separate two-hourly workflow feeds it.
+    Reading only the collector's file was a real mistake and an instructive one: it holds a
+    rolling window of about 27 matches, so the store had 27 results, the model was refused
+    for having no usable calibration, and the sport looked unmodellable. The 9,035-match
+    history sat in data/tt_history.jsonl the whole time, harvested weeks earlier for the
+    hand-written model. Nothing was broken — the adapter was simply pointed at one of the
+    two files.
+
+    Setka's robots.txt allows everything (Allow: /), re-checked 2026-07-26.
     """
+    for path in paths:
+        yield from _tt_file(path)
+
+
+def _tt_file(path):
     if not os.path.exists(path):
         return
     with open(path) as f:
@@ -257,6 +268,12 @@ def tennis(start=2015, end=2026):
                 "home": first[0], "away": second[0],
                 "home_id": first[1], "away_id": second[1],
                 "home_score": first[2], "away_score": second[2],
+                # best-of-3 and best-of-5 are DIFFERENT GAMES for a set handicap: a Bo5
+                # match can finish 3-0 and a Bo3 one cannot, and "+2.5 sets" therefore
+                # means "wins a set" in one format and something else in the other. Pooled
+                # together they failed calibration; kept apart each is measured on its own
+                # matches, and the appearance floor refuses whoever has too few of them.
+                "pool": f"bo{rec.get('best_of') or 3}",
                 "league": rec.get("tourney_name"), "season": year,
                 "neutral": True,          # no home court on tour
                 "source": "tml",

@@ -779,8 +779,8 @@ class TestRegression(unittest.TestCase):
                  "appearances": {"": {"A": 500, "B": 3}},
                  "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
                                          "mean_abs_margin": 1.0},
-                 "bands": [{"lo": -9, "hi": 9, "n": 900, "margin": {"0": 1}}],
-                 "_margin": [{0.0: 1.0}], "_total": [{2.0: 1.0}]}
+                 "bands": {"": [{"lo": -9, "hi": 9, "n": 900, "margin": {"0": 1}}]},
+                 "_margin": {"": [{0.0: 1.0}]}, "_total": {"": [{2.0: 1.0}]}}
         self.assertIsNone(model_generic.lookup(model, "A", "B")[0])
         model["appearances"][""]["B"] = model_generic.MIN_APPEARANCES
         self.assertIsNotNone(model_generic.lookup(model, "A", "B")[0])
@@ -868,8 +868,8 @@ class TestRegression(unittest.TestCase):
                                  "bottom": {"C": 99, "D": 99}},
                  "aliases": {}, "line": {"slope": 0.01, "intercept": 0.0,
                                          "mean_abs_margin": 1.0},
-                 "bands": [{"lo": -9, "hi": 9, "n": 500, "margin": {"0": 1}}],
-                 "_margin": [{0.0: 1.0}], "_total": [{2.0: 1.0}]}
+                 "bands": {"": [{"lo": -9, "hi": 9, "n": 500, "margin": {"0": 1}}]},
+                 "_margin": {"": [{0.0: 1.0}]}, "_total": {"": [{2.0: 1.0}]}}
         # A and D never share a pool, so the fixture cannot be priced at all.
         self.assertIsNone(model_generic.lookup(model, "A", "D")[0])
         self.assertIsNotNone(model_generic.lookup(model, "A", "B")[0])

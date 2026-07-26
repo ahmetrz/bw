@@ -130,12 +130,23 @@ work with the same code. Basketball now runs on it; its bespoke model was delete
 than kept alongside.
 
 `MODELLED_SPORTS` in `engine/pick.py` is the list of HAND-WRITTEN models and is meant to
-stop growing. Coverage is `data/results/` plus whatever passes its calibration. Today the
-generic gate admits football (0.010), basketball (0.028) and baseball (0.014), and refuses
-tennis (0.030) and table tennis (27 results). Football and table tennis still run on their
-hand-written models in production; the generic football model now out-evidences the
-bespoke one — it has a held-out calibration and the bespoke one does not — so replacing it
-is the next thing to do, after a side-by-side on one card.
+stop growing. Coverage is `data/results/` plus whatever passes its calibration. The generic gate now
+admits ALL FIVE sports that have an adapter: football 0.012, basketball 0.028, tennis
+0.012, baseball 0.014, table tennis 0.011. Football and table tennis still run their
+hand-written models in production; both generic versions now out-evidence them, because
+they have a held-out calibration and the bespoke ones do not, so replacing them is the
+next thing to do after a side-by-side on one card.
+
+Both of the sports that were refused turned out to be refused for a REASON THE GATE COULD
+NOT SEE, and finding each took minutes once the gate pointed at them:
+  * Table tennis had 27 results because the adapter read the collector's rolling window
+    and not the 9,035-match archive sitting next to it. Nothing was broken; the adapter
+    was pointed at one of two files.
+  * Tennis mixed best-of-3 and best-of-5 into one distribution. A Bo5 match can finish
+    3-0 in sets and a Bo3 one cannot, so "+2.5 sets" is two different bets, and the pooled
+    record contained outcomes neither format could produce. `pool` now separates them.
+That is what a refusal is for: it does not say the sport is unmodellable, it says stop and
+look.
 
 Sources checked and REFUSED on robots grounds while doing this, all by our crawler's name:
 NHL (`api-web.nhle.com`, `api.nhle.com`), OpenDota, Liquipedia, bo3.gg's `/api/`, ESPN,

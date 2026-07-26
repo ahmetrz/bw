@@ -58,8 +58,9 @@ def calibrate(rows, gaps, fit, bands, lines, seen=None):
     would have caught. So the distributions come from the earlier matches and the
     comparison is made on the later ones the model has never seen.
     """
+    # `bands` is now {pool: [band, ...]} with "" as the sport-wide fallback.
     fitted = {"line": fit, "bands": bands,
-              "_margin": [mg._pmf(b["margin"]) for b in bands]}
+              "_margin": {k: [mg._pmf(b["margin"]) for b in v] for k, v in bands.items()}}
     out = []
     rows = sorted(rows, key=lambda x: x["date"])
     for line in lines:
@@ -72,7 +73,7 @@ def calibrate(rows, gaps, fit, bands, lines, seen=None):
                     seen.get((pool, mg.team_key(r, "home")), 0),
                     seen.get((pool, mg.team_key(r, "away")), 0)) < mg.MIN_APPEARANCES:
                 continue
-            pmf, mu, _ = mg.margin_pmf(fitted, eff)
+            pmf, mu, _ = mg.margin_pmf(fitted, eff, pool)
             # The UNDERDOG taking the points — the rung a safety ladder actually offers.
             dog = {-m: p for m, p in pmf.items()} if mu >= 0 else pmf
             pred += sum(p for m, p in dog.items() if m + line > 0)
@@ -177,8 +178,11 @@ def report(model):
     ln = model["line"]
     print(f"  beklenen fark = {ln['slope']:.5f} × derece farkı + {ln['intercept']:.3f}"
           f"   (ortalama |fark| {ln['mean_abs_margin']:.2f})")
-    print(f"  {len(model['bands'])} bant · bant başına ~{model['bands'][0]['n']} maç · "
-          f"beklenen fark {model['bands'][0]['lo']:+.2f} → {model['bands'][-1]['hi']:+.2f}")
+    g = model["bands"][""]
+    pooled = [k for k in model["bands"] if k]
+    print(f"  {len(g)} bant · bant başına ~{g[0]['n']} maç · "
+          f"beklenen fark {g[0]['lo']:+.2f} → {g[-1]['hi']:+.2f}"
+          + (f" · {len(pooled)} havuzun kendi bantları var" if pooled else ""))
     ho = model.get("calibration_holdout") or {}
     if ho.get("test"):
         print(f"  kalibrasyon: {ho['train']} maçla fit, GÖRÜLMEMİŞ {ho['test']} maçta "
