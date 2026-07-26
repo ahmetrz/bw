@@ -91,8 +91,7 @@ def pick_key(p):
     return (p.get("match_id", p.get("fixture_id")), p["market_key"][1], p.get("outcome_id"))
 
 
-SCORE_FIELDS = ("id", "score", "confidence_points", "evidence_points",
-                "confidence_pct", "evidence_pct")
+SCORE_FIELDS = ("id", "score", "band", "model_pct", "evidence_pct", "evidence_penalty")
 
 
 def number(results):
@@ -144,8 +143,10 @@ def build_notice(results, page_name, host=None, host_source="", source_note=""):
         lines += [
             f"<b>{len(picks)} seçim</b> · {full['hours']} saatlik kart"
             + (f" (24 saat içinde {len(short['picks'])})" if short else ""),
-            f"en yüksek puan <b>{picks[0]['score']:.0f}/100</b> · "
-            f"ortalama {sum(p['score'] for p in picks) / len(picks):.0f}",
+            f"en iyi seçim <b>{picks[0]['score']:.0f}/100</b> "
+            f"({html.escape(str(picks[0].get('band') or ''))}) · "
+            f"ortalama {sum(p['score'] for p in picks) / len(picks):.0f} · "
+            f"puan = modelin tutma olasılığı",
             f"min oran {config.MIN_ODDS:.2f} · model güven eşiği "
             f"%{config.MIN_MODEL_SURVIVAL * 100:.0f} · maç başına tek seçim",
             "",
@@ -202,7 +203,8 @@ def log_predictions(results, path, host=None):
                 "logged_at": stamp,
                 "id": p.get("id"),
                 "score": p.get("score"),
-                "confidence_pct": p.get("confidence_pct"),
+                "band": p.get("band"),
+                "model_pct": p.get("model_pct"),
                 "evidence_pct": p.get("evidence_pct"),
                 "match_id": p.get("match_id", p.get("fixture_id")),
                 "sport_id": p.get("sport_id"),
@@ -298,8 +300,10 @@ def main():
                     {
                         "id": p.get("id"),
                         "score": p.get("score"),
-                        "confidence_pct": p.get("confidence_pct"),
+                        "band": p.get("band"),
+                        "model_pct": p.get("model_pct"),
                         "evidence_pct": p.get("evidence_pct"),
+                        "evidence_penalty": p.get("evidence_penalty"),
                         "match": f"{p['p1']} v {p['p2']}",
                         "p1": p.get("p1"), "p2": p.get("p2"),
                         "league": p.get("league"),

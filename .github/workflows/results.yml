@@ -1,0 +1,88 @@
+name: results
+
+# Gunun secimlerini sonuclandirir ve isaretlenmis sayfayi Telegram'a yollar.
+#
+# NEDEN GUNDE BIRKAC KEZ VE NEDEN GECE YARISI DEGIL: futbol sonuclari
+# football-data.co.uk'ten geliyor ve haftada birkac kez yayinlaniyor. Bu aksam oynanan
+# bir kart cogu zaman ayni gece notlandirilamiyor. Sabit bir "gece yarisi gonder" kurali
+# bu yuzden cogunlukla bos bir karneyi "gunun sonucu" diye yollardi.
+#
+# Bunun yerine: her calismada notlandirilabilecek ne varsa notlandirilir, sayfa yeniden
+# uretilir ve Telegram'a SADECE o gune ait sonuclanan sayi bir oncekine gore ARTTIYSA
+# bildirim gider (tools/daily_results.py, data/results_sent.json). Yeni bir sey yoksa
+# sessizce gecer.
+#
+# 21:30 UTC  Avrupa aksam maclari bitmis olur, ilk karne.
+# 04:30 UTC  gece ve Amerika maclari + football-data.co.uk'in gunluk guncellemesi.
+# 12:30 UTC  gec gelen sonuclar icin son yoklama.
+
+on:
+  schedule:
+    - cron: "30 21 * * *"
+    - cron: "30 4 * * *"
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Gun (YYYY-MM-DD, bos = en son gun)"
+        required: false
+        default: ""
+      force_send:
+        description: "true = yeni sonuc olmasa da gonder"
+        required: false
+        default: "false"
+      dry_run:
+        description: "true = Telegram'a gonderme, sadece yazdir"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: results
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Grade whatever has finished
+        run: python3 tools/grade_predictions.py
+
+      - name: Build the settled page and notify
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          D: ${{ inputs.date || '' }}
+          FORCE: ${{ inputs.force_send || 'false' }}
+          DRY: ${{ inputs.dry_run || 'false' }}
+        run: |
+          set -o pipefail
+          FLAGS=""
+          if [ "${FORCE}" = "true" ]; then FLAGS="${FLAGS} --force-send"; fi
+          if [ "${DRY}"   = "true" ]; then FLAGS="${FLAGS} --no-telegram"; fi
+          if [ -n "${D}" ]; then FLAGS="${FLAGS} --date ${D}"; fi
+          python3 tools/daily_results.py --out results.html ${FLAGS}
+
+      - name: Commit
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add results.html data/predictions.jsonl data/scoreboard.json data/results_sent.json || true
+          if git diff --cached --quiet; then
+            echo "yeni sonuc yok"
+            exit 0
+          fi
+          git commit -m "results: $(date -u +%Y-%m-%d) sonuclari"
+          # Gunluk is ve toplayici da ayni dala yaziyor; rebase ile carpismayi onle.
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep $((i * 5))
+          done
+          echo "push basarisiz — bir sonraki calistirma yakalar"

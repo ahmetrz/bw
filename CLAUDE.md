@@ -22,6 +22,17 @@ does not place bets.
   only says it exists. The scan path separately writes `report.json` and, on demand,
   `coupon.html` — that one ranks by within-book cheapness, NOT by the model, so it is
   deliberately not produced by the daily run.
+- **Result loop:** `.github/workflows/results.yml` (21:30 / 04:30 / 12:30 UTC) grades what
+  has finished and rebuilds the SAME page as `results.html`, each selection marked
+  KAZANDI / KAYBETTİ / İADE with a hit-rate strip. It notifies only when that day's settled
+  count GREW, because football results come from football-data.co.uk a few times a week —
+  a fixed nightly send would deliver a mostly empty scorecard and call it the day's result.
+- **Adding to the slip:** there is NO unauthenticated way to load a Betwinner betslip
+  (`/en/user/coupon` 302s to login; the service-api coupon paths 404; and `betwinner2.com`
+  robots.txt is `Disallow: /`, so the mirror must not be crawled to find one). "One tap
+  adds all fifty" would mean driving a logged-in session with the operator's credentials,
+  which this tool does not do. The page instead offers tick-then-repeat: one tap per leg,
+  progress remembered per day in localStorage.
 
 ## The daily rule, in order (this is the product)
 1. **The model picks the direction.** Never the price. A short price is a probability
@@ -47,14 +58,15 @@ least-bad option available would defeat the whole exercise.
 scan.py                entrypoint for the ranked scan
 tools/daily_report.py  the daily run: windows → picks → score → page → Telegram
 tools/fetch_window.py  sports → tournaments → fixtures → markets, budgeted+checkpointed
-tools/make_picks_page.py  picks.html: the numbered, filterable, sortable day's list
+tools/make_picks_page.py  ONE template for picks.html and results.html
+tools/daily_results.py    settles a logged day, rebuilds the page as a scorecard
 tools/make_coupon.py   scan-path slip of deep links (NOT the daily product)
 engine/bwfeed.py       Betwinner feed → normalized rows (market keying, coverage)
 engine/parser.py       OddsPapi response → the same rows (book-agnostic)
 engine/score.py        hard filters + composite score
 engine/ladder.py       safety laddering; three-way vs two-way read off the payload
 engine/pick.py         direction + ladder + gates → one selection per match
-engine/rating.py       the 0-100 score: 70 model confidence + 30 evidence, no price
+engine/rating.py       the 0-100 score = model probability, discounted by evidence
 engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
 engine/settlement.py   what a selection actually means when it settles
 engine/telegram.py     daily notification (no-ops without credentials)
@@ -116,12 +128,17 @@ the first real Betwinner fixture.
    the score does not move when the odds change. A score that quietly folded the price
    back in would rank by the book's opinion while looking like analysis — and it would go
    unnoticed for weeks, because a short price and a confident model agree often enough.
-   The score is 70 points of confidence measured **from the floor upward** (a selection
-   that only scrapes past `MIN_MODEL_SURVIVAL` scores near 0, not near 75, since passing
-   the floor is the entry condition rather than an achievement) plus 30 points of
-   evidence (name-match strength, matches behind the division, sample behind the rating
-   bucket). Selections are numbered 1..N by score, once across the whole card, so a bet
-   keeps the same number in both windows.
+   **The score IS the model's win probability**, discounted toward the floor when the
+   evidence is thin: `puan = 100 × (floor + (p − floor) × evidence)`. It was first built
+   as a position in a band — 70 points of "how far past the floor" plus 30 of evidence —
+   which is defensible arithmetic and an unreadable number: a 75.8% selection scored 28,
+   and 28 reads as "the model is 28% sure", the opposite of its meaning. A score must mean
+   ONE thing to the person reading it. Evidence = name-match strength, matches behind the
+   division, sample behind the rating bucket; the discount is reported in points so it can
+   be argued with. Scores necessarily cluster just above the floor — that band IS the
+   product, and stretching it would invent a difference between 91% and 93% the model
+   cannot support. Selections are numbered 1..N by score, once across the whole card, so a
+   bet keeps the same number in both windows.
 7. **Only emit what settles the same day.** Outrights are dropped structurally (an entry
    with no second participant is not a head-to-head, which also removes tournament
    winners, election questions, novelty bundles and multi-runner races in one rule), and

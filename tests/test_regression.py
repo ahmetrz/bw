@@ -21,7 +21,8 @@ sys.path.insert(0, ROOT)
 import config  # noqa: E402
 from engine import (bwfeed, grade, ladder, mirror, parlay, pick, rating,  # noqa: E402
                     score, settlement, telegram)
-from tools import daily_report, make_picks_page  # noqa: E402
+from tools import daily_report, daily_results as tools_daily_results  # noqa: E402
+from tools import make_picks_page  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import grade_predictions  # noqa: E402
@@ -545,26 +546,45 @@ class TestRegression(unittest.TestCase):
         b = rating.score({"model_survival": 0.76, "name_match": 1.0, "odds": 1.2})
         self.assertGreater(a["score"], b["score"])
 
-    def test_score_is_measured_from_the_floor_not_from_zero(self):
-        """Everything offered has already cleared MIN_MODEL_SURVIVAL, so the interesting
-        question is how far PAST the floor a pick sits. A selection that only just scrapes
-        through must not arrive looking like a 75/100."""
+    def test_score_reads_as_the_model_probability(self):
+        """The score has to mean ONE thing: how often the model thinks this wins.
+
+        The first version scored a position in a band, so a 75.8% selection came out at
+        28/100 and was read as "the model is 28% sure" — the opposite of its meaning. With
+        full evidence the number must now BE the probability, with nothing to translate.
+        """
         floor = config.MIN_MODEL_SURVIVAL
-        just = rating.score({"model_survival": floor + 1e-9, "name_match": 1.0}, floor)
-        self.assertEqual(just["confidence_points"], 0.0)
-        certain = rating.score({"model_survival": 1.0, "name_match": 1.0}, floor)
-        self.assertEqual(certain["confidence_points"], 70.0)
-        self.assertEqual(certain["score"], 100.0)
+        full = {"name_match": 1.0, "division_matches": 12000}
+        for prob in (0.758, 0.83, 0.91, 0.999):
+            got = rating.score(dict(full, model_survival=prob), floor)
+            self.assertAlmostEqual(got["score"], round(100.0 * prob, 1), places=1)
+            self.assertAlmostEqual(got["model_pct"], round(100.0 * prob, 1), places=1)
+        # No evidence at all cannot leave a selection worth more than the entry condition.
+        none = rating.score({"model_survival": 0.95, "name_match": 0.80}, floor)
+        self.assertAlmostEqual(none["score"], 100.0 * floor, places=1)
 
     def test_evidence_discounts_a_weaker_foundation(self):
-        """Same stated confidence, different backing — the score has to say so."""
+        """Same stated probability, different backing — the score has to say so, and say
+        how much it cost."""
         strong = rating.score({"model_survival": 0.9, "name_match": 1.0,
                                "division_matches": 12000})
         weak = rating.score({"model_survival": 0.9, "name_match": 0.83,
                              "division_matches": 400})
-        self.assertEqual(strong["confidence_points"], weak["confidence_points"])
-        self.assertGreater(strong["evidence_points"], weak["evidence_points"])
+        self.assertEqual(strong["model_pct"], weak["model_pct"])
+        self.assertGreater(strong["evidence_pct"], weak["evidence_pct"])
         self.assertGreater(strong["score"], weak["score"])
+        # The discount is visible in the same units as the score, so it can be argued with.
+        self.assertAlmostEqual(weak["score"] + weak["evidence_penalty"],
+                               strong["score"], places=1)
+        self.assertEqual(strong["evidence_penalty"], 0.0)
+
+    def test_score_bands_are_fixed_not_relative(self):
+        """A label has to mean the same thing on a strong card and a weak one. Quantile
+        bands would relabel the identical bet every morning."""
+        self.assertEqual(rating.band(96.0), "çok güçlü")
+        self.assertEqual(rating.band(75.4), "sınırda")
+        self.assertEqual(rating.score({"model_survival": 0.93, "name_match": 1.0,
+                                       "division_matches": 9000})["band"], "çok güçlü")
 
     def test_numbering_is_best_first_and_shared_across_windows(self):
         """#1 is the day's best selection, and a bet keeps ONE number in both windows.
@@ -602,21 +622,21 @@ class TestRegression(unittest.TestCase):
             "min_odds": 1.10, "min_model_survival": 0.75,
             "windows": [
                 {"hours": 24, "matches": 3, "skipped": {"no_model": 1},
-                 "picks": [{"id": 1, "score": 88.0, "confidence_pct": 80.0,
-                            "evidence_pct": 100.0, "p1": "Napoli", "p2": "Carrarese",
+                 "picks": [{"id": 1, "score": 88.0, "band": "güçlü", "model_pct": 88.0,
+                            "evidence_pct": 100.0, "model_survival": 0.88, "p1": "Napoli", "p2": "Carrarese",
                             "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
                             "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
                             "odds": 1.10, "settlement": {"scope": "regulation"},
                             "url": "https://betwinner2.com/en/line/1/1/2"}]},
                 {"hours": 48, "matches": 5, "skipped": {"no_model": 2},
-                 "picks": [{"id": 1, "score": 88.0, "confidence_pct": 80.0,
-                            "evidence_pct": 100.0, "p1": "Napoli", "p2": "Carrarese",
+                 "picks": [{"id": 1, "score": 88.0, "band": "güçlü", "model_pct": 88.0,
+                            "evidence_pct": 100.0, "model_survival": 0.88, "p1": "Napoli", "p2": "Carrarese",
                             "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
                             "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
                             "odds": 1.10, "settlement": {"scope": "regulation"},
                             "url": "https://betwinner2.com/en/line/1/1/2"},
-                           {"id": 2, "score": 51.0, "confidence_pct": 30.0,
-                            "evidence_pct": 100.0, "p1": "Anna Lapa", "p2": "V. Shevchuk",
+                           {"id": 2, "score": 76.0, "band": "sınırda", "model_pct": 76.0,
+                            "evidence_pct": 100.0, "model_survival": 0.76, "p1": "Anna Lapa", "p2": "V. Shevchuk",
                             "league": "Setka Cup", "start": "2026-07-27T09:00:00+00:00",
                             "sport_id": 10, "selection_tr": "Anna Lapa +2.5 set handikap",
                             "odds": 1.24, "settlement": {"scope": "match",
@@ -639,7 +659,7 @@ class TestRegression(unittest.TestCase):
         # real filter rather than a duplicate of the full list.
         self.assertIn('data-window="24"', page)
         self.assertIn('data-window="48"', page)
-        for needle in ('data-id="1"', 'data-score="88.0"', 'data-odds="1.24"',
+        for needle in ('data-id="1"', 'data-score="88.0"', 'data-odds="1.24"', 'güçlü',
                        "Napoli - Carrarese", "Masa Tenisi", "Futbol",
                        "https://betwinner2.com/en/line/10/3/4"):
             self.assertIn(needle, page)
@@ -653,7 +673,7 @@ class TestRegression(unittest.TestCase):
         """Team names come from the feed. One containing a quote or a tag must not be
         able to break out of an attribute — the page is opened on the operator's phone."""
         report = {"windows": [{"hours": 48, "matches": 1, "picks": [{
-            "id": 1, "score": 50.0, "confidence_pct": 1.0, "evidence_pct": 1.0,
+            "id": 1, "score": 50.0, "band": "sınırda", "model_pct": 50.0, "evidence_pct": 1.0,
             "p1": '<script>alert("x")</script>', "p2": 'O"Brien & Sons',
             "league": "<b>x</b>", "start": "2026-07-26T16:00:00+00:00", "sport_id": 1,
             "selection_tr": "5.5 altı", "odds": 1.5, "settlement": {},
@@ -669,6 +689,56 @@ class TestRegression(unittest.TestCase):
         self.assertNotIn("<script>alert", page)
         self.assertNotIn('"onerror="', page)
         self.assertIn("&lt;script&gt;", page)
+
+    def test_settled_page_marks_every_outcome_and_totals_them(self):
+        """The evening page is the morning page with results on it.
+
+        The badge map is keyed on engine/grade.py's own lowercase constants. An uppercase
+        key here matched nothing and rendered a fully settled day as all-pending — the
+        page looked right and said the opposite of the truth, which is the worst kind of
+        reporting bug.
+        """
+        for key in ("win", "loss", "push", "half"):
+            self.assertIn(key, make_picks_page.RESULTS_TR,
+                          f"grade.py emits {key!r} and the page cannot render it")
+        self.assertEqual(
+            sorted(make_picks_page.RESULTS_TR),
+            sorted([grade.WIN, grade.LOSS, grade.PUSH, grade.HALF]))
+
+        log = []
+        for i, res in enumerate([grade.WIN] * 3 + [grade.LOSS, grade.PUSH, None], 1):
+            log.append({
+                "date": "2026-07-26", "id": i, "score": 90.0 - i, "band": "güçlü",
+                "model_pct": 90.0 - i, "evidence_pct": 100.0, "model_survival": 0.9,
+                "p1": f"Ev {i}", "p2": f"Dep {i}", "league": "Test Ligi", "sport_id": 1,
+                "start": "2026-07-26T16:00:00+00:00", "odds": 1.5,
+                "selection_tr": "Toplam gol 5.5 altı", "url": "https://x.test/1",
+                "result": res, "final_score": [2, 1] if res else None,
+            })
+        report = tools_daily_results.as_report("2026-07-26", log)
+        out = os.path.join(ROOT, "fixtures", "_tmp_results.html")
+        try:
+            make_picks_page.build(report, out)
+            with open(out, encoding="utf-8") as f:
+                page = f.read()
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
+
+        # Count the BADGES, not the word: the footer explains what a pending selection
+        # is not counted as, and that sentence names the outcomes too.
+        badge = lambda css, txt: page.count(f'class="badge {css}">{txt}')
+        self.assertEqual(badge("win", "KAZANDI"), 3)
+        self.assertEqual(badge("loss", "KAYBETTİ"), 1)
+        self.assertEqual(badge("push", "İADE"), 1)
+        # The one with no result must be shown as pending, never as a silent blank.
+        self.assertIn("BEKLİYOR", page)
+        self.assertIn('data-result="pending"', page)
+        # Hit rate counts decided legs only: 3 wins of 4 decided, the push set aside.
+        s = report["summary"]
+        self.assertEqual((s["win"], s["loss"], s["push"], s["graded"]), (3, 1, 1, 5))
+        self.assertAlmostEqual(s["hit_rate"], 0.75)
+        self.assertIn("%75.0", page)
 
     def test_telegram_caption_never_splits_a_tag(self):
         """Telegram caps a caption at 1024 characters and rejects the whole upload if the
