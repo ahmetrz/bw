@@ -24,16 +24,18 @@ name: watch-live
 # dakikada bir tarayan kisa bir pencere aciyor ve o pencerede biten her maci yakaliyor.
 # Saatte tek tarama ayni dakikayi harcayip neredeyse hicbir sey toplamazdi.
 #
-# MALIYET, ve bu depo PRIVATE oldugu icin gercekten onemli: dakikalar sinirli. Mevcut
-# yuk daily ~25 dk/gun, collect-results ~2.4 dk/gun, results ~1.8 dk/gun = ~30 dk/gun,
-# aylik ~900 dakika. Ucretsiz kota 2.000. Gunde 3 x 10 dakikalik pencere ~33 dk/gun,
-# aylik ~990 dakika ekler ve toplam ~1.900'de kalir. Kotasi daha buyuk olan operator
-# minutes girdisini ya da cron'u buyuterek dogrudan daha cok sonuc toplar — kapsam
-# tarama suresiyle neredeyse dogru orantili.
+# MALIYET, ve bu depo PRIVATE oldugu icin gercekten onemli: dakikalar sinirli. Gunluk
+# cekim 25 dakikadan 4 dakikaya indigi icin butcenin buyuk kismi bosaldi; mevcut yuk
+# artik ~12 dk/gun, aylik ~360 dakika. Ucretsiz kota 2.000. Gunde 4 x 10 dakikalik
+# pencere ~40 dk/gun, aylik ~1.200 dakika ekler ve toplam ~1.560'ta kalir.
+#
+# Pencereler gune yayilmis: yakalanan mac sayisi TOPLAM tarama suresiyle orantili, ama
+# devreler gunun farkli saatlerinde oynuyor (Rus masa tenisi geceleri, Amerika kitasi
+# aksamlari), o yuzden ayni dakikayi tek blokta degil dorde bolerek harciyoruz.
 
 on:
   schedule:
-    - cron: "13 2,10,18 * * *"
+    - cron: "13 1,7,13,19 * * *"
   workflow_dispatch:
     inputs:
       minutes:
