@@ -24,24 +24,29 @@ name: watch-live
 # dakikada bir tarayan kisa bir pencere aciyor ve o pencerede biten her maci yakaliyor.
 # Saatte tek tarama ayni dakikayi harcayip neredeyse hicbir sey toplamazdi.
 #
-# MALIYET, ve bu depo PRIVATE oldugu icin gercekten onemli: dakikalar sinirli. Gunluk
-# cekim 25 dakikadan 4 dakikaya indigi icin butcenin buyuk kismi bosaldi; mevcut yuk
-# artik ~12 dk/gun, aylik ~360 dakika. Ucretsiz kota 2.000. Gunde 4 x 10 dakikalik
-# pencere ~40 dk/gun, aylik ~1.200 dakika ekler ve toplam ~1.560'ta kalir.
+# SUREKLI IZLIYOR. Depo public oldugu icin GitHub Actions dakikasi sinirsiz, ve yakalanan
+# mac sayisi dogrudan tarama SURESIYLE orantili — 50-150 saniyelik kalma suresi karsisinda
+# dakikada bir tarayan bir pencere biten her maci yakaliyor. Bu yuzden saat basi 50
+# dakikalik pencere aciliyor: gunde ~20 saat kesintisiz izleme.
 #
-# Pencereler gune yayilmis: yakalanan mac sayisi TOPLAM tarama suresiyle orantili, ama
-# devreler gunun farkli saatlerinde oynuyor (Rus masa tenisi geceleri, Amerika kitasi
-# aksamlari), o yuzden ayni dakikayi tek blokta degil dorde bolerek harciyoruz.
+# Onceki hali gunde 4 x 10 dakikaydi ve bunun tek nedeni deponun private olmasiydi: aylik
+# 2.000 dakikalik kota, gunde ~40 dakikadan fazlasina izin vermiyordu. Kisit kalkinca
+# dogru cadans da degisti — kartta dakikada ~3 mac bitiyor, yani 40 dakika gunde ~120
+# sonuc demekti, 20 saat ise ~3.600. Voleybolun 400 sonuclu kalibrasyon esigi aylar
+# uzaktan gunler uzaga geldi.
+#
+# Saat basi ayri is, tek uzun is degil: durum her taramada diske, ama repoya ancak is
+# bitince yaziliyor, o yuzden bir cokme en fazla bir saat kaybettiriyor.
 
 on:
   schedule:
-    - cron: "13 1,7,13,19 * * *"
+    - cron: "4 * * * *"
   workflow_dispatch:
     inputs:
       minutes:
         description: "Pencere uzunlugu, dakika (0 = tek tarama)"
         required: false
-        default: "10"
+        default: "50"
       every:
         description: "Taramalar arasi saniye (olculen kalma suresi ~50-150 sn)"
         required: false
@@ -63,14 +68,15 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Bir sonraki saatin isi baslamadan bitmeli, yoksa concurrency kuyrugu buyur.
+    timeout-minutes: 57
     steps:
       - uses: actions/checkout@v4
 
       - name: Sweep the live feed
         run: |
           python3 tools/collect_live.py \
-            --minutes "${{ github.event.inputs.minutes || '10' }}" \
+            --minutes "${{ github.event.inputs.minutes || '50' }}" \
             --every "${{ github.event.inputs.every || '60' }}" \
             --sports "${{ github.event.inputs.sports || '' }}"
 
