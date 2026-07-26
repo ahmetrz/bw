@@ -332,6 +332,10 @@ def log_predictions(results, path, host=None):
                 "league": p.get("league"),
                 "start": p.get("start"),
                 "p1": p.get("p1"), "p2": p.get("p2"),
+                # The book's own participant ids. Written here so the GRADER can match
+                # this fixture to a result exactly, instead of normalizing two names and
+                # hoping. The live watcher records results under the same ids.
+                "p1_id": p.get("p1_id"), "p2_id": p.get("p2_id"),
                 "market_line": p["market_key"][1],
                 "outcome_id": p.get("outcome_id"),
                 "selection": p.get("selection"),

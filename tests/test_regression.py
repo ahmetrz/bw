@@ -1125,6 +1125,40 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(collect_live.placeable(crick))
         self.assertFalse(collect_live.placeable({**crick, "note": ""}))
 
+    def test_a_running_match_is_never_graded(self):
+        """The grader must not be able to settle a fixture that is still being played.
+
+        This is the second time this project produced a hit rate out of previous meetings.
+        The first was 87.1% from 31 predictions that had not kicked off. The second was
+        found within minutes of routing grading through the results store: "San Francisco
+        Giants +2.5" settled as a WIN at 9-2, seventy-five minutes after first pitch,
+        because the same two teams had met the day before and the date match allowed one
+        day of slack. One prediction, 100% hit rate, and the number every later change is
+        supposed to be steered by."""
+        start = "2026-07-26T20:05:00+00:00"
+        self.assertFalse(grade_predictions.finished_enough(
+            5, start, "2026-07-26T21:20:00+00:00"))
+        self.assertTrue(grade_predictions.finished_enough(
+            5, start, "2026-07-26T23:30:00+00:00"))
+        # A table tennis match is over in half an hour and must not wait on a football
+        # clock, or a whole sport grades a day late.
+        self.assertTrue(grade_predictions.finished_enough(
+            10, start, "2026-07-26T20:45:00+00:00"))
+        # Unreadable timestamps refuse rather than default to "probably finished".
+        self.assertFalse(grade_predictions.finished_enough(1, None, "2026-07-26T23:00:00"))
+
+        # Same date wins even when an adjacent one appears first in the list.
+        entries = [("2026-07-25", 9, 2), ("2026-07-26", 1, 4)]
+        self.assertEqual(
+            grade_predictions._nearest(entries, start, 1, elapsed_hours=20.0), (1, 4))
+        # And an adjacent date alone cannot answer until today's result has had time to
+        # appear and has not — otherwise yesterday's meeting settles tonight's bet.
+        yesterday = [("2026-07-25", 9, 2)]
+        self.assertIsNone(
+            grade_predictions._nearest(yesterday, start, 1, elapsed_hours=1.2))
+        self.assertEqual(
+            grade_predictions._nearest(yesterday, start, 1, elapsed_hours=20.0), (9, 2))
+
     def test_the_books_own_id_beats_a_name_match(self):
         """Where the card and the store share the book's participant id, use it.
 

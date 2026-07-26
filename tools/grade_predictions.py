@@ -8,15 +8,29 @@ since finished, settles each with engine/grade.py, and writes the outcome back. 
 the per-day and cumulative hit rate, which is the number every future change to this
 project should be judged against.
 
-Result sources, per sport:
-  football (1)      football-data.co.uk season CSVs — the same source the model is fitted
-                    on, so team names already agree and no second name-matching layer is
-                    needed. Updated a few times a week, so grading lags by days, not hours.
-  table tennis (10) data/tt_results.jsonl, accumulated by tools/collect_tt.py.
+Result sources, in the order they are tried:
 
-Anything else stays PENDING rather than being guessed at. A prediction that cannot be
-settled honestly must not be counted in either column: scoring it wrongly would corrupt
-the very measurement the improvements are steered by.
+  1. data/results/<sport>.jsonl — THE RESULTS STORE, and now the main source for every
+     sport. What the live watcher records comes off the same feed the card is built from,
+     so a watched result carries the BOOK'S OWN participant ids and the prediction carries
+     the same two ids. That match is exact. No normalizer, no fuzzy threshold, no chance
+     of resolving to a different team with a similar name — and it covers snooker, darts,
+     volleyball and everything else the moment the watcher sees them, not only the two
+     sports somebody happened to write an archive adapter for.
+  2. football-data.co.uk season CSVs, for football fixtures the watcher did not see. It
+     is the source the football model is fitted on, so the names already agree, but it
+     updates a few times a week — grading through it lags by days.
+  3. data/tt_results.jsonl, the older table tennis collector.
+
+WHY THIS ORDER CHANGED. Grading used to know about exactly those last two, so every
+other sport stayed PENDING for ever: 99 predictions were logged and 99 were ungraded,
+and the project's own live performance — the number every future change is supposed to be
+judged against — was simply not being measured. The watcher had been recording the
+results the whole time; nothing was reading them.
+
+Anything still unmatched stays PENDING rather than being guessed at. A prediction that
+cannot be settled honestly must not be counted in either column: scoring it wrongly would
+corrupt the very measurement the improvements are steered by.
 """
 import argparse
 import csv
@@ -31,7 +45,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import grade  # noqa: E402
+from engine import grade, results_store  # noqa: E402
 from engine.model_elo import _norm  # noqa: E402  (same normalizer the model matches with)
 
 FDCOUK = "https://www.football-data.co.uk/mmz4281"
@@ -125,15 +139,109 @@ def _date(raw):
     return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
 
 
-def lookup_result(table, home, away, start, tolerance_days=1):
+def lookup_result(table, home, away, start, tolerance_days=1, elapsed_hours=None):
     """The result for THIS fixture, matched on date as well as on the two teams.
 
     A one-day tolerance absorbs the timezone gap between the book's kick-off stamp and the
     results file's local date. Anything looser would start matching neighbouring fixtures.
     """
-    from datetime import date, timedelta
+    return _nearest(table.get((_norm(home), _norm(away))), start, tolerance_days,
+                    elapsed_hours)
 
-    entries = table.get((_norm(home), _norm(away)))
+
+def store_results(sport_id):
+    """Two lookups over data/results/<sport>.jsonl: one keyed on the book's ids, one on
+    normalized names. Both map to [(date, home score, away score)].
+
+    The id table only holds rows the live watcher wrote, because only those ids came from
+    Betwinner. A source's own id — EuroLeague's club code, Setka's player number, MLB's
+    team id — identifies the team inside THAT source and means nothing on the book's card;
+    keying on it would settle a fixture from whatever unrelated team shared a number.
+    """
+    by_id, by_name = {}, {}
+    for r in results_store.load(sport_id):
+        entry = (r["date"], r["home_score"], r["away_score"])
+        h, a = _norm(r.get("home")), _norm(r.get("away"))
+        if h and a:
+            by_name.setdefault((h, a), []).append(entry)
+        if r.get("source") == "betwinner-live" and r.get("home_id") and r.get("away_id"):
+            by_id.setdefault((str(r["home_id"]), str(r["away_id"])), []).append(entry)
+    return by_id, by_name
+
+
+def lookup_by_id(table, home_id, away_id, start, tolerance_days=1, elapsed_hours=None):
+    """The exact match: same two participants, as the book numbers them, near that date.
+
+    The date check stays even here. An id pair identifies the PAIRING, not the fixture,
+    and these circuits run the same two players against each other repeatedly — grading
+    tonight's match from last week's meeting is precisely the bug that once produced a
+    fake 87% hit rate.
+    """
+    if not (home_id and away_id):
+        return None
+    return _nearest(table.get((str(home_id), str(away_id))), start, tolerance_days,
+                    elapsed_hours)
+
+
+# The shortest a match of this sport can plausibly take, in hours. A fixture that started
+# less than this ago has NOT finished, whatever some table says about the same two names.
+#
+# This guard exists because the alternative was caught doing real damage. Grading was
+# routed through the results store and immediately settled "San Francisco Giants +2.5" as
+# a WIN at 9-2, seventy-five minutes after a baseball game started — the score was the
+# PREVIOUS DAY'S meeting of the same two teams, reachable through the one-day tolerance.
+# One prediction, 100% hit rate, and a number that would have steered everything after it.
+# It is the second time this project has produced a hit rate out of previous meetings.
+MIN_HOURS = {
+    1: 2.0,    # football
+    2: 2.5,    # ice hockey
+    3: 2.0,    # basketball
+    4: 1.0,    # tennis
+    5: 2.5,    # baseball
+    6: 1.0,    # volleyball
+    8: 1.5,    # handball
+    10: 0.4,   # table tennis
+    16: 0.5,   # badminton
+    21: 1.0,   # darts
+    30: 1.0,   # snooker
+    40: 1.0,   # esports
+    66: 3.0,   # cricket
+}
+DEFAULT_MIN_HOURS = 2.0
+
+# Beyond that, an ADJACENT-day result may only answer for a fixture once this long has
+# passed — long enough that the timezone gap is the only explanation left for a date that
+# does not match, rather than "today's result simply is not in yet".
+ADJACENT_AFTER_HOURS = 8.0
+
+
+def _hours_since(start, now):
+    """Hours between a fixture's start and now, or None if either cannot be read."""
+    try:
+        began = datetime.fromisoformat(str(start))
+        current = datetime.fromisoformat(str(now))
+    except (TypeError, ValueError):
+        return None
+    return (current - began).total_seconds() / 3600.0
+
+
+def finished_enough(sport_id, start, now):
+    """Has this fixture had time to finish? A grader that can score a running match will."""
+    hours = _hours_since(start, now)
+    if hours is None:
+        return False
+    return hours >= MIN_HOURS.get(sport_id, DEFAULT_MIN_HOURS)
+
+
+def _nearest(entries, start, tolerance_days, elapsed_hours=None):
+    """The entry for THIS fixture: same date first, an adjacent one only as a last resort.
+
+    Same-date is preferred rather than merely allowed. Taking the first entry within
+    tolerance meant an adjacent day could answer while the correct row was sitting further
+    down the same list.
+    """
+    from datetime import date
+
     if not entries:
         return None
     want = (start or "")[:10]
@@ -143,14 +251,27 @@ def lookup_result(table, home, away, start, tolerance_days=1):
         target = date.fromisoformat(want)
     except ValueError:
         return None
+    best = None
     for when, hg, ag in entries:
         try:
             got = date.fromisoformat(when)
         except ValueError:
             continue
-        if abs((got - target).days) <= tolerance_days:
+        gap = abs((got - target).days)
+        if gap > tolerance_days:
+            continue
+        if gap == 0:
             return (hg, ag)
-    return None
+        if best is None or gap < best[0]:
+            best = (gap, hg, ag)
+    if best is None:
+        return None
+    # An adjacent day is the timezone gap OR yesterday's meeting of the same pair, and
+    # nothing in the row distinguishes them. Only accept it once today's result has had
+    # ample time to appear and has not.
+    if elapsed_hours is not None and elapsed_hours < ADJACENT_AFTER_HOURS:
+        return None
+    return (best[1], best[2])
 
 
 def tt_results(path="data/tt_results.jsonl"):
@@ -184,19 +305,43 @@ def main():
                         if p.get("sport_id") == 1 and p.get("division")})
     results_fb = football_results(divisions, args.season) if divisions else {}
     results_tt = tt_results()
-    print(f"result rows available: football {len(results_fb)}, table tennis {len(results_tt)}")
+    # The store, per sport, loaded once for the sports actually waiting on it.
+    store = {sid: store_results(sid)
+             for sid in sorted({p.get("sport_id") for p in pending if p.get("sport_id")})}
+    print(f"result rows available: store "
+          f"{ {sid: len(n) for sid, (_i, n) in sorted(store.items())} }, "
+          f"football-data {len(results_fb)}, tt collector {len(results_tt)}")
 
     now = datetime.now(timezone.utc).isoformat()
-    newly = skipped_future = 0
+    newly = skipped_future = still_running = 0
+    by_route = defaultdict(int)
     for p in pending:
-        # A fixture that has not started cannot have a result. Guarding on this as well as
-        # on the date match, because a grader that can score an unplayed match is a grader
-        # that will eventually score one wrongly.
+        # A fixture that has not started cannot have a result, and one that started ten
+        # minutes ago has not finished either. Both guards, because a grader that CAN
+        # score a running match is a grader that eventually will — and it already did,
+        # settling a baseball selection from the previous day's meeting of the same two
+        # teams seventy-five minutes after first pitch.
         if (p.get("start") or "") > now:
             skipped_future += 1
             continue
-        table = results_fb if p.get("sport_id") == 1 else results_tt
-        score = lookup_result(table, p.get("p1"), p.get("p2"), p.get("start"))
+        if not finished_enough(p.get("sport_id"), p.get("start"), now):
+            still_running += 1
+            continue
+        elapsed = _hours_since(p.get("start"), now)
+        by_id, by_name = store.get(p.get("sport_id")) or ({}, {})
+        # Exact first: the same two participants as the book numbers them.
+        score = lookup_by_id(by_id, p.get("p1_id"), p.get("p2_id"), p.get("start"),
+                             elapsed_hours=elapsed)
+        route = "id"
+        if not score:
+            score = lookup_result(by_name, p.get("p1"), p.get("p2"), p.get("start"),
+                                  elapsed_hours=elapsed)
+            route = "store name"
+        if not score:
+            table = results_fb if p.get("sport_id") == 1 else results_tt
+            score = lookup_result(table, p.get("p1"), p.get("p2"), p.get("start"),
+                                  elapsed_hours=elapsed)
+            route = "football-data" if p.get("sport_id") == 1 else "tt collector"
         if not score:
             continue
         row = {"market_key": (0, p["market_line"]), "outcome_id": p.get("outcome_id")}
@@ -204,14 +349,23 @@ def main():
         if outcome is None:
             # An unsupported market must stay pending rather than be scored on a guess.
             continue
+        # Counted only once the market actually settled, so the routes reported add up to
+        # the number graded rather than to the number matched.
+        by_route[route] += 1
         p["result"] = outcome
         p["final_score"] = list(score)
+        p["graded_via"] = route
         p["graded_at"] = datetime.now(timezone.utc).isoformat()
         newly += 1
 
     if newly:
         write_jsonl(args.predictions, preds)
-    print(f"newly graded: {newly} | not started yet: {skipped_future}")
+    print(f"newly graded: {newly} | not started yet: {skipped_future} | "
+          f"still being played: {still_running}")
+    if by_route:
+        # Which route settled what. Worth printing: if the exact id match ever stops
+        # carrying most of them, something upstream has quietly broken.
+        print("  " + " · ".join(f"{k}: {v}" for k, v in sorted(by_route.items())))
 
     graded = [p for p in preds if p.get("result")]
     overall = grade.summarize(graded)
