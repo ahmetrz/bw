@@ -74,29 +74,35 @@ def widget(location_id=1):
     return _get(f"/Matches/widget/{location_id}") or []
 
 
-def ratings(max_pages=None):
+def ratings():
     """Every rated player, keyed by id.
 
-    Paged 20 at a time over ~150 pages. `ratingSc` is the circuit's own rating; some
-    players also carry `ratingUttf`. Career win/loss comes along for free, which is what
-    makes a sanity check on the rating possible at all.
+    The response looks paginated — playersPerPage 20, totalPages 148 — but `players` is a
+    dict KEYED BY PAGE NUMBER and the first call already carries all 148 of them. Walking
+    the pages would have fetched the same payload 148 times.
+
+    `ratingSc` arrives as a STRING here and as a float on the single-player route, so it
+    is coerced. Career win/loss comes along too, which is what makes a sanity check on the
+    rating possible at all.
     """
     out = {}
-    first = _get("/Players/1/rating")
-    if not first:
+    payload = _get("/Players/1/rating")
+    if not payload:
         return out
-    pages = first.get("totalPages") or 1
-    if max_pages:
-        pages = min(pages, max_pages)
-
-    def absorb(payload):
-        for p in (payload or {}).get("players") or []:
-            if p.get("id") is not None:
-                out[p["id"]] = p
-
-    absorb(first)
-    for page in range(2, pages + 1):
-        absorb(_get(f"/Players/1/rating?page={page}"))
+    pages = payload.get("players")
+    if not isinstance(pages, dict):
+        return out
+    for _page, players in pages.items():
+        for p in players or []:
+            pid = p.get("id")
+            if pid is None:
+                continue
+            for key in ("ratingSc", "ratingUttf"):
+                try:
+                    p[key] = float(p[key])
+                except (TypeError, ValueError):
+                    p[key] = None
+            out[pid] = p
     return out
 
 

@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, model_elo, model_football, parlay, pick, score,  # noqa: E402
-                    settlement, telegram, tr)
+from engine import (bwfeed, model_elo, model_football, model_tt, parlay,  # noqa: E402
+                    pick, score, setka, settlement, telegram, tr)
 
 
 def load(path):
@@ -55,7 +55,7 @@ def within(rows, hours, now=None):
     return out
 
 
-def analyse(rows, hours, index, elo_model=None):
+def analyse(rows, hours, index, elo_model=None, tt=None):
     """One window's worth of analysis."""
     windowed = within(rows, hours)
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
@@ -64,7 +64,7 @@ def analyse(rows, hours, index, elo_model=None):
     if not windowed:
         return {"hours": hours, "matches": 0, "picks": [], "skipped": {}}
 
-    picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model)
+    picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model, tt=tt)
     settlement.annotate(picks)
     # Picks come from the unfiltered rows, so they carry no hold yet. Attach it here so
     # the parlay's hard-rule-4 figures can be computed from the same numbers as the scan.
@@ -236,6 +236,20 @@ def main():
               f"{elo_model['matches']} matches fitted")
     else:
         print("Elo model absent — run tools/build_football_model.py", file=sys.stderr)
+    # Table tennis: the calibrated Setka model plus the live rating index.
+    tt = None
+    tt_model = model_tt.load()
+    if tt_model:
+        try:
+            tt = (tt_model, model_tt.build_player_index(setka.ratings()))
+            print(f"Table tennis model: {tt_model['samples']} samples, "
+                  f"logloss {tt_model['logloss']} vs {tt_model['baseline_logloss']} baseline; "
+                  f"{len(tt[1])} rated players")
+        except Exception as e:
+            print(f"Setka ratings unavailable: {e}", file=sys.stderr)
+    else:
+        print("Table tennis model absent — run tools/build_tt_model.py", file=sys.stderr)
+
     try:
         index = model_football.build_index()
         print(f"ClubElo fixtures indexed: {len(index)}")
@@ -244,7 +258,7 @@ def main():
         index = {}
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
-    results = [analyse(rows, h, index, elo_model) for h in windows]
+    results = [analyse(rows, h, index, elo_model, tt) for h in windows]
 
     for r in results:
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "

@@ -21,14 +21,28 @@ probability suggests, and that difference is exactly what a safety ladder exists
 import config
 from engine import ladder, model_football
 
+# Sports with a calibrated model. Everything else is counted as unmodelled rather than
+# guessed at, and that count is reported.
+MODELLED_SPORTS = {1, 10}
+
 # Directions to consider, in the order they are tried. Sides first: a side view is what
 # the ladder can soften most, since double chance and the handicap family both exist.
 DIRECTIONS = ("home", "away", "over", "under")
 
 
 def _survival(row, probs):
-    """P(this leg does not lose the coupon) = win + push, or None if unpriceable."""
-    got = model_football.rung_probs(row, probs)
+    """P(this leg does not lose the coupon) = win + push, or None if unpriceable.
+
+    Dispatches on the model that produced `probs`, because each sport prices its rungs
+    from a different distribution: football from a scoreline matrix, table tennis from a
+    measured set distribution. The probs dict carries its own source so the two can never
+    be crossed — pricing a set handicap off a goals matrix would be silently meaningless.
+    """
+    from engine import model_tt
+
+    source = probs.get("_source")
+    got = (model_tt.rung_probs(row, probs) if source == "setka"
+           else model_football.rung_probs(row, probs))
     if not got:
         return None
     win, push = got
@@ -85,33 +99,45 @@ def best(rows, sport_id, probs, min_odds=None, min_survival=None):
     return c[0] if c else None
 
 
-def resolve(sample, index=None, elo_model=None, min_name_score=0.82):
+def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None):
     """Probabilities for one fixture from whichever model can reach it.
 
-    Our own Elo model is tried FIRST. It is fitted on 38,598 results across 22 divisions
-    and can price a fixture in or out of season, whereas ClubElo publishes only near-term
-    fixtures for the leagues it covers — which is why it reached 0 of 58 matches on a
-    late-July card. ClubElo remains as the fallback because it covers competitions our
-    divisions list does not, including European ties.
+    Football: our own Elo model is tried FIRST. It is fitted on 298,950 results across 39
+    divisions and can price a fixture in or out of season, whereas ClubElo publishes only
+    near-term fixtures for the leagues it covers. ClubElo stays as the fallback because it
+    reaches competitions our division list omits, including the smaller European ties.
+
+    Table tennis: the calibrated Setka model. Its match-winner probabilities are weak by
+    design — the fit says so — but its set distribution is strong, which is where the
+    ladder does its work.
 
     Returns (probs, name_score, source) or (None, 0.0, None).
     """
-    from engine import model_elo, model_football as mf
+    from engine import model_elo, model_football as mf, model_tt
 
     home, away = sample.get("p1"), sample.get("p2")
-    if elo_model:
-        probs, score = model_elo.lookup(elo_model, home, away)
-        if probs and score >= 0.86:
-            return probs, score, "elo"
-    if index:
-        probs, score = mf.lookup(index, home, away, cutoff=min_name_score)
-        if probs and score >= min_name_score:
-            return probs, score, "clubelo"
+    sport = sample.get("sport_id")
+
+    if sport == 10 and tt:
+        probs, score = model_tt.lookup(tt[0], tt[1], home, away)
+        if probs:
+            return probs, score, "setka"
+        return None, 0.0, None
+
+    if sport == 1:
+        if elo_model:
+            probs, score = model_elo.lookup(elo_model, home, away)
+            if probs and score >= 0.86:
+                return probs, score, "elo"
+        if index:
+            probs, score = mf.lookup(index, home, away, cutoff=min_name_score)
+            if probs and score >= min_name_score:
+                return probs, score, "clubelo"
     return None, 0.0, None
 
 
 def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=None,
-                 min_name_score=0.82):
+                 min_name_score=0.82, tt=None):
     """Run the whole selection over a scan's worth of rows, one pick per match.
 
     `rows` should be UNFILTERED normalized rows, not the scored top-N: the ladder needs
@@ -129,10 +155,10 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
     skipped = {"no_model": 0, "no_confident_rung": 0, "unmodelled_sport": 0}
     for match_id, match_rows in by_match.items():
         sample = match_rows[0]
-        if sample.get("sport_id") != 1:      # both football models; other sports pending
+        if sample.get("sport_id") not in MODELLED_SPORTS:
             skipped["unmodelled_sport"] += 1
             continue
-        probs, name_score, source = resolve(sample, index, elo_model, min_name_score)
+        probs, name_score, source = resolve(sample, index, elo_model, min_name_score, tt)
         if not probs:
             skipped["no_model"] += 1
             continue
