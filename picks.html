@@ -5,9 +5,11 @@
 <title>Betwinner analiz — 68 seçim</title>
 <style>
  :root { color-scheme:light dark; --bg:#fff; --fg:#111; --card:#f6f6f8; --line:#e2e2e6;
-          --muted:#666; --accent:#0a7d32; --chip:#eceef2; }
+          --muted:#666; --accent:#0a7d32; --chip:#eceef2; --win:#0a7d32; --loss:#b3261e;
+          --push:#7a5c00; --done:#8f9aa8; }
  @media (prefers-color-scheme:dark) { :root { --bg:#0f1115; --fg:#e8e8ea; --card:#181b21;
-          --line:#2a2e36; --muted:#9aa0aa; --accent:#3ddc84; --chip:#222630; } }
+          --line:#2a2e36; --muted:#9aa0aa; --accent:#3ddc84; --chip:#222630; --win:#3ddc84;
+          --loss:#ff8a8a; --push:#e0c064; --done:#6c7684; } }
  *{box-sizing:border-box}
  body{margin:0;padding:14px;background:var(--bg);color:var(--fg);
    font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
@@ -20,10 +22,19 @@
  select,input{font:inherit;padding:7px 9px;border-radius:9px;border:1px solid var(--line);
    background:var(--bg);color:var(--fg);min-height:38px}
  input[type=range]{padding:0;min-height:26px;width:150px}
+ input[type=checkbox]{min-height:0;width:18px;height:18px;accent-color:var(--accent);
+   margin:0;vertical-align:middle}
  button{font:inherit;padding:7px 12px;border-radius:9px;border:1px solid var(--line);
    background:var(--bg);color:var(--fg);min-height:38px;cursor:pointer}
+ button.primary{background:var(--accent);color:#fff;border-color:transparent;font-weight:600}
+ button:disabled{opacity:.45;cursor:default}
  .chip{background:var(--chip);border-radius:999px;padding:3px 9px;font-size:11.5px;
    color:var(--muted)}
+ .scorecard{display:flex;flex-wrap:wrap;gap:8px;background:var(--card);
+   border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+ .stat{flex:1 1 92px}
+ .stat b{display:block;font-size:19px;line-height:1.2}
+ .stat span{font-size:11.5px;color:var(--muted)}
  table{width:100%;border-collapse:collapse;font-size:13.5px}
  th{text-align:left;font-size:11.5px;color:var(--muted);text-transform:uppercase;
    letter-spacing:.04em;padding:7px 6px;border-bottom:1px solid var(--line);
@@ -31,7 +42,9 @@
  th:hover{color:var(--fg)}
  td{padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
  tr.hide{display:none}
- .id{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px}
+ tr.done .match, tr.done .pickcell{color:var(--done)}
+ .id{color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;white-space:nowrap}
+ .id label{display:inline-flex;align-items:center;gap:5px;cursor:pointer}
  .match{font-weight:600}
  .meta{color:var(--muted);font-size:11.5px;margin-top:2px}
  .pickcell{max-width:290px}
@@ -41,8 +54,15 @@
  .bar{height:4px;border-radius:3px;background:var(--line);margin-top:4px;overflow:hidden;
    min-width:56px}
  .bar i{display:block;height:100%;background:var(--accent)}
+ .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;
+   font-weight:700;letter-spacing:.02em;margin-bottom:3px}
+ .badge.win{background:var(--win);color:#fff}
+ .badge.loss{background:var(--loss);color:#fff}
+ .badge.push,.badge.half{background:var(--push);color:#fff}
+ .badge.pending{background:var(--chip);color:var(--muted)}
  a.go{display:inline-block;padding:6px 10px;border-radius:8px;background:var(--accent);
    color:#fff;text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap}
+ tr.done a.go{background:var(--done)}
  .note{background:var(--card);border:1px solid var(--line);border-radius:10px;
    padding:10px 12px;font-size:12.5px;margin-bottom:12px;color:var(--muted)}
  .note summary{cursor:pointer;color:var(--fg);font-weight:600}
@@ -71,8 +91,10 @@
    #t td:nth-child(7){grid-area:4/3;text-align:right}
    .pickcell{max-width:none}
    /* Two controls per line, so the sticky panel costs three rows instead of five and
-      leaves the phone screen mostly showing selections. */
-   .panel{padding:10px}
+      leaves the phone screen mostly showing selections. Capped in height as well: with
+      filters, sorting and the slip queue in it the panel would otherwise take most of a
+      phone screen while pinned, and the list is what you came for. */
+   .panel{padding:10px;max-height:46vh;overflow-y:auto}
    .panel label{flex:1 1 calc(50% - 4px);min-width:0}
    .panel select, input[type=range]{width:100%}
    label:has(#fText){flex:1 1 100%}
@@ -80,17 +102,27 @@
 </style></head><body>
 
 <h1>Betwinner günlük analiz</h1>
-<div class="sub">2026-07-26 08:47 UTC · 68 seçim · min oran 1.10 ·
+<div class="sub">2026-07-26 09:15 UTC · 68 seçim · min oran 1.10 ·
   model güven eşiği %75 · maç başına tek seçim · iadeli bahisler kapalı</div>
 
+
+
 <details class="note">
-  <summary>Bunlar model çıktısıdır, garanti değil — puan nasıl hesaplanıyor?</summary>
-  <p>Yön <b>veriden</b> gelir, orandan değil; oran yalnızca 1.10 alt sınırında
-  okunur. 100 üzerinden puan tamamen analizden hesaplanır ve kitabın fiyatı puana
-  <b>hiç girmez</b>: <b>%70 model güveni</b> — modelin bu bahsin tutmasına verdiği
-  olasılığın %75 eşiğinin ne kadar üzerinde olduğu — artı <b>%30 kanıt</b> —
-  takım/oyuncu isim eşleşmesinin gücü ve derecelendirmelerin arkasındaki maç sayısı.
-  Aynı güvendeki iki seçim eşit derecede sağlam değildir; puan bunu söyler.</p>
+  <summary>Puan ne demek?</summary>
+  <p><b>Puan = modelin bu bahsin tutma olasılığı.</b> 92 puan, "model bunun yaklaşık
+  %92 tutacağını söylüyor" demektir. Çevirmen gerekmiyor.</p>
+  <p>Tek düzeltme <b>kanıt</b>: aynı olasılıktaki iki seçim eşit sağlamlıkta değildir.
+  Biri 12.000 maçla fit edilmiş bir ligde tam isim eşleşmesine dayanır, diğeri 400 maçlık
+  bir ligde bulanık eşleşmeye. Kanıt zayıfsa olasılık <b>%75 eşiğine doğru geri
+  çekilir</b> — ne kadar çekildiği satırda "−x puan" olarak yazar.</p>
+  <p style="font-family:ui-monospace,monospace;font-size:12px">
+  puan = 100 × ( 0.75 + (olasılık − 0.75) × kanıt )</p>
+  <p>Puanlar dar bir bantta toplanır, çünkü listeye giren her seçim zaten %75
+  eşiğini geçmiştir. Bu bir kusur değil, ürünün kendisi: bandı kozmetik olarak germek,
+  modelin gerçekte ayıramadığı %91 ile %93 arasında yapay bir fark uydurmak olurdu.
+  Çubuk, seçimin bu bandın (%75–%100) neresinde durduğunu gösterir.</p>
+  <p>Bunlar model çıktısıdır, garanti değil. Yön <b>veriden</b> gelir, orandan değil;
+  oran yalnızca 1.10 alt sınırında okunur. Kitabın fiyatı puana <b>hiç girmez</b>.</p>
 </details>
 
 <div class="panel">
@@ -120,6 +152,13 @@
     <span class="chip" id="count"></span>
     <span class="chip">masaüstünde sütun başlıklarından da sıralanır</span>
   </div>
+  <div class="row" style="margin-top:8px">
+    <button id="selAll" type="button">görünenleri seç</button>
+    <button id="selNone" type="button">seçimi temizle</button>
+    <button id="next" class="primary" type="button" disabled>sıradakini aç</button>
+    <span class="chip" id="queue">0 seçili</span>
+    <span class="chip" id="combo"></span>
+  </div>
 </div>
 
 <table id="t">
@@ -132,902 +171,908 @@
   <th data-k="start" class="num">Başlangıç (UTC)</th>
   <th></th>
 </tr></thead>
-<tbody><tr data-sport="1" data-window="24" data-score="89.2"
+<tbody><tr data-sport="1" data-window="24" data-score="96.1"
  data-odds="1.104" data-id="1" data-match="Napoli - Carrarese Calcio" data-pick="Toplam gol 5.5 altı"
- data-start="2026-07-26T16:00:00+00:00" data-text="napoli - carrarese calcio club friendlies toplam gol 5.5 altı futbol">
- <td class="id num">1</td>
+ data-start="2026-07-26T16:00:00+00:00" data-text="napoli - carrarese calcio club friendlies toplam gol 5.5 altı futbol" data-result="" data-key="1">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>1</span></label></td>
  <td><div class="match">Napoli - Carrarese Calcio</div><div class="meta">Futbol · Club Friendlies</div></td>
  <td class="pickcell">Toplam gol 5.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.10</td>
- <td class="num"><span class="score">89</span>
-   <div class="bar"><i style="width:89.2%"></i></div>
-   <div class="meta">güven 85% · kanıt 100%</div></td>
+ <td class="num"><span class="score">96</span>
+   <div class="bar"><i style="width:84%"></i></div>
+   <div class="meta">çok güçlü · kanıt %100</div></td>
  <td class="num meta">2026-07-26 16:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/67559/354178770" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="77.8"
+<tr data-sport="1" data-window="24" data-score="92.1"
  data-odds="1.16" data-id="2" data-match="Frosinone Calcio - Ascoli Calcio 1898" data-pick="Ascoli Calcio 1898 +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T16:30:00+00:00" data-text="frosinone calcio - ascoli calcio 1898 club friendlies ascoli calcio 1898 +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">2</td>
+ data-start="2026-07-26T16:30:00+00:00" data-text="frosinone calcio - ascoli calcio 1898 club friendlies ascoli calcio 1898 +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="2">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>2</span></label></td>
  <td><div class="match">Frosinone Calcio - Ascoli Calcio 1898</div><div class="meta">Futbol · Club Friendlies</div></td>
  <td class="pickcell">Ascoli Calcio 1898 +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.16</td>
- <td class="num"><span class="score">78</span>
-   <div class="bar"><i style="width:77.8%"></i></div>
-   <div class="meta">güven 68% · kanıt 100%</div></td>
+ <td class="num"><span class="score">92</span>
+   <div class="bar"><i style="width:68%"></i></div>
+   <div class="meta">çok güçlü · kanıt %100</div></td>
  <td class="num meta">2026-07-26 16:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/67559/354217238" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="77.4"
+<tr data-sport="1" data-window="24" data-score="90.2"
  data-odds="1.109" data-id="3" data-match="Hobro - Aarhus Fremad" data-pick="Aarhus Fremad +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T12:00:00+00:00" data-text="hobro - aarhus fremad denmark. 1st division aarhus fremad +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">3</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="hobro - aarhus fremad denmark. 1st division aarhus fremad +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="3">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>3</span></label></td>
  <td><div class="match">Hobro - Aarhus Fremad</div><div class="meta">Futbol · Denmark. 1st Division</div></td>
  <td class="pickcell">Aarhus Fremad +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.11</td>
- <td class="num"><span class="score">77</span>
-   <div class="bar"><i style="width:77.4%"></i></div>
-   <div class="meta">güven 76% · kanıt 80%</div></td>
+ <td class="num"><span class="score">90</span>
+   <div class="bar"><i style="width:61%"></i></div>
+   <div class="meta">güçlü · kanıt %80 (−3.9 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/39969/349215074" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="76.6"
+<tr data-sport="1" data-window="24" data-score="90.0"
  data-odds="1.246" data-id="4" data-match="Yunnan Yukun - Shenzhen Peng City" data-pick="Yunnan Yukun kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T11:00:00+00:00" data-text="yunnan yukun - shenzhen peng city china. super league yunnan yukun kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">4</td>
+ data-start="2026-07-26T11:00:00+00:00" data-text="yunnan yukun - shenzhen peng city china. super league yunnan yukun kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="4">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>4</span></label></td>
  <td><div class="match">Yunnan Yukun - Shenzhen Peng City</div><div class="meta">Futbol · China. Super League</div></td>
  <td class="pickcell">Yunnan Yukun kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.25</td>
- <td class="num"><span class="score">77</span>
-   <div class="bar"><i style="width:76.6%"></i></div>
-   <div class="meta">güven 75% · kanıt 80%</div></td>
+ <td class="num"><span class="score">90</span>
+   <div class="bar"><i style="width:60%"></i></div>
+   <div class="meta">güçlü · kanıt %80 (−3.9 puan)</div></td>
  <td class="num meta">2026-07-26 11:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/58043/352403168" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="10" data-window="24" data-score="71.1"
+<tr data-sport="10" data-window="24" data-score="89.7"
  data-odds="1.17" data-id="5" data-match="Eduardo Villegas Sanchez - Ivan Perez Martin" data-pick="Eduardo Villegas Sanchez +2.5 set handikap"
- data-start="2026-07-26T22:10:00+00:00" data-text="eduardo villegas sanchez - ivan perez martin masters. spain eduardo villegas sanchez +2.5 set handikap masa tenisi">
- <td class="id num">5</td>
+ data-start="2026-07-26T22:10:00+00:00" data-text="eduardo villegas sanchez - ivan perez martin masters. spain eduardo villegas sanchez +2.5 set handikap masa tenisi" data-result="" data-key="5">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>5</span></label></td>
  <td><div class="match">Eduardo Villegas Sanchez - Ivan Perez Martin</div><div class="meta">Masa Tenisi · Masters. Spain</div></td>
  <td class="pickcell">Eduardo Villegas Sanchez +2.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
  <td class="num odds">1.17</td>
- <td class="num"><span class="score">71</span>
-   <div class="bar"><i style="width:71.1%"></i></div>
-   <div class="meta">güven 59% · kanıt 100%</div></td>
+ <td class="num"><span class="score">90</span>
+   <div class="bar"><i style="width:59%"></i></div>
+   <div class="meta">güçlü · kanıt %100</div></td>
  <td class="num meta">2026-07-26 22:10</td>
  <td><a class="go" href="https://betwinner2.com/en/line/10/2685660/354248544" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="10" data-window="24" data-score="70.9"
+<tr data-sport="10" data-window="24" data-score="89.6"
  data-odds="1.285" data-id="6" data-match="Ondrej Mezera - Lukas Rulc" data-pick="Ondrej Mezera +2.5 set handikap"
- data-start="2026-07-26T14:15:00+00:00" data-text="ondrej mezera - lukas rulc setka cup. czech republic ondrej mezera +2.5 set handikap masa tenisi">
- <td class="id num">6</td>
+ data-start="2026-07-26T14:15:00+00:00" data-text="ondrej mezera - lukas rulc setka cup. czech republic ondrej mezera +2.5 set handikap masa tenisi" data-result="" data-key="6">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>6</span></label></td>
  <td><div class="match">Ondrej Mezera - Lukas Rulc</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
  <td class="pickcell">Ondrej Mezera +2.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
  <td class="num odds">1.28</td>
- <td class="num"><span class="score">71</span>
-   <div class="bar"><i style="width:70.9%"></i></div>
-   <div class="meta">güven 58% · kanıt 100%</div></td>
+ <td class="num"><span class="score">90</span>
+   <div class="bar"><i style="width:58%"></i></div>
+   <div class="meta">güçlü · kanıt %100</div></td>
  <td class="num meta">2026-07-26 14:15</td>
  <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354271554" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="69.8"
+<tr data-sport="1" data-window="24" data-score="88.4"
  data-odds="1.156" data-id="7" data-match="Sogndal - Ranheim" data-pick="Toplam gol 5.5 altı"
- data-start="2026-07-26T15:00:00+00:00" data-text="sogndal - ranheim norway. adeccoligaen toplam gol 5.5 altı futbol">
- <td class="id num">7</td>
+ data-start="2026-07-26T15:00:00+00:00" data-text="sogndal - ranheim norway. adeccoligaen toplam gol 5.5 altı futbol" data-result="" data-key="7">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>7</span></label></td>
  <td><div class="match">Sogndal - Ranheim</div><div class="meta">Futbol · Norway. Adeccoligaen</div></td>
  <td class="pickcell">Toplam gol 5.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.16</td>
- <td class="num"><span class="score">70</span>
-   <div class="bar"><i style="width:69.8%"></i></div>
-   <div class="meta">güven 63% · kanıt 85%</div></td>
+ <td class="num"><span class="score">88</span>
+   <div class="bar"><i style="width:54%"></i></div>
+   <div class="meta">güçlü · kanıt %85 (−2.4 puan)</div></td>
  <td class="num meta">2026-07-26 15:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/31508/349223122" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="65.6"
+<tr data-sport="1" data-window="24" data-score="87.4"
  data-odds="1.122" data-id="8" data-match="Paksi - Ferencvarosi" data-pick="Paksi +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T18:00:00+00:00" data-text="paksi - ferencvarosi hungary. nb i paksi +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">8</td>
+ data-start="2026-07-26T18:00:00+00:00" data-text="paksi - ferencvarosi hungary. nb i paksi +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="8">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>8</span></label></td>
  <td><div class="match">Paksi - Ferencvarosi</div><div class="meta">Futbol · Hungary. NB I</div></td>
  <td class="pickcell">Paksi +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">66</span>
-   <div class="bar"><i style="width:65.6%"></i></div>
-   <div class="meta">güven 56% · kanıt 89%</div></td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:50%"></i></div>
+   <div class="meta">orta · kanıt %89 (−1.5 puan)</div></td>
  <td class="num meta">2026-07-26 18:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/30213/352989476" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="64.8"
- data-odds="1.101" data-id="9" data-match="Zaglebie Lubin - Piast Gliwice" data-pick="Zaglebie Lubin +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-27T17:00:00+00:00" data-text="zaglebie lubin - piast gliwice poland. ekstraklasa zaglebie lubin +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">9</td>
- <td><div class="match">Zaglebie Lubin - Piast Gliwice</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
- <td class="pickcell">Zaglebie Lubin +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.10</td>
- <td class="num"><span class="score">65</span>
-   <div class="bar"><i style="width:64.8%"></i></div>
-   <div class="meta">güven 54% · kanıt 91%</div></td>
- <td class="num meta">2026-07-27 17:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352758412" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="64.7"
- data-odds="1.1" data-id="10" data-match="Rangers - West Ham United" data-pick="West Ham United +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T15:00:00+00:00" data-text="rangers - west ham united club friendlies west ham united +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">10</td>
+<tr data-sport="1" data-window="24" data-score="87.4"
+ data-odds="1.1" data-id="9" data-match="Rangers - West Ham United" data-pick="West Ham United +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-26T15:00:00+00:00" data-text="rangers - west ham united club friendlies west ham united +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="9">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>9</span></label></td>
  <td><div class="match">Rangers - West Ham United</div><div class="meta">Futbol · Club Friendlies</div></td>
  <td class="pickcell">West Ham United +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.10</td>
- <td class="num"><span class="score">65</span>
-   <div class="bar"><i style="width:64.7%"></i></div>
-   <div class="meta">güven 50% · kanıt 100%</div></td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:50%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-26 15:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/67559/353584236" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="64.6"
+<tr data-sport="1" data-window="48" data-score="87.2"
+ data-odds="1.101" data-id="10" data-match="Zaglebie Lubin - Piast Gliwice" data-pick="Zaglebie Lubin +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-27T17:00:00+00:00" data-text="zaglebie lubin - piast gliwice poland. ekstraklasa zaglebie lubin +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="10">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>10</span></label></td>
+ <td><div class="match">Zaglebie Lubin - Piast Gliwice</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
+ <td class="pickcell">Zaglebie Lubin +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.10</td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:49%"></i></div>
+   <div class="meta">orta · kanıt %91 (−1.2 puan)</div></td>
+ <td class="num meta">2026-07-27 17:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352758412" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="86.9"
  data-odds="1.154" data-id="11" data-match="Aalesunds - Viking" data-pick="Viking kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T17:15:00+00:00" data-text="aalesunds - viking norway. eliteserien viking kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">11</td>
+ data-start="2026-07-26T17:15:00+00:00" data-text="aalesunds - viking norway. eliteserien viking kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="11">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>11</span></label></td>
  <td><div class="match">Aalesunds - Viking</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
  <td class="pickcell">Viking kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.15</td>
- <td class="num"><span class="score">65</span>
-   <div class="bar"><i style="width:64.6%"></i></div>
-   <div class="meta">güven 56% · kanıt 86%</div></td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:48%"></i></div>
+   <div class="meta">orta · kanıt %86 (−2.0 puan)</div></td>
  <td class="num meta">2026-07-26 17:15</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354732" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="63.7"
- data-odds="1.141" data-id="12" data-match="GAIS - Halmstads" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T14:30:00+00:00" data-text="gais - halmstads sweden. allsvenskan toplam gol 4.5 altı futbol">
- <td class="id num">12</td>
- <td><div class="match">GAIS - Halmstads</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
- <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
- <td class="num odds">1.14</td>
- <td class="num"><span class="score">64</span>
-   <div class="bar"><i style="width:63.7%"></i></div>
-   <div class="meta">güven 54% · kanıt 86%</div></td>
- <td class="num meta">2026-07-26 14:30</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369320" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="63.4"
- data-odds="1.107" data-id="13" data-match="Red Bull Bragantino - Coritiba" data-pick="Coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T21:30:00+00:00" data-text="red bull bragantino - coritiba brazil. campeonato brasileiro. serie a coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">13</td>
+<tr data-sport="1" data-window="24" data-score="86.9"
+ data-odds="1.107" data-id="12" data-match="Red Bull Bragantino - Coritiba" data-pick="Coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir)"
+ data-start="2026-07-26T21:30:00+00:00" data-text="red bull bragantino - coritiba brazil. campeonato brasileiro. serie a coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="12">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>12</span></label></td>
  <td><div class="match">Red Bull Bragantino - Coritiba</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
  <td class="pickcell">Coritiba +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.11</td>
- <td class="num"><span class="score">63</span>
-   <div class="bar"><i style="width:63.4%"></i></div>
-   <div class="meta">güven 48% · kanıt 100%</div></td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:48%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-26 21:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856466" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="63.0"
- data-odds="1.1" data-id="14" data-match="Gremio Porto Alegrense - Fluminense" data-pick="Gremio Porto Alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T21:30:00+00:00" data-text="gremio porto alegrense - fluminense brazil. campeonato brasileiro. serie a gremio porto alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">14</td>
+<tr data-sport="1" data-window="24" data-score="86.8"
+ data-odds="1.1" data-id="13" data-match="Gremio Porto Alegrense - Fluminense" data-pick="Gremio Porto Alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-26T21:30:00+00:00" data-text="gremio porto alegrense - fluminense brazil. campeonato brasileiro. serie a gremio porto alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="13">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>13</span></label></td>
  <td><div class="match">Gremio Porto Alegrense - Fluminense</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
  <td class="pickcell">Gremio Porto Alegrense +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.10</td>
- <td class="num"><span class="score">63</span>
-   <div class="bar"><i style="width:63.0%"></i></div>
-   <div class="meta">güven 47% · kanıt 100%</div></td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:47%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-26 21:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856478" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="62.2"
+<tr data-sport="1" data-window="24" data-score="86.6"
+ data-odds="1.141" data-id="14" data-match="GAIS - Halmstads" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-26T14:30:00+00:00" data-text="gais - halmstads sweden. allsvenskan toplam gol 4.5 altı futbol" data-result="" data-key="14">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>14</span></label></td>
+ <td><div class="match">GAIS - Halmstads</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
+ <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
+ <td class="num odds">1.14</td>
+ <td class="num"><span class="score">87</span>
+   <div class="bar"><i style="width:46%"></i></div>
+   <div class="meta">orta · kanıt %86 (−2.0 puan)</div></td>
+ <td class="num meta">2026-07-26 14:30</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369320" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="86.5"
  data-odds="1.123" data-id="15" data-match="All Boys - Defensores de Belgrano" data-pick="Toplam gol 0.5 üstü"
- data-start="2026-07-26T18:00:00+00:00" data-text="all boys - defensores de belgrano argentina. primera b nacional toplam gol 0.5 üstü futbol">
- <td class="id num">15</td>
+ data-start="2026-07-26T18:00:00+00:00" data-text="all boys - defensores de belgrano argentina. primera b nacional toplam gol 0.5 üstü futbol" data-result="" data-key="15">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>15</span></label></td>
  <td><div class="match">All Boys - Defensores de Belgrano</div><div class="meta">Futbol · Argentina. Primera B Nacional</div></td>
  <td class="pickcell">Toplam gol 0.5 üstü<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">62</span>
-   <div class="bar"><i style="width:62.2%"></i></div>
-   <div class="meta">güven 46% · kanıt 100%</div></td>
+ <td class="num"><span class="score">86</span>
+   <div class="bar"><i style="width:46%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-26 18:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/2922491/353076068" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="61.3"
+<tr data-sport="1" data-window="24" data-score="86.2"
  data-odds="1.21" data-id="16" data-match="St. Mirren - Dunfermline Athletic" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T14:00:00+00:00" data-text="st. mirren - dunfermline athletic scotland. league cup toplam gol 4.5 altı futbol">
- <td class="id num">16</td>
+ data-start="2026-07-26T14:00:00+00:00" data-text="st. mirren - dunfermline athletic scotland. league cup toplam gol 4.5 altı futbol" data-result="" data-key="16">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>16</span></label></td>
  <td><div class="match">St. Mirren - Dunfermline Athletic</div><div class="meta">Futbol · Scotland. League Cup</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.21</td>
- <td class="num"><span class="score">61</span>
-   <div class="bar"><i style="width:61.3%"></i></div>
-   <div class="meta">güven 45% · kanıt 100%</div></td>
+ <td class="num"><span class="score">86</span>
+   <div class="bar"><i style="width:45%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-26 14:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/120443/353211984" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="61.1"
+<tr data-sport="1" data-window="48" data-score="86.0"
  data-odds="1.121" data-id="17" data-match="Miedz Legnica - Podbeskidzie Bielsko-Biala" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-27T17:00:00+00:00" data-text="miedz legnica - podbeskidzie bielsko-biala poland championship. liga 1 toplam gol 4.5 altı futbol">
- <td class="id num">17</td>
+ data-start="2026-07-27T17:00:00+00:00" data-text="miedz legnica - podbeskidzie bielsko-biala poland championship. liga 1 toplam gol 4.5 altı futbol" data-result="" data-key="17">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>17</span></label></td>
  <td><div class="match">Miedz Legnica - Podbeskidzie Bielsko-Biala</div><div class="meta">Futbol · Poland Championship. Liga 1</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">61</span>
-   <div class="bar"><i style="width:61.1%"></i></div>
-   <div class="meta">güven 48% · kanıt 91%</div></td>
+ <td class="num"><span class="score">86</span>
+   <div class="bar"><i style="width:44%"></i></div>
+   <div class="meta">orta · kanıt %91 (−1.1 puan)</div></td>
  <td class="num meta">2026-07-27 17:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/30693/353001870" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="59.5"
- data-odds="1.23" data-id="18" data-match="Sundsvall - Falkenbergs" data-pick="Sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T11:00:00+00:00" data-text="sundsvall - falkenbergs sweden. superettan sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">18</td>
- <td><div class="match">Sundsvall - Falkenbergs</div><div class="meta">Futbol · Sweden. Superettan</div></td>
- <td class="pickcell">Sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.23</td>
- <td class="num"><span class="score">60</span>
-   <div class="bar"><i style="width:59.5%"></i></div>
-   <div class="meta">güven 49% · kanıt 85%</div></td>
- <td class="num meta">2026-07-26 11:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/1371789/352432698" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="59.4"
- data-odds="1.169" data-id="19" data-match="Club Necaxa - Monterrey" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T23:00:00+00:00" data-text="club necaxa - monterrey mexico. liga mx toplam gol 4.5 altı futbol">
- <td class="id num">19</td>
+<tr data-sport="1" data-window="24" data-score="85.5"
+ data-odds="1.169" data-id="18" data-match="Club Necaxa - Monterrey" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-26T23:00:00+00:00" data-text="club necaxa - monterrey mexico. liga mx toplam gol 4.5 altı futbol" data-result="" data-key="18">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>18</span></label></td>
  <td><div class="match">Club Necaxa - Monterrey</div><div class="meta">Futbol · Mexico. Liga MX</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.17</td>
- <td class="num"><span class="score">59</span>
-   <div class="bar"><i style="width:59.4%"></i></div>
-   <div class="meta">güven 43% · kanıt 97%</div></td>
+ <td class="num"><span class="score">86</span>
+   <div class="bar"><i style="width:42%"></i></div>
+   <div class="meta">orta · kanıt %97</div></td>
  <td class="num meta">2026-07-26 23:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/2306111/350474842" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="59.4"
- data-odds="1.143" data-id="20" data-match="Pachuca - Queretaro" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-27T01:00:00+00:00" data-text="pachuca - queretaro mexico. liga mx toplam gol 4.5 altı futbol">
- <td class="id num">20</td>
+<tr data-sport="1" data-window="24" data-score="85.5"
+ data-odds="1.143" data-id="19" data-match="Pachuca - Queretaro" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-27T01:00:00+00:00" data-text="pachuca - queretaro mexico. liga mx toplam gol 4.5 altı futbol" data-result="" data-key="19">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>19</span></label></td>
  <td><div class="match">Pachuca - Queretaro</div><div class="meta">Futbol · Mexico. Liga MX</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.14</td>
- <td class="num"><span class="score">59</span>
-   <div class="bar"><i style="width:59.4%"></i></div>
-   <div class="meta">güven 43% · kanıt 97%</div></td>
+ <td class="num"><span class="score">86</span>
+   <div class="bar"><i style="width:42%"></i></div>
+   <div class="meta">orta · kanıt %97</div></td>
  <td class="num meta">2026-07-27 01:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/2306111/350474838" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="59.3"
+<tr data-sport="1" data-window="24" data-score="85.3"
+ data-odds="1.23" data-id="20" data-match="Sundsvall - Falkenbergs" data-pick="Sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-26T11:00:00+00:00" data-text="sundsvall - falkenbergs sweden. superettan sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="20">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>20</span></label></td>
+ <td><div class="match">Sundsvall - Falkenbergs</div><div class="meta">Futbol · Sweden. Superettan</div></td>
+ <td class="pickcell">Sundsvall +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.23</td>
+ <td class="num"><span class="score">85</span>
+   <div class="bar"><i style="width:41%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.8 puan)</div></td>
+ <td class="num meta">2026-07-26 11:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/1371789/352432698" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="85.2"
  data-odds="1.215" data-id="21" data-match="Lokomotiv Moscow - Akhmat" data-pick="Lokomotiv Moscow kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T14:00:00+00:00" data-text="lokomotiv moscow - akhmat russia. premier league lokomotiv moscow kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">21</td>
+ data-start="2026-07-26T14:00:00+00:00" data-text="lokomotiv moscow - akhmat russia. premier league lokomotiv moscow kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="21">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>21</span></label></td>
  <td><div class="match">Lokomotiv Moscow - Akhmat</div><div class="meta">Futbol · Russia. Premier League</div></td>
  <td class="pickcell">Lokomotiv Moscow kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.22</td>
- <td class="num"><span class="score">59</span>
-   <div class="bar"><i style="width:59.3%"></i></div>
-   <div class="meta">güven 49% · kanıt 84%</div></td>
+ <td class="num"><span class="score">85</span>
+   <div class="bar"><i style="width:41%"></i></div>
+   <div class="meta">orta · kanıt %84 (−1.9 puan)</div></td>
  <td class="num meta">2026-07-26 14:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/225733/345132778" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="58.3"
+<tr data-sport="1" data-window="48" data-score="85.1"
  data-odds="1.21" data-id="22" data-match="Sport Club do Recife - Cuiaba" data-pick="Cuiaba +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-27T22:30:00+00:00" data-text="sport club do recife - cuiaba brazil. campeonato brasileiro. serie b cuiaba +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">22</td>
+ data-start="2026-07-27T22:30:00+00:00" data-text="sport club do recife - cuiaba brazil. campeonato brasileiro. serie b cuiaba +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="22">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>22</span></label></td>
  <td><div class="match">Sport Club do Recife - Cuiaba</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie B</div></td>
  <td class="pickcell">Cuiaba +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.21</td>
- <td class="num"><span class="score">58</span>
-   <div class="bar"><i style="width:58.3%"></i></div>
-   <div class="meta">güven 40% · kanıt 100%</div></td>
+ <td class="num"><span class="score">85</span>
+   <div class="bar"><i style="width:40%"></i></div>
+   <div class="meta">orta · kanıt %100</div></td>
  <td class="num meta">2026-07-27 22:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/57265/353616514" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="57.8"
+<tr data-sport="1" data-window="24" data-score="84.9"
  data-odds="1.144" data-id="23" data-match="Wisla Krakow - Katowice" data-pick="Katowice +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T18:15:00+00:00" data-text="wisla krakow - katowice poland. ekstraklasa katowice +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">23</td>
+ data-start="2026-07-26T18:15:00+00:00" data-text="wisla krakow - katowice poland. ekstraklasa katowice +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="23">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>23</span></label></td>
  <td><div class="match">Wisla Krakow - Katowice</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
  <td class="pickcell">Katowice +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.14</td>
- <td class="num"><span class="score">58</span>
-   <div class="bar"><i style="width:57.8%"></i></div>
-   <div class="meta">güven 44% · kanıt 91%</div></td>
+ <td class="num"><span class="score">85</span>
+   <div class="bar"><i style="width:40%"></i></div>
+   <div class="meta">orta · kanıt %91 (−1.0 puan)</div></td>
  <td class="num meta">2026-07-26 18:15</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352993838" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="57.6"
+<tr data-sport="1" data-window="24" data-score="84.7"
  data-odds="1.102" data-id="24" data-match="Sarpsborg 08 - HamKam" data-pick="HamKam +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T15:00:00+00:00" data-text="sarpsborg 08 - hamkam norway. eliteserien hamkam +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">24</td>
+ data-start="2026-07-26T15:00:00+00:00" data-text="sarpsborg 08 - hamkam norway. eliteserien hamkam +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="24">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>24</span></label></td>
  <td><div class="match">Sarpsborg 08 - HamKam</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
  <td class="pickcell">HamKam +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.10</td>
- <td class="num"><span class="score">58</span>
-   <div class="bar"><i style="width:57.6%"></i></div>
-   <div class="meta">güven 46% · kanıt 85%</div></td>
+ <td class="num"><span class="score">85</span>
+   <div class="bar"><i style="width:39%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.7 puan)</div></td>
  <td class="num meta">2026-07-26 15:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354726" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="56.0"
+<tr data-sport="1" data-window="24" data-score="84.3"
  data-odds="1.106" data-id="25" data-match="Rakow Czestochowa - Wisla PLock" data-pick="Wisla PLock +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T12:45:00+00:00" data-text="rakow czestochowa - wisla plock poland. ekstraklasa wisla plock +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">25</td>
+ data-start="2026-07-26T12:45:00+00:00" data-text="rakow czestochowa - wisla plock poland. ekstraklasa wisla plock +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="25">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>25</span></label></td>
  <td><div class="match">Rakow Czestochowa - Wisla PLock</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
  <td class="pickcell">Wisla PLock +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.11</td>
- <td class="num"><span class="score">56</span>
-   <div class="bar"><i style="width:56.0%"></i></div>
-   <div class="meta">güven 41% · kanıt 91%</div></td>
+ <td class="num"><span class="score">84</span>
+   <div class="bar"><i style="width:37%"></i></div>
+   <div class="meta">orta · kanıt %91 (−0.9 puan)</div></td>
  <td class="num meta">2026-07-26 12:45</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352427756" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="56.0"
+<tr data-sport="1" data-window="48" data-score="84.3"
  data-odds="1.119" data-id="26" data-match="Botosani - Rapid Bucuresti" data-pick="Botosani +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-27T18:30:00+00:00" data-text="botosani - rapid bucuresti romania. liga 1 botosani +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">26</td>
+ data-start="2026-07-27T18:30:00+00:00" data-text="botosani - rapid bucuresti romania. liga 1 botosani +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="26">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>26</span></label></td>
  <td><div class="match">Botosani - Rapid Bucuresti</div><div class="meta">Futbol · Romania. Liga 1</div></td>
  <td class="pickcell">Botosani +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">56</span>
-   <div class="bar"><i style="width:56.0%"></i></div>
-   <div class="meta">güven 41% · kanıt 92%</div></td>
+ <td class="num"><span class="score">84</span>
+   <div class="bar"><i style="width:37%"></i></div>
+   <div class="meta">orta · kanıt %92 (−0.8 puan)</div></td>
  <td class="num meta">2026-07-27 18:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/11121/349893554" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="55.4"
+<tr data-sport="1" data-window="24" data-score="84.1"
  data-odds="1.197" data-id="27" data-match="Brommapojkarna - Hammarby" data-pick="Brommapojkarna +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T12:00:00+00:00" data-text="brommapojkarna - hammarby sweden. allsvenskan brommapojkarna +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">27</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="brommapojkarna - hammarby sweden. allsvenskan brommapojkarna +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="27">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>27</span></label></td>
  <td><div class="match">Brommapojkarna - Hammarby</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
  <td class="pickcell">Brommapojkarna +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.20</td>
- <td class="num"><span class="score">55</span>
-   <div class="bar"><i style="width:55.4%"></i></div>
-   <div class="meta">güven 43% · kanıt 85%</div></td>
+ <td class="num"><span class="score">84</span>
+   <div class="bar"><i style="width:36%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369316" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="53.7"
+<tr data-sport="1" data-window="48" data-score="83.6"
  data-odds="1.144" data-id="28" data-match="CFR Cluj - Voluntari" data-pick="CFR Cluj kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-27T15:30:00+00:00" data-text="cfr cluj - voluntari romania. liga 1 cfr cluj kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">28</td>
+ data-start="2026-07-27T15:30:00+00:00" data-text="cfr cluj - voluntari romania. liga 1 cfr cluj kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="28">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>28</span></label></td>
  <td><div class="match">CFR Cluj - Voluntari</div><div class="meta">Futbol · Romania. Liga 1</div></td>
  <td class="pickcell">CFR Cluj kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.14</td>
- <td class="num"><span class="score">54</span>
-   <div class="bar"><i style="width:53.7%"></i></div>
-   <div class="meta">güven 37% · kanıt 92%</div></td>
+ <td class="num"><span class="score">84</span>
+   <div class="bar"><i style="width:34%"></i></div>
+   <div class="meta">orta · kanıt %92 (−0.8 puan)</div></td>
  <td class="num meta">2026-07-27 15:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/11121/349893510" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="53.5"
+<tr data-sport="1" data-window="24" data-score="83.5"
  data-odds="1.222" data-id="29" data-match="Sirius - Goteborg" data-pick="Goteborg +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T12:00:00+00:00" data-text="sirius - goteborg sweden. allsvenskan goteborg +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">29</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="sirius - goteborg sweden. allsvenskan goteborg +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="29">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>29</span></label></td>
  <td><div class="match">Sirius - Goteborg</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
  <td class="pickcell">Goteborg +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.22</td>
- <td class="num"><span class="score">54</span>
-   <div class="bar"><i style="width:53.5%"></i></div>
-   <div class="meta">güven 40% · kanıt 85%</div></td>
+ <td class="num"><span class="score">84</span>
+   <div class="bar"><i style="width:34%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.5 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369318" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="53.1"
+<tr data-sport="1" data-window="24" data-score="83.4"
  data-odds="1.124" data-id="30" data-match="Orenburg - Rostov" data-pick="Rostov +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T16:30:00+00:00" data-text="orenburg - rostov russia. premier league rostov +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">30</td>
+ data-start="2026-07-26T16:30:00+00:00" data-text="orenburg - rostov russia. premier league rostov +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="30">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>30</span></label></td>
  <td><div class="match">Orenburg - Rostov</div><div class="meta">Futbol · Russia. Premier League</div></td>
  <td class="pickcell">Rostov +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">53</span>
-   <div class="bar"><i style="width:53.1%"></i></div>
-   <div class="meta">güven 40% · kanıt 84%</div></td>
+ <td class="num"><span class="score">83</span>
+   <div class="bar"><i style="width:34%"></i></div>
+   <div class="meta">orta · kanıt %84 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 16:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/225733/345133294" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="52.3"
+<tr data-sport="1" data-window="24" data-score="83.1"
  data-odds="1.134" data-id="31" data-match="Malmo - Elfsborg" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T14:30:00+00:00" data-text="malmo - elfsborg sweden. allsvenskan toplam gol 4.5 altı futbol">
- <td class="id num">31</td>
+ data-start="2026-07-26T14:30:00+00:00" data-text="malmo - elfsborg sweden. allsvenskan toplam gol 4.5 altı futbol" data-result="" data-key="31">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>31</span></label></td>
  <td><div class="match">Malmo - Elfsborg</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.13</td>
- <td class="num"><span class="score">52</span>
-   <div class="bar"><i style="width:52.3%"></i></div>
-   <div class="meta">güven 38% · kanıt 85%</div></td>
+ <td class="num"><span class="score">83</span>
+   <div class="bar"><i style="width:32%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.5 puan)</div></td>
  <td class="num meta">2026-07-26 14:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369326" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="52.3"
+<tr data-sport="1" data-window="48" data-score="83.1"
  data-odds="1.21" data-id="32" data-match="Hacken - AIK" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-27T17:00:00+00:00" data-text="hacken - aik sweden. allsvenskan toplam gol 4.5 altı futbol">
- <td class="id num">32</td>
+ data-start="2026-07-27T17:00:00+00:00" data-text="hacken - aik sweden. allsvenskan toplam gol 4.5 altı futbol" data-result="" data-key="32">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>32</span></label></td>
  <td><div class="match">Hacken - AIK</div><div class="meta">Futbol · Sweden. Allsvenskan</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.21</td>
- <td class="num"><span class="score">52</span>
-   <div class="bar"><i style="width:52.3%"></i></div>
-   <div class="meta">güven 38% · kanıt 85%</div></td>
+ <td class="num"><span class="score">83</span>
+   <div class="bar"><i style="width:32%"></i></div>
+   <div class="meta">orta · kanıt %85 (−1.5 puan)</div></td>
  <td class="num meta">2026-07-27 17:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/212425/352369322" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="51.5"
+<tr data-sport="1" data-window="24" data-score="82.8"
  data-odds="1.159" data-id="33" data-match="SonderjyskE - Midtjylland" data-pick="SonderjyskE +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T12:00:00+00:00" data-text="sonderjyske - midtjylland denmark. superliga sonderjyske +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">33</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="sonderjyske - midtjylland denmark. superliga sonderjyske +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="33">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>33</span></label></td>
  <td><div class="match">SonderjyskE - Midtjylland</div><div class="meta">Futbol · Denmark. Superliga</div></td>
  <td class="pickcell">SonderjyskE +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.16</td>
- <td class="num"><span class="score">52</span>
-   <div class="bar"><i style="width:51.5%"></i></div>
-   <div class="meta">güven 39% · kanıt 80%</div></td>
+ <td class="num"><span class="score">83</span>
+   <div class="bar"><i style="width:31%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−2.0 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/8773/346875616" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="50.0"
+<tr data-sport="1" data-window="24" data-score="82.4"
  data-odds="1.109" data-id="34" data-match="Puszcza Niepolomice - KSP Polonia Warszawa" data-pick="KSP Polonia Warszawa +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T17:30:00+00:00" data-text="puszcza niepolomice - ksp polonia warszawa poland championship. liga 1 ksp polonia warszawa +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">34</td>
+ data-start="2026-07-26T17:30:00+00:00" data-text="puszcza niepolomice - ksp polonia warszawa poland championship. liga 1 ksp polonia warszawa +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="34">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>34</span></label></td>
  <td><div class="match">Puszcza Niepolomice - KSP Polonia Warszawa</div><div class="meta">Futbol · Poland Championship. Liga 1</div></td>
  <td class="pickcell">KSP Polonia Warszawa +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.11</td>
- <td class="num"><span class="score">50</span>
-   <div class="bar"><i style="width:50.0%"></i></div>
-   <div class="meta">güven 32% · kanıt 91%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:30%"></i></div>
+   <div class="meta">sınırda · kanıt %91 (−0.7 puan)</div></td>
  <td class="num meta">2026-07-26 17:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/30693/352490936" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="50.0"
+<tr data-sport="1" data-window="24" data-score="82.2"
  data-odds="1.145" data-id="35" data-match="Flamengo - Sao Paulo" data-pick="Sao Paulo +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T21:30:00+00:00" data-text="flamengo - sao paulo brazil. campeonato brasileiro. serie a sao paulo +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">35</td>
+ data-start="2026-07-26T21:30:00+00:00" data-text="flamengo - sao paulo brazil. campeonato brasileiro. serie a sao paulo +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="35">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>35</span></label></td>
  <td><div class="match">Flamengo - Sao Paulo</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
  <td class="pickcell">Sao Paulo +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.15</td>
- <td class="num"><span class="score">50</span>
-   <div class="bar"><i style="width:50.0%"></i></div>
-   <div class="meta">güven 29% · kanıt 100%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:29%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
  <td class="num meta">2026-07-26 21:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351853172" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="49.0"
+<tr data-sport="1" data-window="24" data-score="82.1"
  data-odds="1.121" data-id="36" data-match="Ilves - Lahti" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T12:00:00+00:00" data-text="ilves - lahti finland. veikkausliiga toplam gol 4.5 altı futbol">
- <td class="id num">36</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="ilves - lahti finland. veikkausliiga toplam gol 4.5 altı futbol" data-result="" data-key="36">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>36</span></label></td>
  <td><div class="match">Ilves - Lahti</div><div class="meta">Futbol · Finland. Veikkausliiga</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.12</td>
- <td class="num"><span class="score">49</span>
-   <div class="bar"><i style="width:49.0%"></i></div>
-   <div class="meta">güven 37% · kanıt 76%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:28%"></i></div>
+   <div class="meta">sınırda · kanıt %76 (−2.2 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1554897/352415840" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="48.2"
+<tr data-sport="1" data-window="24" data-score="81.9"
  data-odds="1.128" data-id="37" data-match="Horsens - Nordsjaelland" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T16:00:00+00:00" data-text="horsens - nordsjaelland denmark. superliga toplam gol 4.5 altı futbol">
- <td class="id num">37</td>
+ data-start="2026-07-26T16:00:00+00:00" data-text="horsens - nordsjaelland denmark. superliga toplam gol 4.5 altı futbol" data-result="" data-key="37">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>37</span></label></td>
  <td><div class="match">Horsens - Nordsjaelland</div><div class="meta">Futbol · Denmark. Superliga</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.13</td>
- <td class="num"><span class="score">48</span>
-   <div class="bar"><i style="width:48.2%"></i></div>
-   <div class="meta">güven 35% · kanıt 80%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:28%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.8 puan)</div></td>
  <td class="num meta">2026-07-26 16:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/8773/346875612" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="48.1"
+<tr data-sport="1" data-window="48" data-score="81.9"
  data-odds="1.131" data-id="38" data-match="Randers - Silkeborg" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-27T17:00:00+00:00" data-text="randers - silkeborg denmark. superliga toplam gol 4.5 altı futbol">
- <td class="id num">38</td>
+ data-start="2026-07-27T17:00:00+00:00" data-text="randers - silkeborg denmark. superliga toplam gol 4.5 altı futbol" data-result="" data-key="38">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>38</span></label></td>
  <td><div class="match">Randers - Silkeborg</div><div class="meta">Futbol · Denmark. Superliga</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.13</td>
- <td class="num"><span class="score">48</span>
-   <div class="bar"><i style="width:48.1%"></i></div>
-   <div class="meta">güven 35% · kanıt 80%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:28%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.8 puan)</div></td>
  <td class="num meta">2026-07-27 17:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/8773/346875644" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="48.1"
+<tr data-sport="1" data-window="24" data-score="81.9"
  data-odds="1.29" data-id="39" data-match="Copenhagen - Lyngby" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T14:00:00+00:00" data-text="copenhagen - lyngby denmark. superliga toplam gol 4.5 altı futbol">
- <td class="id num">39</td>
+ data-start="2026-07-26T14:00:00+00:00" data-text="copenhagen - lyngby denmark. superliga toplam gol 4.5 altı futbol" data-result="" data-key="39">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>39</span></label></td>
  <td><div class="match">Copenhagen - Lyngby</div><div class="meta">Futbol · Denmark. Superliga</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.29</td>
- <td class="num"><span class="score">48</span>
-   <div class="bar"><i style="width:48.1%"></i></div>
-   <div class="meta">güven 35% · kanıt 80%</div></td>
+ <td class="num"><span class="score">82</span>
+   <div class="bar"><i style="width:28%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.8 puan)</div></td>
  <td class="num meta">2026-07-26 14:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/8773/346875614" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="48" data-score="47.7"
- data-odds="1.152" data-id="40" data-match="CSKA Sofia - Botev Plovdiv" data-pick="CSKA Sofia kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-27T18:15:00+00:00" data-text="cska sofia - botev plovdiv bulgaria. first league cska sofia kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">40</td>
- <td><div class="match">CSKA Sofia - Botev Plovdiv</div><div class="meta">Futbol · Bulgaria. First League</div></td>
- <td class="pickcell">CSKA Sofia kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
- <td class="num odds">1.15</td>
- <td class="num"><span class="score">48</span>
-   <div class="bar"><i style="width:47.7%"></i></div>
-   <div class="meta">güven 25% · kanıt 100%</div></td>
- <td class="num meta">2026-07-27 18:15</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/2924971/352415894" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="10" data-window="24" data-score="47.1"
- data-odds="1.27" data-id="41" data-match="Martin Kocvara - Radovan Pisa" data-pick="Martin Kocvara +1.5 set handikap"
- data-start="2026-07-26T10:45:00+00:00" data-text="martin kocvara - radovan pisa setka cup. czech republic martin kocvara +1.5 set handikap masa tenisi">
- <td class="id num">41</td>
- <td><div class="match">Martin Kocvara - Radovan Pisa</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
- <td class="pickcell">Martin Kocvara +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
- <td class="num odds">1.27</td>
- <td class="num"><span class="score">47</span>
-   <div class="bar"><i style="width:47.1%"></i></div>
-   <div class="meta">güven 28% · kanıt 92%</div></td>
- <td class="num meta">2026-07-26 10:45</td>
- <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354271572" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="10" data-window="24" data-score="47.1"
- data-odds="1.35" data-id="42" data-match="Stepan Rejent - Adam Radkovsky" data-pick="Stepan Rejent +1.5 set handikap"
- data-start="2026-07-26T14:45:00+00:00" data-text="stepan rejent - adam radkovsky setka cup. czech republic stepan rejent +1.5 set handikap masa tenisi">
- <td class="id num">42</td>
- <td><div class="match">Stepan Rejent - Adam Radkovsky</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
- <td class="pickcell">Stepan Rejent +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
- <td class="num odds">1.35</td>
- <td class="num"><span class="score">47</span>
-   <div class="bar"><i style="width:47.1%"></i></div>
-   <div class="meta">güven 28% · kanıt 92%</div></td>
- <td class="num meta">2026-07-26 14:45</td>
- <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354328196" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="10" data-window="24" data-score="47.1"
- data-odds="1.31" data-id="43" data-match="Leon Kolman - Ondrej Chadima" data-pick="Leon Kolman +1.5 set handikap"
- data-start="2026-07-26T18:15:00+00:00" data-text="leon kolman - ondrej chadima setka cup. czech republic leon kolman +1.5 set handikap masa tenisi">
- <td class="id num">43</td>
- <td><div class="match">Leon Kolman - Ondrej Chadima</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
- <td class="pickcell">Leon Kolman +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
- <td class="num odds">1.31</td>
- <td class="num"><span class="score">47</span>
-   <div class="bar"><i style="width:47.1%"></i></div>
-   <div class="meta">güven 28% · kanıt 92%</div></td>
- <td class="num meta">2026-07-26 18:15</td>
- <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354271552" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="10" data-window="24" data-score="47.1"
- data-odds="1.21" data-id="44" data-match="Leon Kolman - Jan Botka" data-pick="Leon Kolman +1.5 set handikap"
- data-start="2026-07-26T19:15:00+00:00" data-text="leon kolman - jan botka setka cup. czech republic leon kolman +1.5 set handikap masa tenisi">
- <td class="id num">44</td>
- <td><div class="match">Leon Kolman - Jan Botka</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
- <td class="pickcell">Leon Kolman +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
- <td class="num odds">1.21</td>
- <td class="num"><span class="score">47</span>
-   <div class="bar"><i style="width:47.1%"></i></div>
-   <div class="meta">güven 28% · kanıt 92%</div></td>
- <td class="num meta">2026-07-26 19:15</td>
- <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354303630" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="46.8"
- data-odds="1.152" data-id="45" data-match="Criciuma - Clube Nautico Capibaribe" data-pick="Criciuma kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T19:00:00+00:00" data-text="criciuma - clube nautico capibaribe brazil. campeonato brasileiro. serie b criciuma kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">45</td>
- <td><div class="match">Criciuma - Clube Nautico Capibaribe</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie B</div></td>
- <td class="pickcell">Criciuma kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
- <td class="num odds">1.15</td>
- <td class="num"><span class="score">47</span>
-   <div class="bar"><i style="width:46.8%"></i></div>
-   <div class="meta">güven 24% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 19:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/57265/353437212" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="46.4"
- data-odds="1.275" data-id="46" data-match="Zhejiang Professional - Dalian Yingbo" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T12:00:00+00:00" data-text="zhejiang professional - dalian yingbo china. super league toplam gol 4.5 altı futbol">
- <td class="id num">46</td>
+<tr data-sport="1" data-window="24" data-score="81.4"
+ data-odds="1.275" data-id="40" data-match="Zhejiang Professional - Dalian Yingbo" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-26T12:00:00+00:00" data-text="zhejiang professional - dalian yingbo china. super league toplam gol 4.5 altı futbol" data-result="" data-key="40">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>40</span></label></td>
  <td><div class="match">Zhejiang Professional - Dalian Yingbo</div><div class="meta">Futbol · China. Super League</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.27</td>
- <td class="num"><span class="score">46</span>
-   <div class="bar"><i style="width:46.4%"></i></div>
-   <div class="meta">güven 32% · kanıt 80%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/58043/352415900" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="46.4"
- data-odds="1.217" data-id="47" data-match="Chengdu Rongcheng - Beijing Guoan" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T11:35:00+00:00" data-text="chengdu rongcheng - beijing guoan china. super league toplam gol 4.5 altı futbol">
- <td class="id num">47</td>
+<tr data-sport="1" data-window="24" data-score="81.4"
+ data-odds="1.217" data-id="41" data-match="Chengdu Rongcheng - Beijing Guoan" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-26T11:35:00+00:00" data-text="chengdu rongcheng - beijing guoan china. super league toplam gol 4.5 altı futbol" data-result="" data-key="41">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>41</span></label></td>
  <td><div class="match">Chengdu Rongcheng - Beijing Guoan</div><div class="meta">Futbol · China. Super League</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.22</td>
- <td class="num"><span class="score">46</span>
-   <div class="bar"><i style="width:46.4%"></i></div>
-   <div class="meta">güven 32% · kanıt 80%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 11:35</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/58043/352410162" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="46.4"
- data-odds="1.297" data-id="48" data-match="Shandong Taishan - Henan" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T11:35:00+00:00" data-text="shandong taishan - henan china. super league toplam gol 4.5 altı futbol">
- <td class="id num">48</td>
+<tr data-sport="1" data-window="24" data-score="81.4"
+ data-odds="1.297" data-id="42" data-match="Shandong Taishan - Henan" data-pick="Toplam gol 4.5 altı"
+ data-start="2026-07-26T11:35:00+00:00" data-text="shandong taishan - henan china. super league toplam gol 4.5 altı futbol" data-result="" data-key="42">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>42</span></label></td>
  <td><div class="match">Shandong Taishan - Henan</div><div class="meta">Futbol · China. Super League</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.30</td>
- <td class="num"><span class="score">46</span>
-   <div class="bar"><i style="width:46.4%"></i></div>
-   <div class="meta">güven 32% · kanıt 80%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 11:35</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/58043/352410168" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="46.4"
- data-odds="1.228" data-id="49" data-match="Brann - Valerenga" data-pick="Brann kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T12:30:00+00:00" data-text="brann - valerenga norway. eliteserien brann kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">49</td>
+<tr data-sport="1" data-window="24" data-score="81.4"
+ data-odds="1.228" data-id="43" data-match="Brann - Valerenga" data-pick="Brann kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T12:30:00+00:00" data-text="brann - valerenga norway. eliteserien brann kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="43">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>43</span></label></td>
  <td><div class="match">Brann - Valerenga</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
  <td class="pickcell">Brann kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.23</td>
- <td class="num"><span class="score">46</span>
-   <div class="bar"><i style="width:46.4%"></i></div>
-   <div class="meta">güven 30% · kanıt 85%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %85 (−1.1 puan)</div></td>
  <td class="num meta">2026-07-26 12:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354736" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="46.2"
+<tr data-sport="10" data-window="24" data-score="81.4"
+ data-odds="1.27" data-id="44" data-match="Martin Kocvara - Radovan Pisa" data-pick="Martin Kocvara +1.5 set handikap"
+ data-start="2026-07-26T10:45:00+00:00" data-text="martin kocvara - radovan pisa setka cup. czech republic martin kocvara +1.5 set handikap masa tenisi" data-result="" data-key="44">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>44</span></label></td>
+ <td><div class="match">Martin Kocvara - Radovan Pisa</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
+ <td class="pickcell">Martin Kocvara +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
+ <td class="num odds">1.27</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %92 (−0.6 puan)</div></td>
+ <td class="num meta">2026-07-26 10:45</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354271572" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="10" data-window="24" data-score="81.4"
+ data-odds="1.35" data-id="45" data-match="Stepan Rejent - Adam Radkovsky" data-pick="Stepan Rejent +1.5 set handikap"
+ data-start="2026-07-26T14:45:00+00:00" data-text="stepan rejent - adam radkovsky setka cup. czech republic stepan rejent +1.5 set handikap masa tenisi" data-result="" data-key="45">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>45</span></label></td>
+ <td><div class="match">Stepan Rejent - Adam Radkovsky</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
+ <td class="pickcell">Stepan Rejent +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
+ <td class="num odds">1.35</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %92 (−0.6 puan)</div></td>
+ <td class="num meta">2026-07-26 14:45</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354328196" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="10" data-window="24" data-score="81.4"
+ data-odds="1.31" data-id="46" data-match="Leon Kolman - Ondrej Chadima" data-pick="Leon Kolman +1.5 set handikap"
+ data-start="2026-07-26T18:15:00+00:00" data-text="leon kolman - ondrej chadima setka cup. czech republic leon kolman +1.5 set handikap masa tenisi" data-result="" data-key="46">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>46</span></label></td>
+ <td><div class="match">Leon Kolman - Ondrej Chadima</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
+ <td class="pickcell">Leon Kolman +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
+ <td class="num odds">1.31</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %92 (−0.6 puan)</div></td>
+ <td class="num meta">2026-07-26 18:15</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354271552" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="10" data-window="24" data-score="81.4"
+ data-odds="1.21" data-id="47" data-match="Leon Kolman - Jan Botka" data-pick="Leon Kolman +1.5 set handikap"
+ data-start="2026-07-26T19:15:00+00:00" data-text="leon kolman - jan botka setka cup. czech republic leon kolman +1.5 set handikap masa tenisi" data-result="" data-key="47">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>47</span></label></td>
+ <td><div class="match">Leon Kolman - Jan Botka</div><div class="meta">Masa Tenisi · Setka Cup. Czech Republic</div></td>
+ <td class="pickcell">Leon Kolman +1.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
+ <td class="num odds">1.21</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:26%"></i></div>
+   <div class="meta">sınırda · kanıt %92 (−0.6 puan)</div></td>
+ <td class="num meta">2026-07-26 19:15</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/10/2187287/354303630" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="48" data-score="81.3"
+ data-odds="1.152" data-id="48" data-match="CSKA Sofia - Botev Plovdiv" data-pick="CSKA Sofia kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-27T18:15:00+00:00" data-text="cska sofia - botev plovdiv bulgaria. first league cska sofia kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="48">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>48</span></label></td>
+ <td><div class="match">CSKA Sofia - Botev Plovdiv</div><div class="meta">Futbol · Bulgaria. First League</div></td>
+ <td class="pickcell">CSKA Sofia kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
+ <td class="num odds">1.15</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:25%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-27 18:15</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/2924971/352415894" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="81.0"
+ data-odds="1.152" data-id="49" data-match="Criciuma - Clube Nautico Capibaribe" data-pick="Criciuma kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T19:00:00+00:00" data-text="criciuma - clube nautico capibaribe brazil. campeonato brasileiro. serie b criciuma kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="49">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>49</span></label></td>
+ <td><div class="match">Criciuma - Clube Nautico Capibaribe</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie B</div></td>
+ <td class="pickcell">Criciuma kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
+ <td class="num odds">1.15</td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:24%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 19:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/57265/353437212" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="80.8"
  data-odds="1.3" data-id="50" data-match="Hradec Kralove - Pardubice" data-pick="Hradec Kralove kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T18:00:00+00:00" data-text="hradec kralove - pardubice czech republic. chance liga hradec kralove kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">50</td>
+ data-start="2026-07-26T18:00:00+00:00" data-text="hradec kralove - pardubice czech republic. chance liga hradec kralove kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="50">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>50</span></label></td>
  <td><div class="match">Hradec Kralove - Pardubice</div><div class="meta">Futbol · Czech Republic. Chance Liga</div></td>
  <td class="pickcell">Hradec Kralove kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.30</td>
- <td class="num"><span class="score">46</span>
-   <div class="bar"><i style="width:46.2%"></i></div>
-   <div class="meta">güven 23% · kanıt 100%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:23%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
  <td class="num meta">2026-07-26 18:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27707/351619946" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="45.0"
- data-odds="1.162" data-id="51" data-match="Clube do Remo - EC Vitoria Salvador" data-pick="EC Vitoria Salvador +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T22:30:00+00:00" data-text="clube do remo - ec vitoria salvador brazil. campeonato brasileiro. serie a ec vitoria salvador +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">51</td>
- <td><div class="match">Clube do Remo - EC Vitoria Salvador</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
- <td class="pickcell">EC Vitoria Salvador +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.16</td>
- <td class="num"><span class="score">45</span>
-   <div class="bar"><i style="width:45.0%"></i></div>
-   <div class="meta">güven 21% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 22:30</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856472" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="44.3"
- data-odds="1.285" data-id="52" data-match="Sevilla - AD Ceuta" data-pick="Sevilla kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T19:00:00+00:00" data-text="sevilla - ad ceuta club friendlies sevilla kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">52</td>
- <td><div class="match">Sevilla - AD Ceuta</div><div class="meta">Futbol · Club Friendlies</div></td>
- <td class="pickcell">Sevilla kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
- <td class="num odds">1.28</td>
- <td class="num"><span class="score">44</span>
-   <div class="bar"><i style="width:44.3%"></i></div>
-   <div class="meta">güven 20% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 19:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/67559/354217540" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="43.9"
- data-odds="1.143" data-id="53" data-match="St. Gallen - Zurich" data-pick="Zurich +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T14:30:00+00:00" data-text="st. gallen - zurich switzerland. superleague zurich +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">53</td>
+<tr data-sport="1" data-window="24" data-score="80.7"
+ data-odds="1.143" data-id="51" data-match="St. Gallen - Zurich" data-pick="Zurich +2.5 handikap (en fazla 2 farkla kaybedebilir)"
+ data-start="2026-07-26T14:30:00+00:00" data-text="st. gallen - zurich switzerland. superleague zurich +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="51">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>51</span></label></td>
  <td><div class="match">St. Gallen - Zurich</div><div class="meta">Futbol · Switzerland. SuperLeague</div></td>
  <td class="pickcell">Zurich +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
  <td class="num odds">1.14</td>
- <td class="num"><span class="score">44</span>
-   <div class="bar"><i style="width:43.9%"></i></div>
-   <div class="meta">güven 30% · kanıt 77%</div></td>
+ <td class="num"><span class="score">81</span>
+   <div class="bar"><i style="width:23%"></i></div>
+   <div class="meta">sınırda · kanıt %77 (−1.7 puan)</div></td>
  <td class="num meta">2026-07-26 14:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27695/346887890" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="42.9"
- data-odds="1.32" data-id="54" data-match="Sandefjord - Bodo-Glimt" data-pick="Sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T15:00:00+00:00" data-text="sandefjord - bodo-glimt norway. eliteserien sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">54</td>
- <td><div class="match">Sandefjord - Bodo-Glimt</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
- <td class="pickcell">Sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.32</td>
- <td class="num"><span class="score">43</span>
-   <div class="bar"><i style="width:42.9%"></i></div>
-   <div class="meta">güven 25% · kanıt 85%</div></td>
- <td class="num meta">2026-07-26 15:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354738" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="48" data-score="42.7"
- data-odds="1.192" data-id="55" data-match="Rosenborg - Fredrikstad" data-pick="Toplam gol 1.5 üstü"
- data-start="2026-07-27T17:00:00+00:00" data-text="rosenborg - fredrikstad norway. eliteserien toplam gol 1.5 üstü futbol">
- <td class="id num">55</td>
- <td><div class="match">Rosenborg - Fredrikstad</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
- <td class="pickcell">Toplam gol 1.5 üstü<div class="meta">regulation</div></td>
- <td class="num odds">1.19</td>
- <td class="num"><span class="score">43</span>
-   <div class="bar"><i style="width:42.7%"></i></div>
-   <div class="meta">güven 25% · kanıt 85%</div></td>
- <td class="num meta">2026-07-27 17:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354730" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="42.5"
- data-odds="1.181" data-id="56" data-match="Inter Turku - Gnistan" data-pick="Inter Turku kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T12:00:00+00:00" data-text="inter turku - gnistan finland. veikkausliiga inter turku kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">56</td>
+<tr data-sport="1" data-window="24" data-score="80.3"
+ data-odds="1.181" data-id="52" data-match="Inter Turku - Gnistan" data-pick="Inter Turku kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T12:00:00+00:00" data-text="inter turku - gnistan finland. veikkausliiga inter turku kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="52">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>52</span></label></td>
  <td><div class="match">Inter Turku - Gnistan</div><div class="meta">Futbol · Finland. Veikkausliiga</div></td>
  <td class="pickcell">Inter Turku kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.18</td>
- <td class="num"><span class="score">42</span>
-   <div class="bar"><i style="width:42.5%"></i></div>
-   <div class="meta">güven 28% · kanıt 76%</div></td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:21%"></i></div>
+   <div class="meta">sınırda · kanıt %76 (−1.6 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/1554897/352432196" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="39.9"
+<tr data-sport="1" data-window="24" data-score="80.3"
+ data-odds="1.32" data-id="53" data-match="Sandefjord - Bodo-Glimt" data-pick="Sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir)"
+ data-start="2026-07-26T15:00:00+00:00" data-text="sandefjord - bodo-glimt norway. eliteserien sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="53">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>53</span></label></td>
+ <td><div class="match">Sandefjord - Bodo-Glimt</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
+ <td class="pickcell">Sandefjord +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.32</td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:21%"></i></div>
+   <div class="meta">sınırda · kanıt %85 (−0.9 puan)</div></td>
+ <td class="num meta">2026-07-26 15:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354738" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="80.3"
+ data-odds="1.162" data-id="54" data-match="Clube do Remo - EC Vitoria Salvador" data-pick="EC Vitoria Salvador +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-26T22:30:00+00:00" data-text="clube do remo - ec vitoria salvador brazil. campeonato brasileiro. serie a ec vitoria salvador +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="54">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>54</span></label></td>
+ <td><div class="match">Clube do Remo - EC Vitoria Salvador</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
+ <td class="pickcell">EC Vitoria Salvador +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.16</td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:21%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 22:30</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856472" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="48" data-score="80.2"
+ data-odds="1.192" data-id="55" data-match="Rosenborg - Fredrikstad" data-pick="Toplam gol 1.5 üstü"
+ data-start="2026-07-27T17:00:00+00:00" data-text="rosenborg - fredrikstad norway. eliteserien toplam gol 1.5 üstü futbol" data-result="" data-key="55">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>55</span></label></td>
+ <td><div class="match">Rosenborg - Fredrikstad</div><div class="meta">Futbol · Norway. Eliteserien</div></td>
+ <td class="pickcell">Toplam gol 1.5 üstü<div class="meta">regulation</div></td>
+ <td class="num odds">1.19</td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:21%"></i></div>
+   <div class="meta">sınırda · kanıt %85 (−0.9 puan)</div></td>
+ <td class="num meta">2026-07-27 17:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/1793471/352354730" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="80.1"
+ data-odds="1.285" data-id="56" data-match="Sevilla - AD Ceuta" data-pick="Sevilla kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T19:00:00+00:00" data-text="sevilla - ad ceuta club friendlies sevilla kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="56">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>56</span></label></td>
+ <td><div class="match">Sevilla - AD Ceuta</div><div class="meta">Futbol · Club Friendlies</div></td>
+ <td class="pickcell">Sevilla kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
+ <td class="num odds">1.28</td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:20%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 19:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/67559/354217540" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="79.6"
  data-odds="1.26" data-id="57" data-match="Young Boys - Sion" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T12:00:00+00:00" data-text="young boys - sion switzerland. superleague toplam gol 4.5 altı futbol">
- <td class="id num">57</td>
+ data-start="2026-07-26T12:00:00+00:00" data-text="young boys - sion switzerland. superleague toplam gol 4.5 altı futbol" data-result="" data-key="57">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>57</span></label></td>
  <td><div class="match">Young Boys - Sion</div><div class="meta">Futbol · Switzerland. SuperLeague</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.26</td>
- <td class="num"><span class="score">40</span>
-   <div class="bar"><i style="width:39.9%"></i></div>
-   <div class="meta">güven 24% · kanıt 77%</div></td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:18%"></i></div>
+   <div class="meta">sınırda · kanıt %77 (−1.4 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27695/346887898" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="39.9"
+<tr data-sport="1" data-window="24" data-score="79.6"
  data-odds="1.197" data-id="58" data-match="Lugano - Vaduz" data-pick="Toplam gol 4.5 altı"
- data-start="2026-07-26T14:30:00+00:00" data-text="lugano - vaduz switzerland. superleague toplam gol 4.5 altı futbol">
- <td class="id num">58</td>
+ data-start="2026-07-26T14:30:00+00:00" data-text="lugano - vaduz switzerland. superleague toplam gol 4.5 altı futbol" data-result="" data-key="58">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>58</span></label></td>
  <td><div class="match">Lugano - Vaduz</div><div class="meta">Futbol · Switzerland. SuperLeague</div></td>
  <td class="pickcell">Toplam gol 4.5 altı<div class="meta">regulation</div></td>
  <td class="num odds">1.20</td>
- <td class="num"><span class="score">40</span>
-   <div class="bar"><i style="width:39.9%"></i></div>
-   <div class="meta">güven 24% · kanıt 77%</div></td>
+ <td class="num"><span class="score">80</span>
+   <div class="bar"><i style="width:18%"></i></div>
+   <div class="meta">sınırda · kanıt %77 (−1.4 puan)</div></td>
  <td class="num meta">2026-07-26 14:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/27695/346887886" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="39.6"
- data-odds="1.37" data-id="59" data-match="Widzew Lodz - Motor Lublin" data-pick="Motor Lublin +1.5 handikap (en fazla 1 farkla kaybedebilir)"
- data-start="2026-07-26T15:30:00+00:00" data-text="widzew lodz - motor lublin poland. ekstraklasa motor lublin +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol">
- <td class="id num">59</td>
- <td><div class="match">Widzew Lodz - Motor Lublin</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
- <td class="pickcell">Motor Lublin +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.37</td>
- <td class="num"><span class="score">40</span>
-   <div class="bar"><i style="width:39.6%"></i></div>
-   <div class="meta">güven 18% · kanıt 91%</div></td>
- <td class="num meta">2026-07-26 15:30</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352458912" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="38.5"
- data-odds="1.277" data-id="60" data-match="Ufa - SKA-Khabarovsk" data-pick="Ufa kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T12:00:00+00:00" data-text="ufa - ska-khabarovsk russian championship. league 1 ufa kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">60</td>
+<tr data-sport="1" data-window="24" data-score="79.0"
+ data-odds="1.277" data-id="59" data-match="Ufa - SKA-Khabarovsk" data-pick="Ufa kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T12:00:00+00:00" data-text="ufa - ska-khabarovsk russian championship. league 1 ufa kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="59">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>59</span></label></td>
  <td><div class="match">Ufa - SKA-Khabarovsk</div><div class="meta">Futbol · Russian Championship. League 1</div></td>
  <td class="pickcell">Ufa kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.28</td>
- <td class="num"><span class="score">38</span>
-   <div class="bar"><i style="width:38.5%"></i></div>
-   <div class="meta">güven 19% · kanıt 84%</div></td>
+ <td class="num"><span class="score">79</span>
+   <div class="bar"><i style="width:16%"></i></div>
+   <div class="meta">sınırda · kanıt %84 (−0.8 puan)</div></td>
  <td class="num meta">2026-07-26 12:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/2421233/352628072" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="38.1"
- data-odds="1.23" data-id="61" data-match="Mladost Lucani - Novi Pazar" data-pick="Toplam gol 3.5 altı"
- data-start="2026-07-26T18:30:00+00:00" data-text="mladost lucani - novi pazar serbia. superliga toplam gol 3.5 altı futbol">
- <td class="id num">61</td>
- <td><div class="match">Mladost Lucani - Novi Pazar</div><div class="meta">Futbol · Serbia. SuperLiga</div></td>
- <td class="pickcell">Toplam gol 3.5 altı<div class="meta">regulation</div></td>
- <td class="num odds">1.23</td>
- <td class="num"><span class="score">38</span>
-   <div class="bar"><i style="width:38.1%"></i></div>
-   <div class="meta">güven 12% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 18:30</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/30035/353231470" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="37.8"
- data-odds="1.38" data-id="62" data-match="Jablonec - Sigma Olomouc" data-pick="Jablonec kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T15:30:00+00:00" data-text="jablonec - sigma olomouc czech republic. chance liga jablonec kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">62</td>
- <td><div class="match">Jablonec - Sigma Olomouc</div><div class="meta">Futbol · Czech Republic. Chance Liga</div></td>
- <td class="pickcell">Jablonec kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
- <td class="num odds">1.38</td>
- <td class="num"><span class="score">38</span>
-   <div class="bar"><i style="width:37.8%"></i></div>
-   <div class="meta">güven 11% · kanıt 100%</div></td>
+<tr data-sport="1" data-window="24" data-score="79.0"
+ data-odds="1.37" data-id="60" data-match="Widzew Lodz - Motor Lublin" data-pick="Motor Lublin +1.5 handikap (en fazla 1 farkla kaybedebilir)"
+ data-start="2026-07-26T15:30:00+00:00" data-text="widzew lodz - motor lublin poland. ekstraklasa motor lublin +1.5 handikap (en fazla 1 farkla kaybedebilir) futbol" data-result="" data-key="60">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>60</span></label></td>
+ <td><div class="match">Widzew Lodz - Motor Lublin</div><div class="meta">Futbol · Poland. Ekstraklasa</div></td>
+ <td class="pickcell">Motor Lublin +1.5 handikap (en fazla 1 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.37</td>
+ <td class="num"><span class="score">79</span>
+   <div class="bar"><i style="width:16%"></i></div>
+   <div class="meta">sınırda · kanıt %91</div></td>
  <td class="num meta">2026-07-26 15:30</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/27707/351580732" target="_blank" rel="noopener">Aç</a></td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/27731/352458912" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="37.3"
- data-odds="1.284" data-id="63" data-match="Rubin Kazan - Krasnodar" data-pick="Krasnodar kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T16:30:00+00:00" data-text="rubin kazan - krasnodar russia. premier league krasnodar kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">63</td>
+<tr data-sport="1" data-window="24" data-score="78.6"
+ data-odds="1.284" data-id="61" data-match="Rubin Kazan - Krasnodar" data-pick="Krasnodar kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T16:30:00+00:00" data-text="rubin kazan - krasnodar russia. premier league krasnodar kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="61">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>61</span></label></td>
  <td><div class="match">Rubin Kazan - Krasnodar</div><div class="meta">Futbol · Russia. Premier League</div></td>
  <td class="pickcell">Krasnodar kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.28</td>
- <td class="num"><span class="score">37</span>
-   <div class="bar"><i style="width:37.3%"></i></div>
-   <div class="meta">güven 17% · kanıt 84%</div></td>
+ <td class="num"><span class="score">79</span>
+   <div class="bar"><i style="width:14%"></i></div>
+   <div class="meta">sınırda · kanıt %84 (−0.7 puan)</div></td>
  <td class="num meta">2026-07-26 16:30</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/225733/345133304" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="36.2"
- data-odds="1.25" data-id="64" data-match="Bahia - Corinthians Paulista" data-pick="Toplam gol 3.5 altı"
- data-start="2026-07-26T19:00:00+00:00" data-text="bahia - corinthians paulista brazil. campeonato brasileiro. serie a toplam gol 3.5 altı futbol">
- <td class="id num">64</td>
- <td><div class="match">Bahia - Corinthians Paulista</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
- <td class="pickcell">Toplam gol 3.5 altı<div class="meta">regulation</div></td>
- <td class="num odds">1.25</td>
- <td class="num"><span class="score">36</span>
-   <div class="bar"><i style="width:36.2%"></i></div>
-   <div class="meta">güven 9% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 19:00</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856464" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="35.5"
- data-odds="1.21" data-id="65" data-match="Koper - NK Radomlje" data-pick="NK Radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir)"
- data-start="2026-07-26T18:15:00+00:00" data-text="koper - nk radomlje slovenia. league 1 nk radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol">
- <td class="id num">65</td>
- <td><div class="match">Koper - NK Radomlje</div><div class="meta">Futbol · Slovenia. League 1</div></td>
- <td class="pickcell">NK Radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
- <td class="num odds">1.21</td>
- <td class="num"><span class="score">36</span>
-   <div class="bar"><i style="width:35.5%"></i></div>
-   <div class="meta">güven 8% · kanıt 100%</div></td>
- <td class="num meta">2026-07-26 18:15</td>
- <td><a class="go" href="https://betwinner2.com/en/line/1/30049/352502212" target="_blank" rel="noopener">Aç</a></td>
-</tr>
-<tr data-sport="1" data-window="24" data-score="35.1"
- data-odds="1.22" data-id="66" data-match="Yanbian Longding - Meizhou Hakka" data-pick="Toplam gol 1.5 üstü"
- data-start="2026-07-26T10:00:00+00:00" data-text="yanbian longding - meizhou hakka china. league one toplam gol 1.5 üstü futbol">
- <td class="id num">66</td>
+<tr data-sport="1" data-window="24" data-score="78.2"
+ data-odds="1.22" data-id="62" data-match="Yanbian Longding - Meizhou Hakka" data-pick="Toplam gol 1.5 üstü"
+ data-start="2026-07-26T10:00:00+00:00" data-text="yanbian longding - meizhou hakka china. league one toplam gol 1.5 üstü futbol" data-result="" data-key="62">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>62</span></label></td>
  <td><div class="match">Yanbian Longding - Meizhou Hakka</div><div class="meta">Futbol · China. League One</div></td>
  <td class="pickcell">Toplam gol 1.5 üstü<div class="meta">regulation</div></td>
  <td class="num odds">1.22</td>
- <td class="num"><span class="score">35</span>
-   <div class="bar"><i style="width:35.1%"></i></div>
-   <div class="meta">güven 16% · kanıt 80%</div></td>
+ <td class="num"><span class="score">78</span>
+   <div class="bar"><i style="width:13%"></i></div>
+   <div class="meta">sınırda · kanıt %80 (−0.8 puan)</div></td>
  <td class="num meta">2026-07-26 10:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/202305/353732972" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="10" data-window="24" data-score="34.5"
+<tr data-sport="1" data-window="24" data-score="77.9"
+ data-odds="1.23" data-id="63" data-match="Mladost Lucani - Novi Pazar" data-pick="Toplam gol 3.5 altı"
+ data-start="2026-07-26T18:30:00+00:00" data-text="mladost lucani - novi pazar serbia. superliga toplam gol 3.5 altı futbol" data-result="" data-key="63">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>63</span></label></td>
+ <td><div class="match">Mladost Lucani - Novi Pazar</div><div class="meta">Futbol · Serbia. SuperLiga</div></td>
+ <td class="pickcell">Toplam gol 3.5 altı<div class="meta">regulation</div></td>
+ <td class="num odds">1.23</td>
+ <td class="num"><span class="score">78</span>
+   <div class="bar"><i style="width:12%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 18:30</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/30035/353231470" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="77.8"
+ data-odds="1.38" data-id="64" data-match="Jablonec - Sigma Olomouc" data-pick="Jablonec kaybetmez (beraberlik de kazandırır)"
+ data-start="2026-07-26T15:30:00+00:00" data-text="jablonec - sigma olomouc czech republic. chance liga jablonec kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="64">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>64</span></label></td>
+ <td><div class="match">Jablonec - Sigma Olomouc</div><div class="meta">Futbol · Czech Republic. Chance Liga</div></td>
+ <td class="pickcell">Jablonec kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
+ <td class="num odds">1.38</td>
+ <td class="num"><span class="score">78</span>
+   <div class="bar"><i style="width:11%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 15:30</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/27707/351580732" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="77.2"
+ data-odds="1.25" data-id="65" data-match="Bahia - Corinthians Paulista" data-pick="Toplam gol 3.5 altı"
+ data-start="2026-07-26T19:00:00+00:00" data-text="bahia - corinthians paulista brazil. campeonato brasileiro. serie a toplam gol 3.5 altı futbol" data-result="" data-key="65">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>65</span></label></td>
+ <td><div class="match">Bahia - Corinthians Paulista</div><div class="meta">Futbol · Brazil. Campeonato Brasileiro. Serie A</div></td>
+ <td class="pickcell">Toplam gol 3.5 altı<div class="meta">regulation</div></td>
+ <td class="num odds">1.25</td>
+ <td class="num"><span class="score">77</span>
+   <div class="bar"><i style="width:9%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 19:00</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/1268397/351856464" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="1" data-window="24" data-score="77.0"
+ data-odds="1.21" data-id="66" data-match="Koper - NK Radomlje" data-pick="NK Radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir)"
+ data-start="2026-07-26T18:15:00+00:00" data-text="koper - nk radomlje slovenia. league 1 nk radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir) futbol" data-result="" data-key="66">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>66</span></label></td>
+ <td><div class="match">Koper - NK Radomlje</div><div class="meta">Futbol · Slovenia. League 1</div></td>
+ <td class="pickcell">NK Radomlje +2.5 handikap (en fazla 2 farkla kaybedebilir)<div class="meta">regulation</div></td>
+ <td class="num odds">1.21</td>
+ <td class="num"><span class="score">77</span>
+   <div class="bar"><i style="width:8%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
+ <td class="num meta">2026-07-26 18:15</td>
+ <td><a class="go" href="https://betwinner2.com/en/line/1/30049/352502212" target="_blank" rel="noopener">Aç</a></td>
+</tr>
+<tr data-sport="10" data-window="24" data-score="76.6"
  data-odds="1.24" data-id="67" data-match="Anna Lapa - Viktoria Shevchuk" data-pick="Anna Lapa +2.5 set handikap"
- data-start="2026-07-26T14:05:00+00:00" data-text="anna lapa - viktoria shevchuk setka cup. women anna lapa +2.5 set handikap masa tenisi">
- <td class="id num">67</td>
+ data-start="2026-07-26T14:05:00+00:00" data-text="anna lapa - viktoria shevchuk setka cup. women anna lapa +2.5 set handikap masa tenisi" data-result="" data-key="67">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>67</span></label></td>
  <td><div class="match">Anna Lapa - Viktoria Shevchuk</div><div class="meta">Masa Tenisi · Setka Cup. Women</div></td>
  <td class="pickcell">Anna Lapa +2.5 set handikap<div class="meta">match ⚠ teyit gerek</div></td>
  <td class="num odds">1.24</td>
- <td class="num"><span class="score">34</span>
-   <div class="bar"><i style="width:34.5%"></i></div>
-   <div class="meta">güven 6% · kanıt 100%</div></td>
+ <td class="num"><span class="score">77</span>
+   <div class="bar"><i style="width:6%"></i></div>
+   <div class="meta">sınırda · kanıt %100</div></td>
  <td class="num meta">2026-07-26 14:05</td>
  <td><a class="go" href="https://betwinner2.com/en/line/10/1734759/354270604" target="_blank" rel="noopener">Aç</a></td>
 </tr>
-<tr data-sport="1" data-window="24" data-score="27.6"
+<tr data-sport="1" data-window="24" data-score="75.7"
  data-odds="1.272" data-id="68" data-match="Sochi - Arsenal Tula" data-pick="Sochi kaybetmez (beraberlik de kazandırır)"
- data-start="2026-07-26T15:00:00+00:00" data-text="sochi - arsenal tula russian championship. league 1 sochi kaybetmez (beraberlik de kazandırır) futbol">
- <td class="id num">68</td>
+ data-start="2026-07-26T15:00:00+00:00" data-text="sochi - arsenal tula russian championship. league 1 sochi kaybetmez (beraberlik de kazandırır) futbol" data-result="" data-key="68">
+ <td class="id num"><label><input type="checkbox" class="sel"><span>68</span></label></td>
  <td><div class="match">Sochi - Arsenal Tula</div><div class="meta">Futbol · Russian Championship. League 1</div></td>
  <td class="pickcell">Sochi kaybetmez (beraberlik de kazandırır)<div class="meta">regulation</div></td>
  <td class="num odds">1.27</td>
- <td class="num"><span class="score">28</span>
-   <div class="bar"><i style="width:27.6%"></i></div>
-   <div class="meta">güven 3% · kanıt 84%</div></td>
+ <td class="num"><span class="score">76</span>
+   <div class="bar"><i style="width:3%"></i></div>
+   <div class="meta">sınırda · kanıt %84</div></td>
  <td class="num meta">2026-07-26 15:00</td>
  <td><a class="go" href="https://betwinner2.com/en/line/1/2421233/352626170" target="_blank" rel="noopener">Aç</a></td>
 </tr></tbody></table>
 <div class="empty" id="empty" hidden>Bu filtrelerle seçim kalmadı.</div>
 
-<footer>614 maç tarandı · modelsiz 511 · eşiği geçemeyen 35 · modeli olmayan spor 0<br>Bir maçta modelin güvenli bir görüşü yoksa o maçtan seçim ÇIKMAZ; listeyi doldurmak için en az kötü seçenek eklenmez.<br>bağlantılar betwinner2.com üzerinden — Betwinner erişilebilir alan adını değiştirdiğinde otomatik güncellenir</footer>
+<footer>596 maç tarandı · modelsiz 493 · eşiği geçemeyen 35 · modeli olmayan spor 0<br>Bir maçta modelin güvenli bir görüşü yoksa o maçtan seçim ÇIKMAZ; listeyi doldurmak için en az kötü seçenek eklenmez.<br>Kupona ekleme: Betwinner'ın kimlik doğrulaması olmadan kupon yükleyen bir ucu yok, bu yüzden tek dokunuşta hepsini ekleyen bir yol da yok. Bunun yerine istediklerini işaretle ve <b>sıradakini aç</b>'a basmaya devam et — bacak başına tek dokunuş, ilerleme hatırlanır.<br>bağlantılar betwinner2.com üzerinden — Betwinner erişilebilir alan adını değiştirdiğinde otomatik güncellenir</footer>
 
 <script>
 var rows=[].slice.call(document.querySelectorAll('#t tbody tr'));
+var body=document.querySelector('#t tbody');
+var DAY="2026-07-26";
 function num(el,k){return parseFloat(el.dataset[k])||0}
+function shown(){return rows.filter(function(r){return !r.classList.contains('hide')})}
+
 function apply(){
   var sp=document.getElementById('fSport').value,
       w=document.getElementById('fWindow').value,
       sc=+document.getElementById('fScore').value,
       od=+document.getElementById('fOdds').value/100,
+      rf=document.getElementById('fResult'),
+      res=rf?rf.value:'',
       q=document.getElementById('fText').value.toLowerCase().trim();
   document.getElementById('vScore').textContent=sc;
   document.getElementById('vOdds').textContent=od.toFixed(2);
@@ -1035,6 +1080,7 @@ function apply(){
   rows.forEach(function(r){
     var ok = (!sp||r.dataset.sport===sp)
       && (!w||num(r,'window')<=+w)
+      && (!res||r.dataset.result===res)
       && num(r,'score')>=sc && num(r,'odds')>=od
       && (!q||r.dataset.text.indexOf(q)>=0);
     r.classList.toggle('hide',!ok); if(ok)n++;
@@ -1042,14 +1088,13 @@ function apply(){
   document.getElementById('count').textContent=n+' / '+rows.length+' seçim';
   document.getElementById('empty').hidden = n>0;
 }
-['fSport','fWindow','fScore','fOdds','fText'].forEach(function(id){
-  document.getElementById(id).addEventListener('input',apply);
+['fSport','fWindow','fScore','fOdds','fText','fResult'].forEach(function(id){
+  var el=document.getElementById(id); if(el) el.addEventListener('input',apply);
 });
 
 // Sorting lives in the panel, not only in the column headers: on a phone the header row
 // is hidden entirely by the card layout, so header clicks are a desktop shortcut and this
 // select is the path that works everywhere.
-var body=document.querySelector('#t tbody');
 function sortBy(k,asc){
   rows.sort(function(a,b){
     // Number() and not parseFloat(): parseFloat('2026-07-26T15:00') happily returns 2026,
@@ -1071,6 +1116,51 @@ document.querySelectorAll('#t th[data-k]').forEach(function(th){
     var k=th.dataset.k; dir[k]=!dir[k]; sortBy(k,dir[k]);
   });
 });
+
+/* Adding the slip. Betwinner has no unauthenticated way to load a betslip — /en/user/coupon
+   redirects to login — so "one tap adds all of them" is not on offer without driving a
+   logged-in session with the operator's credentials, which this tool deliberately does not
+   do. This is the honest fastest version: tick the ones you want, then keep pressing one
+   button. Each press opens the next fixture, so it is one tap per leg with no scrolling,
+   searching or losing your place, and the site's own betslip accumulates as you go.
+   Progress is remembered per day, so closing the page does not restart the queue. */
+var KEY='bw-added-'+DAY;
+var added={};
+try { added=JSON.parse(localStorage.getItem(KEY)||'{}') } catch(e) { added={} }
+function save(){ try { localStorage.setItem(KEY,JSON.stringify(added)) } catch(e) {} }
+function checked(){
+  return rows.filter(function(r){
+    var c=r.querySelector('.sel'); return c&&c.checked;
+  });
+}
+function pending(){ return checked().filter(function(r){ return !added[r.dataset.key] }) }
+function refresh(){
+  rows.forEach(function(r){ r.classList.toggle('done',!!added[r.dataset.key]) });
+  var c=checked().length, p=pending().length;
+  document.getElementById('queue').textContent = c ? (c-p)+' / '+c+' eklendi' : '0 seçili';
+  document.getElementById('next').disabled = p===0;
+  var combo=1, legs=0;
+  checked().forEach(function(r){ combo*=num(r,'odds'); legs++; });
+  document.getElementById('combo').textContent =
+    legs>1 ? legs+' bacak · kombine oran '+combo.toFixed(2) : '';
+}
+document.addEventListener('change',function(e){ if(e.target.classList.contains('sel')) refresh() });
+document.getElementById('selAll').addEventListener('click',function(){
+  shown().forEach(function(r){ var c=r.querySelector('.sel'); if(c) c.checked=true }); refresh();
+});
+document.getElementById('selNone').addEventListener('click',function(){
+  rows.forEach(function(r){ var c=r.querySelector('.sel'); if(c) c.checked=false }); refresh();
+});
+document.getElementById('next').addEventListener('click',function(){
+  var q=pending(); if(!q.length) return;
+  // Sıradakini listedeki sırasıyla al, ekranda görünen sırayla değil-tekrar sıralasan bile
+  // kuyruk kaybolmasın.
+  var r=q[0], a=r.querySelector('a.go');
+  added[r.dataset.key]=1; save(); refresh();
+  r.scrollIntoView({block:'center',behavior:'smooth'});
+  if(a) window.open(a.href,'_blank','noopener');
+});
+
 document.getElementById('reset').addEventListener('click',function(){
   document.getElementById('fSport').value='';
   document.getElementById('fWindow').selectedIndex=0;
@@ -1078,9 +1168,10 @@ document.getElementById('reset').addEventListener('click',function(){
   document.getElementById('fOdds').value=100;
   document.getElementById('fText').value='';
   document.getElementById('fSort').selectedIndex=0;
+  var rf=document.getElementById('fResult'); if(rf) rf.value='';
   sortBy('score',false);
   apply();
 });
-apply();
+apply(); refresh();
 </script>
 </body></html>

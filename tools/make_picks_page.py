@@ -25,16 +25,16 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from engine import tr  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CATALOGUE = os.path.join(ROOT, "research", "sports_catalogue.json")
 
-# Turkish names for the sports that can actually appear. Anything else falls back to the
-# catalogue's English name rather than to a bare id — an unlabelled "10" in a filter is
-# useless, and the catalogue is already in the repo.
-SPORTS_TR = {
-    1: "Futbol", 2: "Buz Hokeyi", 3: "Basketbol", 4: "Tenis", 10: "Masa Tenisi",
-    17: "Hokey", 29: "Voleybol", 40: "E-Spor", 71: "Beyzbol", 107: "Hentbol",
-}
+# Sport names live in engine/tr.py with the rest of the user-facing wording. The
+# catalogue is the fallback, so a sport added to the book before it is added there still
+# labels as its English name rather than as a bare id — an unlabelled "10" in a filter is
+# useless.
+SPORTS_TR = tr.SPORTS
 
 # engine/grade.py's outcomes, in the words the operator reads them in. Keyed on the exact
 # lowercase constants that module emits — an uppercase key here silently matched nothing

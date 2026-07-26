@@ -100,6 +100,11 @@ jobs:
       - name: Grade yesterday's predictions
         run: python3 tools/grade_predictions.py || echo "notlandirma atlandi"
 
+      # Yontem sayfasi koddan uretiliyor, elle yazilmiyor: bir esletirme ya da bir
+      # sinyalin durumu degisirse sayfa da degisir. Gunluk uretmek onu taze tutar.
+      - name: Build the method page
+        run: python3 tools/make_method_page.py --out method.html || echo "yontem sayfasi uretilemedi"
+
       # NOT: coupon.html artik gunluk kostan uretilmiyor. O sayfa taramanin
       # "kitap-ici ucuzluk" siralamasini gosteriyordu; gunluk urun ise model yonu +
       # guvenlik merdiveni. Ayni kosuda iki farkli siralamayla iki HTML uretmek,
@@ -113,7 +118,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Ham cekim repoya girmiyor; sadece rapor, secim sayfasi ve tahmin gunlugu.
-          git add daily_report.json picks.html data/predictions.jsonl data/scoreboard.json || true
+          git add daily_report.json picks.html method.html data/predictions.jsonl data/scoreboard.json || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
           git pull --rebase origin main || true
           git push || echo "push atlandi"

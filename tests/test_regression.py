@@ -20,9 +20,9 @@ sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
 from engine import (bwfeed, grade, ladder, mirror, parlay, pick, rating,  # noqa: E402
-                    score, settlement, telegram)
+                    score, settlement, signals, telegram)
 from tools import daily_report, daily_results as tools_daily_results  # noqa: E402
-from tools import make_picks_page  # noqa: E402
+from tools import make_method_page, make_picks_page  # noqa: E402
 
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import grade_predictions  # noqa: E402
@@ -739,6 +739,45 @@ class TestRegression(unittest.TestCase):
         self.assertEqual((s["win"], s["loss"], s["push"], s["graded"]), (3, 1, 1, 5))
         self.assertAlmostEqual(s["hit_rate"], 0.75)
         self.assertIn("%75.0", page)
+
+    def test_every_modelled_sport_has_a_live_signal(self):
+        """A sport that produces selections must have something marked live behind it.
+
+        The registry said table tennis had ZERO live signals for weeks after its model was
+        fitted and wired, and nothing noticed until a generated page put the two side by
+        side. A modelled sport with no live signal is either a stale registry or a model
+        running on nothing, and both need to be seen.
+        """
+        for sid in pick.MODELLED_SPORTS:
+            cov = signals.coverage(sid)[sid]
+            self.assertGreater(
+                cov["live"], 0,
+                f"sport {sid} is modelled but engine/signals.py lists no live signal")
+
+    def test_method_page_reports_coverage_without_flattering_it(self):
+        """The generated method page must state the gap, not imply it away.
+
+        1,261 researched mappings against 2 modelled sports is the honest headline, and a
+        long table is very good at implying the opposite.
+        """
+        out = os.path.join(ROOT, "fixtures", "_tmp_method.html")
+        try:
+            groups, mappings = make_method_page.build(out)
+            with open(out, encoding="utf-8") as f:
+                page = f.read()
+        finally:
+            if os.path.exists(out):
+                os.remove(out)
+
+        self.assertGreater(groups, 10)
+        self.assertGreater(mappings, 500)
+        self.assertIn(str(len(pick.MODELLED_SPORTS)), page)
+        for needle in ("Modelli", "Merdiven hazır, model yok", "Kapsam dışı",
+                       "puan = 100", "MIN_ODDS"):
+            self.assertIn(needle, page)
+        # Self-contained, like every page this project attaches to a Telegram message.
+        self.assertNotIn("<script src", page)
+        self.assertNotIn("<link", page)
 
     def test_telegram_caption_never_splits_a_tag(self):
         """Telegram caps a caption at 1024 characters and rejects the whole upload if the

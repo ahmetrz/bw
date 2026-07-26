@@ -10,6 +10,33 @@ falls through to its raw token, because a confident-looking Turkish label on a m
 have not decoded would be worse than the raw one: it would read as understood.
 """
 
+# Turkish names for every sport in the catalogue. Kept here with the rest of the
+# user-facing wording rather than duplicated per page: the picks page, the results page
+# and the method page all label the same 64 sports, and three copies would drift.
+SPORTS = {
+    1: "Futbol", 2: "Buz Hokeyi", 3: "Basketbol", 4: "Tenis", 5: "Beyzbol",
+    6: "Voleybol", 7: "Ragbi", 8: "Hentbol", 9: "Boks", 10: "Masa Tenisi",
+    11: "Satranç", 12: "Bilardo", 13: "Amerikan Futbolu", 14: "Futsal", 16: "Badminton",
+    17: "Sutopu", 18: "Motor Sporları", 19: "Biatlon", 20: "TV Oyunları", 21: "Dart",
+    22: "Alp Disiplini Kayak", 23: "Kayakla Atlama", 24: "Kayak", 25: "Plaj Futbolu",
+    26: "Formula 1", 27: "Çim Hokeyi", 28: "Avustralya Futbolu", 29: "Plaj Voleybolu",
+    30: "Snooker", 31: "Motosiklet", 36: "Bisiklet", 37: "Yüzme", 38: "Poker",
+    40: "E-Spor", 41: "Golf", 44: "At Yarışı", 48: "Lakros", 56: "Dövüş Sanatları",
+    60: "Eskrim", 63: "Yelken", 64: "Atıcılık", 66: "Kriket", 68: "Tazı Yarışı",
+    69: "Toto", 80: "Gal Futbolu", 81: "Sumo", 82: "Loto", 87: "Özel Bahisler",
+    92: "Koşu Atı", 102: "Speedway", 112: "Halter", 126: "Hurling",
+    132: "At Yarışı (uzun vadeli)", 133: "Koşu Atı (uzun vadeli)", 138: "Sörf",
+    151: "Tazı Yarışı (uzun vadeli)", 155: "Bilek Güreşi", 176: "Hava Durumu",
+    189: "UFC", 202: "Siyaset", 278: "Çıplak El Boksu", 303: "Geleceğin Oyunları",
+    307: "Profesyonel Güreş", 314: "Polybet",
+}
+
+
+def sport(sport_id, fallback=None):
+    """Turkish name for a sport id, or the given fallback (usually the English name)."""
+    return SPORTS.get(sport_id) or fallback or (str(sport_id) if sport_id else "")
+
+
 MARKET_TYPES = {
     "moneyline": "Maç Sonucu (1X2)",
     "moneyline2way": "Maç Sonucu (çift seçenek)",
