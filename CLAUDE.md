@@ -149,6 +149,24 @@ draw, an unreadable format, and anything gone too briefly to be sure it is gone.
 that guesses is worse than no watcher: a wrong row is indistinguishable from a real one
 once it is inside a rating.
 
+**Archives are now the exception, not the plan.** Free result archives were worth hunting
+while watching was rationed by a private repo's Actions quota. The repo is public, the
+watcher runs fifty minutes an hour, and it collects from every sport the book carries, so
+an archive is only worth writing when a sport is too THIN to accumulate — snooker at four
+fixtures in 48 hours will take months to reach 400 whatever the cadence. Checked by our
+crawler's name, 2026-07-26:
+  * `api.snooker.org` — no robots.txt (404), but the API answers **401** without a
+    registered application name. Not usable without signing up.
+  * `api.openligadb.de` — no robots.txt, real JSON, 812 leagues. Its ice hockey and
+    handball seasons are mostly 2008-2013, and the current ones (CHL, DEL) are not the
+    competitions Betwinner's card carries. Open and useless to us, which is worth writing
+    down so nobody checks it twice.
+  * `dartsorakel.com` — `User-agent: *` / `Disallow:` (empty), so everything is allowed.
+    HTML rather than an API; the one candidate still worth building if darts stays thin.
+  * `cev.eu` — no robots.txt. A website, not a feed.
+  * `volleybox.net`, `hltv.org`, `shl.se` — **403 to us on robots.txt itself**. Blocked
+    before any question of permission arises.
+
 Betwinner has a results SERVICE as well, and it is worth another look but is not a blocker:
 `service-api/result/web/api/v3/games` is the live version (v1/v2/v4+ answer
 UnsupportedApiVersion; v3 answers a clean 400, so the route and version are right and only
