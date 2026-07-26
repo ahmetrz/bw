@@ -184,7 +184,9 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
         model = (generic or {}).get(sport)
         if not model:
             return None, 0.0, None
-        probs, score = model_generic.lookup(model, home, away)
+        probs, score = model_generic.lookup(
+            model, home, away,
+            home_id=sample.get("p1_id"), away_id=sample.get("p2_id"))
         if probs and score >= 0.86:
             return probs, score, "generic"
         return None, 0.0, None

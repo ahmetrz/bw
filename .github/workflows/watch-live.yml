@@ -99,10 +99,29 @@ jobs:
             echo "degisiklik yok"
             exit 0
           fi
+          # Kendi satirlarimizin bir kopyasi. Cakisma olursa bunlari uzak duruma YENIDEN
+          # ISLEYECEGIZ: izlenmis bir sonuc tekrar izlenemez, mac bitti. "Bir sonraki
+          # calistirma yakalar" burada dogru degil — bir sonraki kosu temiz bir kaptan
+          # origin/main ile basliyor, gonderilemeyen satirlar kayboluyor.
+          mkdir -p /tmp/bwsave && cp -r data/results /tmp/bwsave/
           git commit -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ)"
-          # Bu is saatte bir yaziyor ve gunluk kosu da ayni dala yaziyor.
           for i in 1 2 3; do
-            git pull --rebase origin main && git push && exit 0
+            if git pull --rebase origin main && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main
+            git reset --hard origin/main
+            python3 tools/merge_store.py /tmp/bwsave/results
+            CHANGED=$(git diff --name-only -- data/results \
+              | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p')
+            for SPORT in $CHANGED; do
+              python3 tools/build_generic_model.py --sport "$SPORT" >/dev/null 2>&1 || true
+            done
+            git add data/results data/models || true
+            if git diff --cached --quiet; then
+              echo "uzak durumda zaten var"
+              exit 0
+            fi
+            git commit -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ) (yeniden islendi)"
             sleep $((i * 5))
           done
-          echo "push basarisiz — bir sonraki calistirma yakalar"
+          echo "push basarisiz — satirlar /tmp/bwsave altinda, bu kap silinince gider"

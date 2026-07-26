@@ -106,6 +106,28 @@ def _aliases_by_pool(aliases, latest):
     return out
 
 
+def _book_ids(rows, latest):
+    """pool -> {betwinner participant id: current team name}.
+
+    Only from rows the live watcher collected, because only those ids came from the book.
+    A source's own id — EuroLeague's club code, Setka's player id — identifies the team
+    inside THAT source and means nothing on Betwinner's card, so mixing the two would
+    resolve a fixture to whichever unrelated team happened to share a number.
+    """
+    out = {}
+    for r in rows:
+        if r.get("source") != "betwinner-live":
+            continue
+        pool = mg.pool_of(r)
+        for side in ("home", "away"):
+            bid = r.get(f"{side}_id")
+            if not bid:
+                continue
+            key = (pool, mg.team_key(r, side))
+            out.setdefault(pool, {})[str(bid)] = latest.get(key, r[side])
+    return out
+
+
 def _appearances_by_pool(seen, latest):
     out = {}
     for (pool, key), n in seen.items():
@@ -164,6 +186,12 @@ def build(sport_id, out_dir=mg.MODELS):
         "appearances": _appearances_by_pool(_appearances(rows), latest),
         "pools": _by_pool(rating, latest),
         "aliases": _aliases_by_pool(aliases, latest),
+        # THE BOOK'S OWN PARTICIPANT IDS, where a source recorded them. The live watcher
+        # takes them straight off the feed the card is built from, so for anything it
+        # collected the fixture on today's card and the row in the store share a key that
+        # no spelling can break — and name matching, with its fuzzy threshold and its
+        # (Women)/U20 guard, does not have to be right for that fixture at all.
+        "book_ids": _book_ids(rows, latest),
     }
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, f"{sport_id}.json"), "w") as f:

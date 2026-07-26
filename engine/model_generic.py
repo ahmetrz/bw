@@ -368,20 +368,35 @@ def appearances(model, pool, team):
     return ((model.get("appearances") or {}).get(pool) or {}).get(team, 0)
 
 
-def lookup(model, home, away, matcher=None):
+def lookup(model, home, away, matcher=None, home_id=None, away_id=None):
     """Probabilities for one fixture, or (None, 0.0) when it cannot be priced honestly.
 
     BOTH teams must resolve inside the SAME pool. A cross-pool comparison is how a model
     ends up rating a Championship side against a Bundesliga side on a scale neither of
     them has ever been measured on.
+
+    When the card and the store share the BOOK'S participant id, that wins outright and
+    the names are not consulted. Name matching is the weakest link in this whole path: it
+    needs a fuzzy threshold, it needs a guard against "(Women)" and "U20" resolving to the
+    senior side — a guard that was once dropped and immediately priced a women's fixture
+    at 99.78% off the men's ratings — and it still fails on a transliteration or a sponsor
+    rename. An id has none of those failure modes. It is available for every fixture the
+    live watcher collected, because it comes off the same feed the card is built from.
     """
     if not model:
         return None, 0.0
     match = matcher or exact_matcher(model)
     best = None
+    ids = model.get("book_ids") or {}
     for pool in model["pools"]:
-        h, hs = match(home, pool)
-        a, asc = match(away, pool)
+        by_id = ids.get(pool) or {}
+        h = by_id.get(str(home_id)) if home_id else None
+        a = by_id.get(str(away_id)) if away_id else None
+        hs = asc = 1.0
+        if h is None:
+            h, hs = match(home, pool)
+        if a is None:
+            a, asc = match(away, pool)
         if h is None or a is None or h == a:
             continue
         # A provisional rating is not a rating. Refusing here costs a selection; pricing

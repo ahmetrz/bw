@@ -234,6 +234,12 @@ def normalize(data, book="betwinner"):
                     "fixture_id": ci,
                     "p1": gm.get("O1"),
                     "p2": gm.get("O2"),
+                    # The book's own participant ids, present on every fixture it lists.
+                    # A model that has seen these teams under the same ids can resolve the
+                    # fixture EXACTLY, without a name match — which is the one step in
+                    # this pipeline that can silently resolve to the wrong team.
+                    "p1_id": gm.get("O1I"),
+                    "p2_id": gm.get("O2I"),
                     "start": start,
                     # Needed to build the deep link back into Betwinner. The numeric
                     # form /en/line/<sport>/<champ>/<game> resolves; the slug form

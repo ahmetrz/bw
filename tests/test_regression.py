@@ -1125,6 +1125,49 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(collect_live.placeable(crick))
         self.assertFalse(collect_live.placeable({**crick, "note": ""}))
 
+    def test_the_books_own_id_beats_a_name_match(self):
+        """Where the card and the store share the book's participant id, use it.
+
+        Name matching is the weakest link in this pipeline. It needs a fuzzy threshold, it
+        needs a guard against "(Women)" and "U20" resolving to the senior side — a guard
+        that was once dropped and immediately priced a women's fixture at 99.78% off the
+        men's ratings — and it still fails on a transliteration or a sponsor rename. An id
+        has none of those failure modes, and the live watcher takes it off the same feed
+        the card is built from, so for anything it collected the two sides share a key
+        that no spelling can break."""
+        model = {
+            "sport_id": 99,
+            "pools": {"": {"Alpha FC": 1600.0, "Beta United": 1500.0}},
+            "appearances": {"": {"Alpha FC": 50, "Beta United": 50}},
+            "book_ids": {"": {"111": "Alpha FC", "222": "Beta United"}},
+            "bands": {"": [{"lo": -9, "hi": 9, "n": 900,
+                            "margin": {0: 300, 1: 300, -1: 300},
+                            "total": {2.0: 900}}]},
+            "line": {"slope": 0.004, "intercept": 0.0, "mean_abs_margin": 1.0},
+            "unit": "goals",
+        }
+        model["_margin"] = {k: [model_generic._pmf(b["margin"]) for b in v]
+                            for k, v in model["bands"].items()}
+        model["_total"] = {k: [model_generic._pmf(b["total"]) for b in v]
+                           for k, v in model["bands"].items()}
+        # Names the matcher could never resolve — a rename and a transliteration.
+        probs, score = model_generic.lookup(
+            model, "Alpha Sportclub 1902", "Бета Юнайтед", home_id=111, away_id=222)
+        self.assertIsNotNone(probs)
+        self.assertEqual(probs["_teams"], ("Alpha FC", "Beta United"))
+        self.assertEqual(score, 1.0)
+        # Without the ids, the same fixture is refused rather than guessed at.
+        self.assertIsNone(
+            model_generic.lookup(model, "Alpha Sportclub 1902", "Бета Юнайтед")[0])
+        # An id the store has never seen falls back to the name, not to a wrong team.
+        self.assertIsNone(
+            model_generic.lookup(model, "Nothing Like It", "Beta United",
+                                 home_id=999, away_id=222)[0])
+        # And the normalized card carries the ids in the first place, or none of the
+        # above ever fires on a real fixture.
+        rows = bwfeed.normalize(_sample())
+        self.assertTrue(any(r.get("p1_id") and r.get("p2_id") for r in rows))
+
     def test_a_sport_skipped_before_fetching_is_still_reported(self):
         """Cutting the fetch must not cut the coverage report.
 
