@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine import results_store  # noqa: E402
+from tools import collect_live  # noqa: E402
 
 
 def rows_of(path):
@@ -38,9 +39,36 @@ def rows_of(path):
                 continue
 
 
+def merge_ledger(saved, live):
+    """Union two append-only collection ledgers, keyed on (timestamp, sport).
+
+    The ledger is what the daily report's "this sport is N days away" projection is
+    computed from, and it was being dropped by the very recovery that saves the results:
+    the retry path resets to the remote state, which does not have the lines this run
+    appended. The results came back and the record of WHEN they arrived did not, so the
+    measured rate would drift downwards every time a slice lost a race.
+    """
+    rows = {}
+    for path in (live, saved):
+        if not path or not os.path.exists(path):
+            continue
+        for r in rows_of(path):
+            at, sport = r.get("at"), r.get("sport")
+            if at is None or sport is None:
+                continue
+            rows[(at, sport)] = r
+    if not rows:
+        return 0
+    with open(live, "w") as f:
+        for key in sorted(rows):
+            f.write(json.dumps(rows[key]) + "\n")
+    return len(rows)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("saved", help="directory holding <sport_id>.jsonl files")
+    ap.add_argument("--ledger", default="", help="saved copy of data/watch_log.jsonl")
     args = ap.parse_args()
 
     if not os.path.isdir(args.saved):
@@ -59,6 +87,9 @@ def main():
         total += added
         if added:
             print(f"sport {sport_id}: +{added} replayed, {held} stored")
+    if args.ledger:
+        kept = merge_ledger(args.ledger, collect_live.LEDGER)
+        print(f"ledger: {kept} entries after union")
     print(f"replayed {total} results that would otherwise have been lost")
     return 0
 

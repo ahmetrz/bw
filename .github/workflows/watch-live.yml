@@ -100,17 +100,19 @@ jobs:
             # "Bir sonraki kosu yakalar" burada dogru degil — bir sonraki kosu temiz bir
             # kaptan origin/main ile basliyor ve gonderilemeyen satirlar kayboluyor.
             rm -rf /tmp/bwsave && mkdir -p /tmp/bwsave && cp -r data/results /tmp/bwsave/
+            cp -f data/watch_log.jsonl /tmp/bwsave/watch_log.jsonl 2>/dev/null || true
             git commit -q -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ)"
             for i in 1 2 3; do
               if git pull --rebase -q origin main && git push -q; then return 0; fi
               git rebase --abort 2>/dev/null || true
               git fetch -q origin main && git reset --hard -q origin/main
-              python3 tools/merge_store.py /tmp/bwsave/results || true
+              python3 tools/merge_store.py /tmp/bwsave/results \
+                --ledger /tmp/bwsave/watch_log.jsonl || true
               for S in $(git diff --name-only -- data/results \
                           | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p'); do
                 python3 tools/build_generic_model.py --sport "$S" >/dev/null 2>&1 || true
               done
-              git add data/results data/models || true
+              git add data/results data/models data/watch_log.jsonl || true
               git diff --cached --quiet && return 0
               git commit -q -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ) (yeniden islendi)"
               sleep $((i * 5))
