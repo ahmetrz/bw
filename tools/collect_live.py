@@ -27,9 +27,9 @@ TWO WAYS A MATCH GETS WRITTEN DOWN, and the first is far better than the second:
   1. The feed SAYS SO. `SC.CPS` becomes "Match finished" and the fixture lingers for a
      while before it is dropped. Nothing is inferred; the book states the match is over
      and states the score. Sweeping often enough to catch that window is the whole job.
-  2. It VANISHED. If a fixture is gone and its last seen score looks finished for its
-     format, it is recorded. This is the fallback, and it is the one that can be wrong,
-     so it is fenced (see `looks_finished`).
+  2. It VANISHED, and the state it was last seen in says the match was over — the score
+     for a race, the CLOCK for a period sport. This is the fallback, and it is the one
+     that can be wrong, so it is fenced (see `looks_finished`).
 
 WHAT IT REFUSES TO RECORD, because a watcher that guesses is worse than no watcher:
   * a sport whose finish condition we cannot state — it is simply not in `SPORTS` below.
@@ -207,16 +207,21 @@ MIN_PERIOD_MINUTES = {
 _PERIOD_MINUTES = re.compile(r'^(\d+)\s*(?:[x×]\s*(\d+)|\s*halves?\s+of\s+(\d+))', re.I)
 
 
-def period_minutes(note):
-    """Declared minutes per period, or None when the note does not state one."""
+def period_shape(note):
+    """(periods, minutes each) as DECLARED by the note, or (None, None)."""
     m = _PERIOD_MINUTES.match((note or "").strip())
     if not m:
-        return None
+        return None, None
     mins = m.group(2) or m.group(3)
     try:
-        return int(mins)
+        return int(m.group(1)), int(mins)
     except (TypeError, ValueError):
-        return None
+        return None, None
+
+
+def period_minutes(note):
+    """Declared minutes per period, or None when the note does not state one."""
+    return period_shape(note)[1]
 
 
 def real_format(sport, note):
@@ -230,6 +235,69 @@ def real_format(sport, note):
         return True
     got = period_minutes(note)
     return got is None or got >= need
+
+
+# SPORTS WHOSE CLOCK WE HAVE READ, and the length of regulation time in seconds.
+#
+# A period sport has no score that says "over" — 1-0 in the second half looks exactly like
+# 1-0 at full time — which is why the vanish path refused the whole class. But the feed
+# publishes a CLOCK, and an end-of-match probe on real football showed the clock says it
+# plainly: `SC.TS` counts up to 5400 and stops there, and `SC.SLS` — the human string,
+# "84 minutes" — goes EMPTY at the same moment. Three matches watched to their end, three
+# times that pair; the one still being played at the time sat at TS=5034 / SLS="84
+# minutes". Only one of the three ever showed "Match finished", so the other two were
+# results this collector was throwing away.
+#
+# This table is short on purpose. It is a list of sports whose TS/SLS semantics were
+# WATCHED, not a list of sports that have a clock. Basketball and hockey have one too and
+# are absent, because nobody has yet seen one of their matches end here — a game clock
+# that counts DOWN, or a period clock that resets, would satisfy this rule at half time.
+# To add a sport: probe it to its end, confirm the pair, then add the line.
+CLOCK_FINISH = {
+    1: 90 * 60,     # football — two forty-five minute halves
+}
+
+# The clock reaching regulation is not the end of the match if there is more scheduled
+# after it, and extra time changes the score AFTER the result our markets settle on. Both
+# are refused: the period must be the last one, and the status must not name an overtime.
+EXTRA = ("extra", "overtime", "penalt", "shoot")
+
+
+def regulation_seconds(rec):
+    """Length of this fixture's regulation time, or None if the sport's clock is unread.
+
+    Read off the note where the book declares one — "2x40" is an eighty-minute game and
+    its clock stops eighty minutes in — and only otherwise from the sport's default.
+    """
+    default = CLOCK_FINISH.get(rec["sport"])
+    if default is None:
+        return None
+    periods, minutes = period_shape(rec.get("note"))
+    if periods and minutes:
+        return periods * minutes * 60
+    return default
+
+
+def clock_says_over(rec):
+    """Has this fixture's clock run out, with nothing scheduled after it?
+
+    Four conditions, and every one of them has to hold:
+      * the sport's clock has been watched to the end of a match (`CLOCK_FINISH`);
+      * `SLS` is EMPTY — while a match is being played the feed reports the minute, so a
+        running clock is a match still running;
+      * `TS` has reached regulation;
+      * we are in the last scheduled period and the status names no overtime, because a
+        match going to extra time keeps playing and its final score is not the one the
+        markets we price settle on.
+    """
+    full = regulation_seconds(rec)
+    if full is None or rec.get("sls"):
+        return False
+    if int(rec.get("ts") or 0) < full:
+        return False
+    if any(word in (rec.get("cps") or "").lower() for word in EXTRA):
+        return False
+    return bool(rec.get("n")) and rec.get("period") == rec["n"]
 
 
 # "7 Games Match (4 Games up to win)" — the explicit form, and the one to trust.
@@ -292,7 +360,12 @@ def snapshot(game, sport):
         return None
     sc = game.get("SC") or {}
     fs = sc.get("FS") or {}
-    if "S1" not in fs and "S2" not in fs:
+    ts = int(sc.get("TS") or 0)
+    # `FS` omits a zero, so a goalless match has no score at all and used to look like one
+    # that had not begun. A running CLOCK says otherwise, and dropping those would drop
+    # every 0-0 — which is not a rare scoreline but roughly one football match in twelve,
+    # and losing it systematically would tilt the model's goal distribution upward.
+    if "S1" not in fs and "S2" not in fs and ts <= 0:
         return None                       # not under way; nothing to remember yet
     kind, n = format_of(game, sport)
     return {
@@ -307,6 +380,11 @@ def snapshot(game, sport):
         # periods that have a score, and one of the two is present for every sport.
         "period": int(sc.get("CP") or len(sc.get("PS") or []) or 0),
         "cps": (sc.get("CPS") or "").strip(),
+        # The clock, both ways the feed states it: `TS` in seconds and `SLS` as the minute
+        # in words. They disagree in exactly one situation and that situation is the end of
+        # the match — see `clock_says_over`.
+        "ts": ts,
+        "sls": (sc.get("SLS") or "").strip(),
         "seen": int(time.time()),
     }
 
@@ -363,27 +441,34 @@ def looks_finished(rec):
     collector reasons rather than reads. Deliberately strict: every branch that cannot
     answer returns False, so an unknown format costs us a result rather than inventing one.
 
-    IT ONLY ANSWERS FOR A RACE, and that limit is the point. In a set, frame, map or leg
-    sport the score ITSELF says the match is over: nobody reaches four in a best-of-seven
-    and plays on. A period sport has no such tell. A football match seen at 1-0 in the
-    second half and gone by the next sweep satisfies every structural check — right
-    period, plausible score — and may well have finished 3-1, so recording it writes down
-    a scoreline that never happened. Being in the last period is not being finished, and
-    there is no reading of the payload that turns one into the other. Period sports are
-    therefore recorded ONLY when the feed itself says "Match finished" (`is_finished_now`),
-    which costs some football results and no correctness. That is the right way round:
-    football, basketball, baseball and hockey all have archives behind them, and the
-    sports this watcher EXISTS for — table tennis, volleyball, snooker, darts, badminton,
-    esports — are races, every one of them.
+    TWO THINGS CAN SAY SO, and neither of them is the score being plausible.
+
+    In a set, frame, map or leg sport the score ITSELF says the match is over: nobody
+    reaches four in a best-of-seven and plays on. That is the race branch below.
+
+    A period sport has no such tell — 1-0 in the second half looks exactly like 1-0 at full
+    time, and a match seen at 1-0 and gone by the next sweep may well have finished 3-1, so
+    recording the structural check alone writes down a scoreline that never happened. That
+    is why this whole class was refused. What replaces the refusal is not a better guess
+    about the score but a DIFFERENT FIELD: the clock, which the feed publishes and which
+    stops. `clock_says_over` is that reading, and it is enabled only for the sports whose
+    clock has been watched to the end of a real match.
+
+    The residual exposure is stated rather than hidden: a fixture that both reaches
+    regulation and disappears for three minutes while injury time is still being played
+    would be recorded at its 90-minute score. It is a narrow window and the alternative
+    costs most of the sport, since only one football match in three announces itself as
+    finished before it drops off the feed.
     """
     s1, s2 = rec["s1"], rec["s2"]
     n = rec.get("n")
-    if rec["kind"] != "target":
-        return False
-    if not n:
-        return False                       # format unreadable — refuse, do not guess
     if s1 == s2 and rec["sport"] not in CAN_DRAW:
         return False                       # caught mid-flight, not a drawn result
+    if rec["kind"] != "target":
+        # A period sport: the clock, or nothing.
+        return clock_says_over(rec)
+    if not n:
+        return False                       # format unreadable — refuse, do not guess
     # A race: somebody has to have got there, and the loser must NOT have got there too,
     # which would mean we are reading a running total rather than a final one.
     return max(s1, s2) >= n and min(s1, s2) < n
@@ -475,7 +560,12 @@ def sweep(state, ids, quiet, round_no, fake=None):
             waiting += 1
             continue
         state.pop(gid, None)
-        if age > FORGET_AFTER or not looks_finished(rec):
+        # `placeable` matters on this path now. It used to be implied — the only fixtures
+        # `looks_finished` accepted were races with a readable target, which is what
+        # `placeable` asks of them — but a period sport reaching the clock rule does not
+        # answer it, and a five-minute-half game filed under football would otherwise be
+        # stored beside the ninety-minute ones.
+        if age > FORGET_AFTER or not (placeable(rec) and looks_finished(rec)):
             dropped += 1
             continue
         done.setdefault(rec["sport"], []).append(to_result(rec, now))
