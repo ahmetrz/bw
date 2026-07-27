@@ -35,6 +35,13 @@ from tools import make_picks_page  # noqa: E402
 
 STATE = "data/results_sent.json"
 
+# Below this many SETTLED legs, a hit rate is arithmetic rather than evidence, and it is
+# labelled as such wherever it is shown. Not a display nicety: this project has twice been
+# steered by a percentage that meant nothing — 87.1% computed from matches that had not
+# kicked off, and 100% computed from a single leg — and both looked entirely credible
+# printed in bold.
+MIN_MEANINGFUL = 20
+
 
 def load_log(path):
     rows = []
@@ -104,17 +111,25 @@ def build_notice(day, report, page_name, total, settled):
             f"<b>{settled} / {total}</b> seçim sonuçlandı",
             f"✅ {s.get('win', 0)} kazandı · ❌ {s.get('loss', 0)} kaybetti · "
             f"↩️ {s.get('push', 0) + s.get('half', 0)} iade/yarım",
+            # A rate on a handful of legs is not a rate, and this project has twice been
+            # misled by exactly that number — an 87.1% built from unplayed matches and a
+            # 100% built from one. Print the count, and say plainly when the sample is too
+            # small to mean anything rather than letting a bold percentage imply it does.
             (f"isabet <b>%{100 * hit:.1f}</b> ({decided} sonuçlanan üzerinden)"
+             + ("" if decided >= MIN_MEANINGFUL
+                else f" — <i>örneklem çok küçük, {MIN_MEANINGFUL} sonuçlanan seçime "
+                     f"kadar bu oranı bir performans olarak okumayın</i>")
              if hit is not None else "isabet: henüz hesaplanamıyor"),
             f"1 birimlik bahislerde getiri <b>{s['returned'] / s['staked']:.3f}x</b>"
             if s.get("staked") else "",
         ]
     pending = total - settled
     if pending:
-        lines += ["", f"<i>{pending} seçim hâlâ bekliyor. Futbol sonuçları "
-                      "football-data.co.uk'ten geliyor ve haftada birkaç kez "
-                      "yayınlanıyor, bu yüzden aynı akşam tamamlanmayabilir — "
-                      "sonuçlar geldikçe bu sayfa güncellenir.</i>"]
+        lines += ["", f"<i>{pending} seçim hâlâ bekliyor. Sonuçların çoğu kitabın canlı "
+                      "akışından, biten maç görüldüğü anda geliyor; izleyicinin o anda "
+                      "bakmadığı maçlar için futbolda football-data.co.uk devreye giriyor "
+                      "ve o haftada birkaç kez yayınlanıyor. Sonuçlar geldikçe bu sayfa "
+                      "güncellenir.</i>"]
     lines += ["", f"📄 İşaretlenmiş tam liste ekteki <b>{page_name}</b> dosyasında."]
     return "\n".join(x for x in lines if x != "")
 

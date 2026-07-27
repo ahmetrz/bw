@@ -376,7 +376,17 @@ SCORECARD = """<div class="scorecard">
   <div class="stat"><b style="color:var(--push)">{push}</b><span>iade / yarım</span></div>
   <div class="stat"><b>{pending}</b><span>bekliyor</span></div>
   <div class="stat"><b>{roi}</b><span>1 birimlik bahislerde getiri</span></div>
-</div>"""
+</div>{caveat}"""
+
+# The page is where the number is actually read, so the warning belongs here and not only
+# in the Telegram caption. A bold percentage over three legs looks exactly like a bold
+# percentage over three hundred, and this project has twice been steered by the former.
+SMALL_SAMPLE = ("""<p class="note">Bu oran <b>{decided}</b> sonuçlanan seçime dayanıyor."""
+                """ En az {need} seçim sonuçlanana kadar bir performans göstergesi"""
+                """ değil — sonuçlar geldikçe anlamlı hale gelecek.</p>""")
+
+# Below this many settled legs a hit rate is arithmetic, not evidence.
+MIN_MEANINGFUL = 20
 
 
 def _fmt_pct(x):
@@ -461,10 +471,13 @@ def build(report, out_path):
     summary = report.get("summary")
     scorecard = ""
     if summary:
+        decided = (summary.get("win", 0) + summary.get("half", 0)
+                   + summary.get("loss", 0))
         scorecard = SCORECARD.format(
             hit=_fmt_pct(summary.get("hit_rate")),
-            decided=(summary.get("win", 0) + summary.get("half", 0)
-                     + summary.get("loss", 0)),
+            decided=decided,
+            caveat=("" if decided >= MIN_MEANINGFUL
+                    else SMALL_SAMPLE.format(decided=decided, need=MIN_MEANINGFUL)),
             win=summary.get("win", 0), loss=summary.get("loss", 0),
             push=summary.get("push", 0) + summary.get("half", 0),
             pending=len(picks) - len(settled),

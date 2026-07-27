@@ -1257,6 +1257,39 @@ class TestRegression(unittest.TestCase):
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
 
+    def test_a_hit_rate_on_a_handful_of_legs_says_so(self):
+        """A percentage over three legs looks exactly like one over three hundred.
+
+        This project has twice been steered by a number that meant nothing: 87.1%
+        computed from matches that had not kicked off, and 100% computed from a single
+        leg. Both were arithmetically correct and both were printed in bold. The fix for
+        the first two was to stop producing them; the fix for the general case is to say
+        how much they rest on, on the PAGE and not only in the Telegram caption, because
+        the page is where the number is actually read."""
+        base = {"id": 1, "score": 90.0, "band": "güçlü", "p1": "A", "p2": "B",
+                "sport_id": 1, "start": "2026-07-26T12:00:00+00:00", "odds": 1.5,
+                "selection_tr": "x", "market_line": "17|2.5", "outcome_id": 10,
+                "model_survival": 0.9, "league": "L", "window": 24}
+        def page(picks, summary):
+            with tempfile.TemporaryDirectory() as tmp:
+                out = os.path.join(tmp, "results.html")
+                make_picks_page.build({"day": "2026-07-26", "picks": picks,
+                                       "summary": summary}, out)
+                with open(out) as f:
+                    return f.read()
+
+        thin = page([dict(base, result="win"), dict(base, id=2, result="loss")],
+                    {"win": 1, "half": 0, "push": 0, "loss": 1, "hit_rate": 0.5,
+                     "staked": 2, "returned": 1.5})
+        self.assertIn("sonuçlanan seçime dayanıyor", thin)
+        self.assertIn(str(make_picks_page.MIN_MEANINGFUL), thin)
+
+        # Once there is enough behind it, the caveat goes away rather than nagging.
+        many = page([dict(base, id=i, result="win") for i in range(40)],
+                    {"win": 40, "half": 0, "push": 0, "loss": 0, "hit_rate": 1.0,
+                     "staked": 40, "returned": 60.0})
+        self.assertNotIn("sonuçlanan seçime dayanıyor", many)
+
     def test_a_result_recorded_the_other_way_round_is_swapped_not_dropped(self):
         """Which participant is "home" belongs to the SOURCE, not to the match.
 
