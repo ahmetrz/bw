@@ -26,7 +26,7 @@ from engine import (bwfeed, coupon, grade, ladder, mirror, model_generic,  # noq
                     parlay, pick, rating, results_store, score, settlement, signals,
                     simulated, telegram)
 from tools import collect_live, daily_report, fetch_window  # noqa: E402
-from tools import grade_predictions  # noqa: E402
+from tools import grade_predictions, heartbeat  # noqa: E402
 from tools import daily_results as tools_daily_results  # noqa: E402
 from tools import make_method_page, make_picks_page  # noqa: E402
 
@@ -1257,6 +1257,30 @@ class TestRegression(unittest.TestCase):
             simulated.save({(2, "RHL"): "why"}, path)
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
+
+    def test_a_missing_day_is_reported_and_a_quiet_one_is_not(self):
+        """A workflow that does not run produces no failure to notice.
+
+        On 2026-07-27 the daily schedule never fired — not late, not at all — and nothing
+        said so. A missing list looks exactly like a card where nothing cleared the
+        confidence floor, and those are opposite situations: one is a real and expected
+        outcome, the other means nobody got their list. So the check asks whether today's
+        OUTPUT exists, from outside, on a different schedule, because a job that never
+        started cannot report anything about itself."""
+        yesterday = {"2026-07-26": 99}
+        # Before the day is due, silence is not evidence of anything.
+        ok, _ = heartbeat.verdict(yesterday, "2026-07-27", 7, 9)
+        self.assertTrue(ok)
+        # After it is due and nothing was logged, say so — and say what is KNOWN rather
+        # than asserting a cause this check cannot see.
+        ok, msg = heartbeat.verdict(yesterday, "2026-07-27", 10, 9)
+        self.assertFalse(ok)
+        self.assertIn("2026-07-27", msg)
+        self.assertIn("hiç tahmin kaydı yok", msg)
+        self.assertIn("2026-07-26", msg)          # yesterday, for comparison
+        # A day that did produce a list is not an alarm.
+        ok, _ = heartbeat.verdict({**yesterday, "2026-07-27": 29}, "2026-07-27", 10, 9)
+        self.assertTrue(ok)
 
     def test_a_coupon_leg_carries_the_line_the_backed_side_sees(self):
         """The bet-slip event must express the line from the BACKED side's point of view.

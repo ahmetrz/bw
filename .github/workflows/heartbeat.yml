@@ -1,0 +1,67 @@
+name: heartbeat
+
+# Gunluk liste CIKMADIYSA bunu soyleyen kontrol.
+#
+# NEDEN AYRI BIR IS: calismayan bir is hata uretmiyor. 2026-07-27'de gunluk zamanlama hic
+# atesLenmedi — gec kalmadi, hic calismadi — ve bunu soyleyen hicbir sey olmadi. Eksik bir
+# liste, "bugun esigi gecen secim cikmadi" durumundan disaridan ayirt edilemiyor; ikisi
+# farkli durumlar ve yalnizca biri insan istiyor.
+#
+# Bu yuzden kontrol "is basarili miydi" diye sormuyor — hic baslamamis bir is kendisi
+# hakkinda hicbir sey raporlayamaz. "Bugunun CIKTISI var mi" diye soruyor, ve baska bir
+# zamanlamadan, disaridan soruyor. Tahmin gunlugune bakiyor cunku sonradan yeniden
+# uretilemeyen tek sey o.
+#
+# Gunde en fazla BIR kez uyariyor. Her saat tekrarlayan bir alarm, operatore onu gormezden
+# gelmeyi ogretir; bunun yalnizca ilk seferinde inanilmasi yeterli.
+
+on:
+  schedule:
+    - cron: "23 9 * * *"
+    - cron: "23 13 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "true = Telegram'a gonderme, sadece yazdir"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: heartbeat
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is today's list there?
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DRY: ${{ inputs.dry_run || 'false' }}
+        run: |
+          FLAG=""
+          if [ "${DRY}" = "true" ]; then FLAG="--dry-run"; fi
+          python3 tools/heartbeat.py ${FLAG}
+
+      - name: Commit
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/heartbeat.json || true
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -q -m "heartbeat: $(date -u +%Y-%m-%d) uyarisi gonderildi"
+          for i in 1 2 3; do
+            git pull --rebase -q origin main && git push -q && exit 0
+            git rebase --abort 2>/dev/null || true
+            git fetch -q origin main && git reset --hard -q origin/main
+            sleep $((i * 5))
+          done
+          echo "push basarisiz — uyari gonderildi, durum kaydedilemedi"
