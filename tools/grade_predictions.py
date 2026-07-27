@@ -161,11 +161,22 @@ def store_results(sport_id):
     by_id, by_name = {}, {}
     for r in results_store.load(sport_id):
         entry = (r["date"], r["home_score"], r["away_score"])
+        # AND THE SAME FIXTURE THE OTHER WAY ROUND, with the scores swapped to match.
+        # Which participant is "home" is a property of the SOURCE, not of the match: in
+        # table tennis and tennis there is no home side at all, so the book's O1/O2 and
+        # Setka's p1/p2 are ordered independently. Keying only one way silently lost
+        # results that were sitting in the store — and losing them is the safe failure,
+        # while forgetting to swap the scores would settle the bet against the wrong
+        # player, which is the unsafe one.
+        flipped = (r["date"], r["away_score"], r["home_score"])
         h, a = _norm(r.get("home")), _norm(r.get("away"))
         if h and a:
             by_name.setdefault((h, a), []).append(entry)
+            by_name.setdefault((a, h), []).append(flipped)
         if r.get("source") == "betwinner-live" and r.get("home_id") and r.get("away_id"):
-            by_id.setdefault((str(r["home_id"]), str(r["away_id"])), []).append(entry)
+            hid, aid = str(r["home_id"]), str(r["away_id"])
+            by_id.setdefault((hid, aid), []).append(entry)
+            by_id.setdefault((aid, hid), []).append(flipped)
     return by_id, by_name
 
 

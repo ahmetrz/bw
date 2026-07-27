@@ -22,6 +22,44 @@ WIN, PUSH, HALF, LOSS = "win", "push", "half", "loss"
 # Groups and outcome ids, matching engine/ladder.py and engine/bwfeed.py.
 G_1X2, G_DOUBLE_CHANCE, G_HANDICAP, G_ASIAN_HANDICAP, G_TOTAL, G_ML2 = 1, 8, 2, 2854, 17, 101
 
+# HANDICAPS IN A UNIT THAT IS NOT GOALS. The arithmetic is identical — a margin against a
+# line — but the group and outcome ids differ per sport, and a group this file does not
+# list settles as None, which means the prediction is never graded at all.
+#
+# That is exactly what happened, and it is why the first real hit rate was empty. The
+# safety ladder's favourite table tennis rung is a set handicap on group 7099, table
+# tennis was the second most-predicted sport, and every one of those predictions sat
+# ungraded for ever while the coverage looked like a data problem. It was not: the results
+# were in the store. Nothing could score them.
+#   109  tennis AND volleyball set handicap
+#   7099 table tennis set handicap
+#   2438 esports map handicap
+HANDICAP_GROUPS = {
+    G_HANDICAP: (7, 8),
+    G_ASIAN_HANDICAP: (3829, 3830),
+    109: (732, 733),
+    7099: (5749, 5750),
+    2438: (2826, 2827),
+}
+
+# Totals in the same position: group 17 counts goals or points, and these count sets,
+# frames or maps. Same arithmetic, different ids.
+#   182  total sets, tennis and volleyball      2604 total sets, table tennis
+#   876  total frames, snooker                  2436 total maps, esports
+TOTAL_GROUPS = {
+    G_TOTAL: (9, 10),
+    182: (971, 972),
+    2604: (3150, 3151),
+    876: (1850, 1851),
+    2436: (2824, 2825),
+}
+
+# Team totals: the line applies to ONE side's score rather than to the pair.
+TEAM_TOTAL_GROUPS = {
+    15: ("home", 11, 12),
+    62: ("away", 13, 14),
+}
+
 
 def _parts(row):
     try:
@@ -99,30 +137,47 @@ def settle(row, home_goals, away_goals):
             return WIN if margin <= 0 else LOSS       # X2
         return None
 
-    if group in (G_HANDICAP, G_ASIAN_HANDICAP):
+    if group in HANDICAP_GROUPS:
         try:
             stored = float(line_txt)
         except (TypeError, ValueError):
             return None
+        home_oid, away_oid = HANDICAP_GROUPS[group]
         # market_key holds the line as the HOME side sees it.
-        if oid in (7, 3829):
+        if oid == home_oid:
             return _handicap(margin, stored)
-        if oid in (8, 3830):
+        if oid == away_oid:
             return _handicap(-margin, -stored)
         return None
 
-    if group == G_TOTAL:
+    if group in TOTAL_GROUPS:
         try:
             ln = float(line_txt)
         except (TypeError, ValueError):
             return None
+        over_oid, under_oid = TOTAL_GROUPS[group]
         total = home_goals + away_goals
         if total == ln:
             return PUSH
-        if oid == 9:
+        if oid == over_oid:
             return WIN if total > ln else LOSS
-        if oid == 10:
+        if oid == under_oid:
             return WIN if total < ln else LOSS
+        return None
+
+    if group in TEAM_TOTAL_GROUPS:
+        try:
+            ln = float(line_txt)
+        except (TypeError, ValueError):
+            return None
+        side, over_oid, under_oid = TEAM_TOTAL_GROUPS[group]
+        scored = home_goals if side == "home" else away_goals
+        if scored == ln:
+            return PUSH
+        if oid == over_oid:
+            return WIN if scored > ln else LOSS
+        if oid == under_oid:
+            return WIN if scored < ln else LOSS
         return None
 
     return None

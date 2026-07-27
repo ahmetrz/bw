@@ -76,6 +76,15 @@ G_TOTAL = 17
 G_SET_HANDICAP_TENNIS = 109
 G_SET_HANDICAP_TT = 7099
 
+# Every group a rung can be built on. Declared so the GRADER can be checked against it: a
+# rung nobody can score is a prediction that never enters the hit rate, which is worse
+# than not offering it — the model then looks untested rather than wrong. Group 7099 was
+# exactly that for weeks.
+LADDER_GROUPS = frozenset({
+    G_1X2, G_MONEYLINE_2WAY, G_DOUBLE_CHANCE, G_HANDICAP, G_ASIAN_HANDICAP, G_TOTAL,
+    G_SET_HANDICAP_TENNIS, G_SET_HANDICAP_TT,
+})
+
 # --- outcome ids within those groups ---
 O_DC_HOME_OR_DRAW = 4     # 1X
 O_DC_DRAW_OR_AWAY = 6     # X2

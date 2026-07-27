@@ -12,6 +12,7 @@ casually, and read the diff before you do:
 import collections
 import json
 import os
+import tempfile
 import sys
 import unittest
 from unittest import mock
@@ -405,9 +406,41 @@ class TestRegression(unittest.TestCase):
             ("over 2.5, 2-1", row(17, 9, "2.5"), 2, 1, grade.WIN),
             ("under 2.5, 2-1", row(17, 10, "2.5"), 2, 1, grade.LOSS),
             ("over 3.0 exact, 2-1", row(17, 9, "3.0"), 2, 1, grade.PUSH),
+            # A HANDICAP IN SETS IS STILL A HANDICAP, and for a long time this grader did
+            # not know it. Group 7099 is the safety ladder's favourite table tennis rung
+            # and table tennis was the second most-predicted sport, so every one of those
+            # predictions settled as None and sat ungraded for ever. The first real hit
+            # rate came back empty and it looked like missing results; the results were in
+            # the store the whole time and nothing could score them.
+            ("TT +2.5 sets, lost 1-3", row(7099, 5749, "2.5"), 1, 3, grade.WIN),
+            ("TT +2.5 sets, lost 0-3", row(7099, 5749, "2.5"), 0, 3, grade.LOSS),
+            ("TT away +1.5 sets, away won 3-1", row(7099, 5750, "-1.5"), 1, 3, grade.WIN),
+            # A best-of-three whitewash beats a +1.5 set handicap and clears +2.5. Both
+            # sides of that boundary, because a set handicap is the tennis and table
+            # tennis ladder's whole vocabulary.
+            ("tennis +1.5 sets, lost 0-2", row(109, 732, "1.5"), 0, 2, grade.LOSS),
+            ("tennis +2.5 sets, lost 0-2", row(109, 732, "2.5"), 0, 2, grade.WIN),
+            ("tennis +1.5 sets, lost 1-2", row(109, 732, "1.5"), 1, 2, grade.WIN),
+            ("TT total sets over 3.5, 3-2", row(2604, 3150, "3.5"), 3, 2, grade.WIN),
+            ("tennis total sets under 3.5, 2-0", row(182, 972, "3.5"), 2, 0, grade.WIN),
+            ("snooker total frames over 8.5, 5-4", row(876, 1850, "8.5"), 5, 4, grade.WIN),
+            ("esports map handicap +1.5, lost 1-2", row(2438, 2826, "1.5"), 1, 2, grade.WIN),
+            ("esports total maps under 2.5, 2-0", row(2436, 2825, "2.5"), 2, 0, grade.WIN),
+            ("team 1 total over 1.5, 2-0", row(15, 11, "1.5"), 2, 0, grade.WIN),
+            ("team 2 total under 1.5, 2-0", row(62, 14, "1.5"), 2, 0, grade.WIN),
+            ("team 2 total over 1.5, 2-2", row(62, 13, "1.5"), 2, 2, grade.WIN),
         ]
         for label, r, hg, ag, expected in cases:
             self.assertEqual(grade.settle(r, hg, ag), expected, label)
+
+        # Every market the LADDER can select must be settleable. A rung that cannot be
+        # graded is a prediction that never enters the hit rate, which is worse than not
+        # offering it: the model looks untested rather than wrong.
+        settleable = (set(grade.HANDICAP_GROUPS) | set(grade.TOTAL_GROUPS)
+                      | set(grade.TEAM_TOTAL_GROUPS) | {1, 8, 101})
+        for group in ladder.LADDER_GROUPS:
+            self.assertIn(group, settleable,
+                          f"ladder can select group {group} and the grader cannot score it")
 
     def test_grader_leaves_unknown_markets_ungraded(self):
         """A market the grader does not understand must return None, not a verdict.
@@ -1223,6 +1256,46 @@ class TestRegression(unittest.TestCase):
             simulated.save({(2, "RHL"): "why"}, path)
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
+
+    def test_a_result_recorded_the_other_way_round_is_swapped_not_dropped(self):
+        """Which participant is "home" belongs to the SOURCE, not to the match.
+
+        In table tennis and tennis there is no home side at all, so the book's O1/O2 and
+        Setka's p1/p2 are ordered independently. Keying results one way silently lost
+        matches that were sitting in the store — on the first real card, a Setka row read
+        "Lukas Rulc 3-1 Ondrej Mezera" while the prediction was on Mezera.
+
+        Losing them is the safe failure. Forgetting to swap the scores is the unsafe one:
+        it settles the bet against the wrong player and reports it as a graded result."""
+        with tempfile.TemporaryDirectory() as tmp:
+            store = os.path.join(tmp, "results")
+            os.makedirs(store)
+            with open(os.path.join(store, "10.jsonl"), "w") as f:
+                f.write(json.dumps({"date": "2026-07-26", "home": "Lukas Rulc",
+                                    "away": "Ondrej Mezera", "home_score": 3,
+                                    "away_score": 1, "source": "setka"}) + "\n")
+            with mock.patch.object(results_store, "STORE", store):
+                _by_id, by_name = grade_predictions.store_results(10)
+
+        start = "2026-07-26T14:15:00+00:00"
+        # Asked in the store's own order: the scores come back as stored.
+        self.assertEqual(
+            grade_predictions.lookup_result(by_name, "Lukas Rulc", "Ondrej Mezera",
+                                            start, elapsed_hours=10), (3, 1))
+        # Asked the other way round: found, and SWAPPED.
+        self.assertEqual(
+            grade_predictions.lookup_result(by_name, "Ondrej Mezera", "Lukas Rulc",
+                                            start, elapsed_hours=10), (1, 3))
+        # Which is what makes the settlement right: Mezera lost by two sets, so +2.5
+        # covers it and +1.5 does not.
+        got = grade_predictions.lookup_result(by_name, "Ondrej Mezera", "Lukas Rulc",
+                                              start, elapsed_hours=10)
+        self.assertEqual(
+            grade.settle({"market_key": (0, "7099|2.5"), "outcome_id": 5749}, *got),
+            grade.WIN)
+        self.assertEqual(
+            grade.settle({"market_key": (0, "7099|1.5"), "outcome_id": 5749}, *got),
+            grade.LOSS)
 
     def test_a_running_match_is_never_graded(self):
         """The grader must not be able to settle a fixture that is still being played.
