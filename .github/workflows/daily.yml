@@ -134,8 +134,12 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           # Ham cekim repoya girmiyor; sadece rapor, secim sayfasi ve tahmin gunlugu.
+          # data/simulated_leagues.json burada uretiliyor ve canli izleyici onu okuyor:
+          # uretilmis fikstür deseni ancak butun bir kartta gorunur, iki dakikalik bir
+          # taramada gorunmez. Commit edilmezse izleyici hicbir zaman ogrenemez.
           git add daily_report.json picks.html method.html data/predictions.jsonl \
-            data/scoreboard.json data/results data/models || true
+            data/scoreboard.json data/simulated_leagues.json data/results data/models \
+            || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
           git pull --rebase origin main || true
           git push || echo "push atlandi"

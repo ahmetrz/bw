@@ -14,26 +14,16 @@ name: watch-live
 # yazar. tools/collect_live.py neyi kaydetmeyi REDDETTIGINI aciklar.
 #
 # CADENCE OLCULDU, TAHMIN EDILMEDI. 15 dakika boyunca 51 saniyede bir tarayip biten
-# maclarin akista NE KADAR KALDIGINA baktim: 274 fikstürün 36'si dustu, biten bir mac
-# akista ~50-150 saniye duruyor, bir kismi tek taramada gorunup kayboluyor. Yani bir maci
-# BITMIS skoruyla yakalama sansi kabaca (kalma suresi / tarama araligi):
-#   dakikada bir tarama  -> neredeyse hepsi
-#   2-3 dakikada bir     -> yarisi kadari
-#   saatte bir           -> ~%2, yani pratikte hicbir sey
-# Bu yuzden is SEYREK VE SIK degil, GUNDE BIRKAC KEZ YOGUN calisiyor: her calistirmada
-# dakikada bir tarayan kisa bir pencere aciyor ve o pencerede biten her maci yakaliyor.
-# Saatte tek tarama ayni dakikayi harcayip neredeyse hicbir sey toplamazdi.
+# maclarin akista NE KADAR KALDIGINA baktim: 274 fikstürün 36'si dustu ve biten bir mac
+# akista ~50-150 saniye duruyor. Yani yakalama sansi kabaca (kalma suresi / tarama
+# araligi): dakikada bir tarama neredeyse hepsini, saatte bir taramaysa ~%2'sini yakalar.
+# Kapsam tarama SURESIYLE orantili, tarama SAYISIYLA degil.
 #
-# SUREKLI IZLIYOR. Depo public oldugu icin GitHub Actions dakikasi sinirsiz, ve yakalanan
-# mac sayisi dogrudan tarama SURESIYLE orantili — 50-150 saniyelik kalma suresi karsisinda
-# dakikada bir tarayan bir pencere biten her maci yakaliyor. Bu yuzden saat basi 50
-# dakikalik pencere aciliyor: gunde ~20 saat kesintisiz izleme.
-#
-# Onceki hali gunde 4 x 10 dakikaydi ve bunun tek nedeni deponun private olmasiydi: aylik
-# 2.000 dakikalik kota, gunde ~40 dakikadan fazlasina izin vermiyordu. Kisit kalkinca
-# dogru cadans da degisti — kartta dakikada ~3 mac bitiyor, yani 40 dakika gunde ~120
-# sonuc demekti, 20 saat ise ~3.600. Voleybolun 400 sonuclu kalibrasyon esigi aylar
-# uzaktan gunler uzaga geldi.
+# Bu yuzden saat basi 55 dakikalik pencere aciliyor — gunde ~22 saat kesintisiz izleme.
+# Onceki hali gunde 4 x 10 dakikaydi ve tek nedeni deponun private olmasiydi: aylik 2.000
+# dakikalik kota gunde ~40 dakikadan fazlasina izin vermiyordu. Depo public olunca kisit
+# kalkti ve dogru cadans da degisti: 40 dakika gunde ~120 sonuc demekti, 22 saat ise
+# birkac bin. Voleybolun 400 sonucluk kalibrasyon esigi aylardan gunlere indi.
 #
 # Saat basi ayri is, tek uzun is degil: durum her taramada diske, ama repoya ancak is
 # bitince yaziliyor, o yuzden bir cokme en fazla bir saat kaybettiriyor.
@@ -46,7 +36,7 @@ on:
       minutes:
         description: "Pencere uzunlugu, dakika (0 = tek tarama)"
         required: false
-        default: "50"
+        default: "55"
       every:
         description: "Taramalar arasi saniye (olculen kalma suresi ~50-150 sn)"
         required: false
@@ -76,7 +66,7 @@ jobs:
       - name: Sweep the live feed
         run: |
           python3 tools/collect_live.py \
-            --minutes "${{ github.event.inputs.minutes || '50' }}" \
+            --minutes "${{ github.event.inputs.minutes || '55' }}" \
             --every "${{ github.event.inputs.every || '60' }}" \
             --sports "${{ github.event.inputs.sports || '' }}"
 
