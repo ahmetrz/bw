@@ -360,7 +360,7 @@ ROW = """<tr data-sport="{sport_id}" data-window="{window}" data-score="{score}"
  data-start="{start_sort}" data-text="{text}" data-result="{result_key}" data-key="{key}">
  <td class="id num"><label><input type="checkbox" class="sel"><span>{id}</span></label></td>
  <td><div class="match">{match}</div><div class="meta">{sport} · {league}</div></td>
- <td class="pickcell">{badge}{pick}<div class="meta">{scope}{warn}{final}</div></td>
+ <td class="pickcell">{badge}{pick}<div class="meta">{where}{scope}{warn}{final}</div></td>
  <td class="num odds">{odds_txt}</td>
  <td class="num"><span class="score">{score_txt}</span>
    <div class="bar"><i style="width:{bar}%"></i></div>
@@ -449,6 +449,11 @@ def build(report, out_path):
             badge=(f'<span class="badge {css}">{label}</span> ' if label
                    else ('<span class="badge pending">BEKLİYOR</span> ' if settled else "")),
             pick=html.escape(str(p.get("selection_tr") or p.get("selection") or "")),
+            # WHICH SECTION OF THE FIXTURE PAGE TO OPEN. The tap was never the expensive
+            # part of adding a leg — finding "Set Handikapı" among a hundred markets was.
+            # The link lands on the fixture; this says where to look once there.
+            where=(f'<b>{html.escape(tr.market_type(str(p.get("market_type") or "")))}</b>'
+                   f' · ' if p.get("market_type") else ""),
             scope=html.escape(str(st.get("scope") or "")),
             warn=" ⚠ teyit gerek" if st.get("needs_confirmation") else "",
             final=(f" · maç sonucu {int(final[0])}-{int(final[1])}"

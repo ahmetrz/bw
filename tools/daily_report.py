@@ -415,6 +415,11 @@ def log_predictions(results, path, host=None):
                 # hoping. The live watcher records results under the same ids.
                 "p1_id": p.get("p1_id"), "p2_id": p.get("p2_id"),
                 "market_line": p["market_key"][1],
+                # Which SECTION of the fixture page this bet lives in. Written here so the
+                # evening scorecard can show it too — it is rebuilt from this log, not from
+                # the morning report, and without it the operator sees the selection but
+                # not where to find it.
+                "market_type": p.get("market_type"),
                 "outcome_id": p.get("outcome_id"),
                 "selection": p.get("selection"),
                 "selection_tr": tr.pick(p),
@@ -572,6 +577,10 @@ def main():
                         "sport_id": p.get("sport_id"),
                         "selection": p["selection"],
                         "selection_tr": tr.pick(p),
+                        # The section of the fixture page this bet lives in. Finding
+                        # "Set Handikapı" among a hundred markets was always the slow
+                        # part of adding a leg; the tap never was.
+                        "market_type": p.get("market_type"),
                         "ladder_rung": p.get("ladder_rung"),
                         "direction": p.get("direction"),
                         "odds": p["odds"],
