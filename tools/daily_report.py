@@ -115,6 +115,65 @@ def skipped_at_fetch(card_path):
     return out
 
 
+def _eta(sid, have, _ledger=[]):
+    """" — canlı izleyici günde ~N topluyor, bu hızla ~M gün", when that can be measured.
+
+    The operator's standing question about this product has been "when do the other sports
+    show up", and the honest answer changes every day as the watcher runs. So it is
+    computed rather than asserted.
+
+    From the LEDGER rather than from the store, because the store cannot answer it. It
+    keeps each fixture's own date, not the moment we learned of it, so a watcher three
+    hours old and one a day old look identical — the first version of this read the store
+    and told the operator volleyball was 28 days away when the measured rate put it at
+    three. The ledger records what was collected and when, so the rate is per HOUR of
+    actual watching and the projection follows from it.
+    """
+    if not _ledger:
+        _ledger.append(_read_ledger())
+    rows = [r for r in _ledger[0] if r.get("sport") == sid]
+    if len(rows) < 2:
+        return " — canlı izleyici biriktiriyor"
+    stamps = sorted(r["at"] for r in rows)
+    try:
+        span = ((datetime.fromisoformat(stamps[-1].replace("Z", "+00:00"))
+                 - datetime.fromisoformat(stamps[0].replace("Z", "+00:00")))
+                .total_seconds() / 3600.0)
+    except ValueError:
+        return " — canlı izleyici biriktiriyor"
+    if span < 1.0:
+        return " — canlı izleyici biriktiriyor"
+    # n entries are n runs, but the span between the first and the last covers only n-1
+    # gaps. Dividing by the raw span would credit every run's yield to one fewer run's
+    # worth of watching, which overstates the rate by half when there are only two points.
+    watched = span * len(rows) / (len(rows) - 1)
+    per_day = sum(r.get("added", 0) for r in rows) / watched * 24.0
+    if per_day <= 0:
+        return " — canlı izleyici biriktiriyor"
+    left = (model_generic.MIN_RESULTS - have) / per_day
+    if left <= 1:
+        return " — canlı izleyici biriktiriyor, bugün yarın dolar"
+    return (f" — canlı izleyici günde ~{per_day:.0f} topluyor, "
+            f"bu hızla ~{left:.0f} gün")
+
+
+def _read_ledger(path=None):
+    path = path or collect_live.LEDGER
+    out = []
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        out.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    except OSError:
+        return []
+    return out
+
+
 def _why_no_model(sid, _cache={}):
     """Why this sport produced nothing, in the words that say what happens next.
 
@@ -133,7 +192,7 @@ def _why_no_model(sid, _cache={}):
         # the operator nothing about whether anything is wrong or how far off it is.
         if stored["games"] < model_generic.MIN_RESULTS:
             return (f"{stored['games']} sonuç toplandı, kalibrasyon için "
-                    f"{model_generic.MIN_RESULTS} gerekiyor — canlı izleyici biriktiriyor")
+                    f"{model_generic.MIN_RESULTS} gerekiyor{_eta(sid, stored['games'])}")
         model = model_generic.load(sid)
         if model:
             return f"model reddedildi: {model_generic.usable(model)[1]}"

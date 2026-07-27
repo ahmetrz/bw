@@ -49,6 +49,8 @@ league, so it cannot be fooled by a small sample or a coarse price grid — and 
 prices at all, which keeps hard rule 6 clean.
 """
 import collections
+import json
+import os
 from datetime import datetime
 
 # The shortest a match of this sport could possibly take, in hours, INCLUDING the walk
@@ -130,7 +132,12 @@ def impossible_schedule(fixtures, sport_id):
                   f"tekrar sahaya çıkıyor — üretilmiş fikstür")
 
 
-STORE = "data/simulated_leagues.json"
+# Absolute, like engine/results_store.STORE. A relative default silently resolves against
+# whatever directory the process happens to be in, so the watcher would read an empty list
+# and go on storing generated fixtures — failing open, which is the wrong way round.
+STORE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "simulated_leagues.json")
 
 
 def save(found, path=STORE):
@@ -139,9 +146,6 @@ def save(found, path=STORE):
     The pattern is only visible across a whole card, which the daily run has and a
     two-minute live sweep does not. So the daily run decides and the watcher obeys.
     """
-    import json
-    import os
-
     payload = sorted([{"sport_id": sid, "league": league, "why": why}
                       for (sid, league), why in (found or {}).items()],
                      key=lambda r: (r["sport_id"] or 0, r["league"] or ""))
@@ -153,8 +157,6 @@ def save(found, path=STORE):
 
 def load(path=STORE):
     """{(sport_id, league): why}, or empty when nothing has been flagged yet."""
-    import json
-
     try:
         with open(path) as f:
             rows = json.load(f)

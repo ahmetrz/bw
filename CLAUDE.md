@@ -190,11 +190,20 @@ so the next attempt starts from the end of this one rather than the beginning.
     `betwinner2.com`, whose robots.txt is `Disallow: /` — so the real request cannot be
     read off the site.
 
-**Cost is a design constraint here, not an afterthought.** The repo is private, so Actions
-minutes are finite, and the daily fetch was most of the spend. `watch-live.yml` opens three
-short dense windows a day rather than one thin sweep an hour, because yield is roughly
-(linger / interval) and hourly sweeping collects about 2% of what finishes — the cadence is
-the dial the operator turns, and `--minutes` lets one job loop instead of scheduling more.
+**Cadence is measured, and so is the yield.** A finished fixture lingers on the feed for
+50-150 seconds, so the chance of catching one is roughly (linger / sweep interval): every
+minute catches nearly all of them, hourly catches about 2%, which is nothing. The repo is
+public so Actions minutes are unlimited, and `watch-live.yml` therefore sweeps 55 minutes
+of every hour.
+
+What that actually returns, from two complete runs rather than from an estimate: **about
+43 results per run, ~1,000 a day**, of which table tennis ~490, football ~130, volleyball
+~120 and esports ~60. An earlier note here said 3,600 a day; that was extrapolated from the
+busiest minute of the busiest hour and was wrong by a factor of three. The daily coverage
+report now computes the rate per sport from `data/watch_log.jsonl` — a ledger of what was
+collected and when — and projects how many days each unmodelled sport still needs. The
+store cannot answer that on its own: it keeps each fixture's own date, not the moment we
+learned of it, so a watcher three hours old looks identical to one a day old.
 
 **What the fetcher does NOT fetch is part of the design.** `tools/fetch_window.py` applies
 two rules while reading the fixture list rather than after pulling a thousand markets per

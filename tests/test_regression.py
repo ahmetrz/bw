@@ -12,6 +12,7 @@ casually, and read the diff before you do:
 import collections
 import json
 import os
+import re
 import tempfile
 import sys
 import unittest
@@ -1256,6 +1257,36 @@ class TestRegression(unittest.TestCase):
             simulated.save({(2, "RHL"): "why"}, path)
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
+
+    def test_the_wait_for_a_sport_is_measured_not_asserted(self):
+        """"When do the other sports show up" is answered from the collection ledger.
+
+        It cannot be answered from the results store, and the first version tried: the
+        store keeps each fixture's own DATE, not the moment we learned of it, so a watcher
+        that had run for three hours looked exactly like one that had run for a day. It
+        told the operator volleyball was 28 days away when the measured rate put it at
+        four. The ledger records what was collected and when, so the rate is per hour of
+        actual watching."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "watch_log.jsonl")
+            with open(path, "w") as f:
+                for at, n in (("2026-07-26T22:35:00Z", 7), ("2026-07-26T23:57:00Z", 3)):
+                    f.write(json.dumps({"at": at, "sport": 6, "added": n}) + "\n")
+            ledger = [daily_report._read_ledger(path)]
+            got = daily_report._eta(6, 14, _ledger=ledger)
+        # 10 results over two runs 82 minutes apart. Two entries are two runs but only ONE
+        # gap between them, so the watching time is the span scaled by n/(n-1) — crediting
+        # both runs to one run's worth of hours would overstate the rate by half.
+        self.assertIn("günde ~", got)
+        self.assertIn("gün", got)
+        rate = int(re.search(r"günde ~(\d+)", got).group(1))
+        self.assertTrue(80 <= rate <= 95, got)
+
+        # Too little to say anything with: say nothing rather than extrapolate from one.
+        self.assertNotIn("günde ~", daily_report._eta(6, 14, _ledger=[[
+            {"at": "2026-07-26T22:35:00Z", "sport": 6, "added": 7}]]))
+        # A ledger that is not there at all is not an error.
+        self.assertEqual(daily_report._read_ledger("/nonexistent/watch_log.jsonl"), [])
 
     def test_a_hit_rate_on_a_handful_of_legs_says_so(self):
         """A percentage over three legs looks exactly like one over three hundred.

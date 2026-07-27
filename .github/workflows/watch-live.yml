@@ -21,9 +21,13 @@ name: watch-live
 #
 # Bu yuzden saat basi 55 dakikalik pencere aciliyor — gunde ~22 saat kesintisiz izleme.
 # Onceki hali gunde 4 x 10 dakikaydi ve tek nedeni deponun private olmasiydi: aylik 2.000
-# dakikalik kota gunde ~40 dakikadan fazlasina izin vermiyordu. Depo public olunca kisit
-# kalkti ve dogru cadans da degisti: 40 dakika gunde ~120 sonuc demekti, 22 saat ise
-# birkac bin. Voleybolun 400 sonucluk kalibrasyon esigi aylardan gunlere indi.
+# dakikalik kota gunde ~40 dakikadan fazlasina izin vermiyordu.
+#
+# GERCEK VERIM, iki tam kosudan olculdu: kosu basina ~43 sonuc, gunde ~1.000. Masa tenisi
+# ~490, futbol ~130, voleybol ~120, e-spor ~60. (Ilk tahminim gunde 3.600'du; en yogun
+# saatin en yogun dakikasindan genellenmisti ve uc kat yanlisti.) Voleybolun 400 sonucluk
+# esigi bu hizla ~4 gun. Gunluk kapsam raporu bu hesabi data/watch_log.jsonl uzerinden
+# spor spor kendisi yapiyor ve kac gun kaldigini yaziyor.
 #
 # Saat basi ayri is, tek uzun is degil: durum her taramada diske, ama repoya ancak is
 # bitince yaziliyor, o yuzden bir cokme en fazla bir saat kaybettiriyor.

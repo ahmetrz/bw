@@ -428,15 +428,41 @@ def sweep(state, ids, quiet, round_no, fake=None):
     return done, {"live": live, "waiting": waiting, "dropped": dropped}
 
 
+# A running ledger of what was collected and WHEN. One line per sport per sweep, so a few
+# a minute at most. It exists because the daily coverage report answers the operator's
+# standing question — when will the other sports be modelled — and that answer is a RATE,
+# which cannot be recovered afterwards: the store keeps each fixture's own date, not the
+# moment we learned about it, so a watcher that has run for three hours looks identical to
+# one that has run for a day.
+LEDGER = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "watch_log.jsonl")
+
+
+def note(added, path=LEDGER):
+    if not added:
+        return
+    stamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "a") as f:
+            for sport, n in sorted(added.items()):
+                f.write(json.dumps({"at": stamp, "sport": sport, "added": n}) + "\n")
+    except OSError:
+        pass                              # a missing ledger costs a projection, not a result
+
+
 def store(done, dry_run):
-    total = 0
+    total, added_by_sport = 0, {}
     for sport, rows in sorted(done.items()):
         if dry_run:
             print(f"    would store {len(rows):>3} for sport {sport}")
             continue
         added, held = results_store.merge(sport, rows)
         total += added
+        if added:
+            added_by_sport[sport] = added
         print(f"    sport {sport:<4} +{added:>3} new ({len(rows)} finished) · {held} stored")
+    note(added_by_sport)
     return total
 
 
