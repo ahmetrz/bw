@@ -30,6 +30,7 @@ SPORTS = {
     112: "Halter", 125: "Call of Duty", 126: "Hurling",
     132: "At Yarışı (uzun vadeli)", 133: "Koşu Atı (uzun vadeli)", 138: "Sörf",
     150: "StarCraft 2", 151: "Tazı Yarışı (uzun vadeli)", 155: "Bilek Güreşi",
+    220: "Tekne Yarışı",
     176: "Hava Durumu", 180: "Kabaddi",
     189: "UFC", 202: "Siyaset", 278: "Çıplak El Boksu", 298: "Overwatch",
     282: "Padel", 283: "Pickleball", 303: "Geleceğin Oyunları",

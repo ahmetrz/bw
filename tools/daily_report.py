@@ -127,11 +127,17 @@ def _why_no_model(sid, _cache={}):
         _cache.update(results_store.summary() or {"_": None})
     stored = _cache.get(sid)
     if stored:
+        # A model file exists for every sport with any results at all, so "refused" is the
+        # wrong word while a sport is simply still filling. `usable` answers "no
+        # calibration table" for a model built from six results, which is true and tells
+        # the operator nothing about whether anything is wrong or how far off it is.
+        if stored["games"] < model_generic.MIN_RESULTS:
+            return (f"{stored['games']} sonuç toplandı, kalibrasyon için "
+                    f"{model_generic.MIN_RESULTS} gerekiyor — canlı izleyici biriktiriyor")
         model = model_generic.load(sid)
         if model:
             return f"model reddedildi: {model_generic.usable(model)[1]}"
-        return (f"{stored['games']} sonuç toplandı, model henüz kurulmadı "
-                f"(kalibrasyon için {model_generic.MIN_RESULTS} gerekiyor)")
+        return f"{stored['games']} sonuç toplandı, model henüz kurulmadı"
     if sid in collect_live.SPORTS:
         return "canlı izleniyor — sonuçlar biriktikçe modellenecek"
     why = collect_live.UNWATCHABLE.get(sid)

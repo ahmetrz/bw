@@ -129,6 +129,7 @@ UNWATCHABLE = {
     68:  "yarış, ikili karşılaşma değil — sert kural 7",
     92:  "yarış, ikili karşılaşma değil — sert kural 7",
     102: "yarış, ikili karşılaşma değil — sert kural 7",
+    220: "yarış, ikili karşılaşma değil — sert kural 7",
     85:  "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
     144: "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
     103: "simülasyon — sert kural 9",
