@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config  # noqa: E402
 from engine import (bwfeed, coupon, mirror, model_elo, model_football,  # noqa: E402
                     model_generic, model_tt, parlay, pick, rating, results_store,
-                    score, setka, settlement, simulated, telegram, tr)
+                    score, setka, settlement, simulated, stake, telegram, tr)
 from tools import collect_live, fetch_window, make_picks_page  # noqa: E402
 
 
@@ -319,8 +319,29 @@ def number(results):
     return results
 
 
+def apply_stakes(results):
+    """Size every selection and return the day's staking summary.
+
+    Sized once, on the widest window, and copied to the others by id — for the same
+    reason the numbering is: the 24h list is a subset of the 48h one, and a selection
+    that is #7 with one unit on it must not become #7 with nothing on it because a
+    shorter window happened to contain fewer selections above it.
+    """
+    if not results:
+        return None
+    full = max(results, key=lambda r: r["hours"])
+    summary = stake.plan(full["picks"])
+    sized = {p.get("id"): (p["stake"], p["in_plan"]) for p in full["picks"]}
+    for r in results:
+        if r is full:
+            continue
+        for p in r["picks"]:
+            p["stake"], p["in_plan"] = sized.get(p.get("id"), (0.0, False))
+    return summary
+
+
 def build_notice(results, page_name, host=None, host_source="", source_note="",
-                 coupon_code=None, coupon_detail=""):
+                 coupon_code=None, coupon_detail="", staking=None):
     """The short Telegram message. The list itself travels as the attached page.
 
     Nine messages of selections could not be sorted, filtered or searched, and scrolling
@@ -348,11 +369,26 @@ def build_notice(results, page_name, host=None, host_source="", source_note="",
             f"min oran {config.MIN_ODDS:.2f} · model güven eşiği "
             f"%{config.MIN_MODEL_SURVIVAL * 100:.0f} · maç başına tek seçim",
             "",
-            f"📄 Liste ekteki <b>{html.escape(page_name)}</b> dosyasında: spora, pencereye, "
-            "puana ve orana göre filtrelenebilir, sütun başlıklarından sıralanabilir, "
+            f"📄 Liste ekte: <b>{html.escape(page_name)}</b> — filtrelenir, sıralanır, "
             "her satırda bahsin bağlantısı var.",
             "",
         ]
+        if staking and staking.get("placed"):
+            # What the day COSTS, which the list on its own does not say. ONE line: the
+            # caption is capped at 1024 characters and clipped on a line boundary, so
+            # every line added here is a line that can push the coupon code off the end.
+            # The reasoning — why the stakes are equal, what break-even means — is on the
+            # page, which is where it can be read properly anyway.
+            lines += [
+                f"💰 <b>{staking['placed']} bahis × %{staking['unit_pct']:g} kasa</b> = "
+                f"ortaya konan <b>%{staking['risk_pct']:g}</b> · başabaş isabet "
+                f"<b>%{(staking.get('break_even_rate') or 0) * 100:.1f}</b>"
+                + (f" · tavan dışı {staking['left_out']}"
+                   if staking.get("left_out") else "")
+                + (" · <i>birim/tavan onayınızı bekliyor</i>"
+                   if staking.get("provisional") else ""),
+                "",
+            ]
         if coupon_code:
             lines += [
                 f"🎟 <b>Kupon kodu: <code>{html.escape(coupon_code)}</code></b>",
@@ -435,6 +471,12 @@ def log_predictions(results, path, host=None):
                 "ladder_rung": p.get("ladder_rung"),
                 "direction": p.get("direction"),
                 "odds": p.get("odds"),
+                # What was actually going to be RISKED on this selection. Recorded with
+                # the pick, because the evening scorecard measures the day the operator
+                # was handed and that day had a cap on it: an ROI computed over
+                # thirty-four legs describes a bet nobody placed if the plan was twenty.
+                "stake": p.get("stake"),
+                "in_plan": p.get("in_plan"),
                 "model_survival": p.get("model_survival"),
                 "model_source": p.get("model_source"),
                 "url": parlay.betwinner_url(p, host),
@@ -520,6 +562,14 @@ def main():
     windows = [int(w) for w in args.windows.split(",") if w.strip()]
     results = number([analyse(rows, h, index, elo_model, tt, generic, fake)
                       for h in windows])
+    staking = apply_stakes(results)
+    if staking:
+        print(f"\nstaking: {staking['placed']} × 1 birim (%{staking['unit_pct']}) = "
+              f"kasanın %{staking['risk_pct']}'i risk altında · "
+              f"{staking['left_out']} seçim tavanın dışında · "
+              f"başabaş isabet %{(staking['break_even_rate'] or 0) * 100:.1f}"
+              + ("  [ONAY BEKLİYOR — birim ve tavan operatörün]"
+                 if staking["provisional"] else ""))
 
     for r in results:
         # The per-league breakdown lives in the coverage section below; dumping the whole
@@ -568,6 +618,7 @@ def main():
         "link_host": host,
         "min_odds": config.MIN_ODDS,
         "min_model_survival": config.MIN_MODEL_SURVIVAL,
+        "staking": staking,
         "windows": [
             {
                 "hours": r["hours"],
@@ -595,6 +646,8 @@ def main():
                         "ladder_rung": p.get("ladder_rung"),
                         "direction": p.get("direction"),
                         "odds": p["odds"],
+                        "stake": p.get("stake"),
+                        "in_plan": p.get("in_plan"),
                         "model_survival": p["model_survival"],
                         "settlement": p.get("settlement"),
                         "url": parlay.betwinner_url(p, host),
@@ -609,13 +662,18 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out}")
 
-    # ONE CODE FOR THE WHOLE LIST. The book's own share-a-slip endpoint takes a set of
+    # ONE CODE FOR THE DAY'S PLAN. The book's own share-a-slip endpoint takes a set of
     # events and returns a five-character code; typing it into "load bet slip" drops every
     # selection in at once. See engine/coupon.py for how it is verified before it is handed
     # over — a slip that loads the wrong bet in one tap is worse than no slip.
+    #
+    # It carries the selections INSIDE the day's cap and not the whole list. A code that
+    # loaded thirty-four legs against a twenty-leg plan would leave fourteen to delete by
+    # hand, which is the work this code exists to remove.
     coupon_code, coupon_detail = (None, "")
     if not args.no_coupon:
         widest_picks = (max(results, key=lambda r: r["hours"])["picks"] if results else [])
+        widest_picks = [p for p in widest_picks if p.get("in_plan", True)]
         coupon_code, coupon_detail = coupon.create(widest_picks)
         print(f"kupon kodu: {coupon_code or '—'} ({coupon_detail})")
     payload["coupon_code"] = coupon_code
@@ -630,7 +688,8 @@ def main():
     notice = build_notice(results, os.path.basename(args.page), host=host,
                           host_source=host_source,
                           source_note=f"kaynak: {os.path.basename(args.input)}",
-                          coupon_code=coupon_code, coupon_detail=coupon_detail)
+                          coupon_code=coupon_code, coupon_detail=coupon_detail,
+                          staking=staking)
     if args.no_telegram:
         print("\n--- notice preview ---\n")
         print(notice)

@@ -27,12 +27,27 @@ does not place bets.
   KAZANDI / KAYBETTİ / İADE with a hit-rate strip. It notifies only when that day's settled
   count GREW, because football results come from football-data.co.uk a few times a week —
   a fixed nightly send would deliver a mostly empty scorecard and call it the day's result.
-- **Adding to the slip:** there is NO unauthenticated way to load a Betwinner betslip
-  (`/en/user/coupon` 302s to login; the service-api coupon paths 404; and `betwinner2.com`
-  robots.txt is `Disallow: /`, so the mirror must not be crawled to find one). "One tap
-  adds all fifty" would mean driving a logged-in session with the operator's credentials,
-  which this tool does not do. The page instead offers tick-then-repeat: one tap per leg,
-  progress remembered per day in localStorage.
+- **Adding to the slip:** `service-api/LiveBet/Open` takes a set of events and returns a
+  five-character code; typing it into the book's "load bet slip" box drops the whole plan
+  in at once. `engine/coupon.py` builds it and then READS IT BACK before handing it over,
+  because a slip that loads the wrong bet in one tap is worse than no slip: two bugs got
+  that far, sending `CI` (the constant id) where the slip wants `I` (the game id), and
+  sending a home-normalized `-1.5` that priced the OPPOSITE handicap at 9.00 instead of
+  1.197. It carries the selections inside the day's cap only. The page keeps tick-then-
+  repeat as the fallback, progress remembered per day in localStorage.
+- **How much to bet:** flat. Every selection in the plan gets the SAME stake, and the only
+  lever is the daily cap on how many there are (`engine/stake.py`). Kelly and every other
+  proportional rule sizes by EDGE — how far the price is from the truth — and this product
+  does not claim one; feeding the model's probability in anyway would convert "the model
+  is 86% sure" into "the model is 86% sure AND the book is wrong about it" and then size
+  the bets on a claim it never made out loud. The reported headline is the BREAK-EVEN hit
+  rate, which is arithmetic on the book's own prices and asserts nothing, and it sits
+  beside the REALISED hit rate — never beside the model's confidence, which is the thing
+  under test. Hit rate counts every graded selection, because a pick under the cap is
+  still evidence about the model; the money counts only what was staked. On a real card:
+  20 bets at 0.5% of bankroll each is 10% staked to make 2%, break-even at 83.2%, and one
+  point of hit rate is worth 0.12% of bankroll — a short-odds list lives within a few
+  points of its own break-even, which is the number that decides the day.
 
 ## The daily rule, in order (this is the product)
 1. **The model picks the direction.** Never the price. A short price is a probability
@@ -75,6 +90,8 @@ engine/results_store.py   ONE results table per sport: date, teams, score. Nothi
 engine/model_generic.py   ONE model for every sport, counted from that table
 engine/model_football.py  ClubElo: 1X2, totals AND the goal-difference distribution
 engine/settlement.py   what a selection actually means when it settles
+engine/stake.py        flat stake + daily cap; a risk rule, deliberately not an edge rule
+engine/coupon.py       the day's plan as ONE bet-slip code, verified before it is handed over
 engine/telegram.py     daily notification (no-ops without credentials)
 engine/tr.py           Turkish labels for everything user-facing
 config.py              gates, weights, exclusions, windows
@@ -141,13 +158,25 @@ none at all. `LiveFeed/Get1x2_VZip` carries every sport the book runs, with both
 both STABLE participant ids, the running score, the period breakdown and the FORMAT note.
 `tools/collect_live.py` sweeps it and writes a result two ways:
   1. **The feed says so** — `SC.CPS` becomes "Match finished". Nothing is inferred.
-  2. **It vanished**, and its last score looks finished FOR ITS OWN FORMAT. The format is
-     read, never assumed: table tennis runs best-of-five and best-of-seven on the same day,
-     so 3-1 is a finished match on one circuit and a lead on the other.
+  2. **It vanished**, and the state it was last seen in says the match was over. For a
+     RACE that is the score, read against the format and never assumed: table tennis runs
+     best-of-five and best-of-seven on the same day, so 3-1 is a finished match on one
+     circuit and a lead on the other. For a PERIOD sport the score can never say it —
+     1-0 in the second half looks exactly like 1-0 at full time — so what says it is the
+     CLOCK: `SC.TS` counts up to regulation and stops, and `SC.SLS` ("84 minutes") goes
+     EMPTY at the same moment. Watched to the end on three real football matches, and
+     only ONE of the three ever displayed "Match finished", so rule 1 alone was dropping
+     two thirds of finished football. `CLOCK_FINISH` is a list of sports whose clock has
+     been WATCHED to the end, not of sports that have one: basketball and hockey are
+     absent because a clock that counts down or resets each period would satisfy the rule
+     at half time. Extra time is refused twice — by the period number and by the status
+     wording — because its goals are not the ones our markets settle on.
 It refuses a sport whose finish condition we cannot state, a tie in a sport that cannot
 draw, an unreadable format, and anything gone too briefly to be sure it is gone. A watcher
 that guesses is worse than no watcher: a wrong row is indistinguishable from a real one
-once it is inside a rating.
+once it is inside a rating. The one residual exposure is stated rather than hidden: a
+football match that reaches 90:00 and drops off the feed for three minutes while injury
+time is still being played is recorded at its 90-minute score.
 
 **Archives are now the exception, not the plan.** Free result archives were worth hunting
 while watching was rationed by a private repo's Actions quota. The repo is public, the

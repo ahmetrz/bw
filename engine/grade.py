@@ -198,6 +198,14 @@ def summarize(graded):
 
     Pushes are reported separately rather than folded into either column: counting a
     returned stake as a win overstates the model and counting it as a loss understates it.
+
+    HIT RATE AND RETURN COUNT DIFFERENT THINGS, and the difference is the daily cap. A
+    selection below the cap is still evidence about the model — it was predicted, it
+    settled, and whether it was funded says nothing about whether it was right — so it
+    counts in the hit rate. It was not staked, so it must not move the money: an ROI over
+    thirty-four legs describes a bet nobody placed when the plan was twenty. Rows written
+    before staking existed carry no `stake` and default to one unit, which is what they
+    were reported as at the time.
     """
     if not graded:
         return None
@@ -206,13 +214,18 @@ def summarize(graded):
     pushes = sum(1 for g in graded if g["result"] == PUSH)
     losses = sum(1 for g in graded if g["result"] == LOSS)
     decided = wins + halves + losses
-    staked = len(graded)
-    returned = sum(payout(g["result"], g["odds"]) for g in graded)
+
+    def units(g):
+        s = g.get("stake")
+        return 1.0 if s is None else float(s)
+
+    staked = sum(units(g) for g in graded)
+    returned = sum(units(g) * payout(g["result"], g["odds"]) for g in graded)
     return {
         "graded": len(graded),
         "win": wins, "half": halves, "push": pushes, "loss": losses,
         "hit_rate": (wins + halves) / decided if decided else None,
-        "staked": staked,
+        "staked": round(staked, 3),
         "returned": round(returned, 3),
         "roi_pct": round(100.0 * (returned - staked) / staked, 2) if staked else None,
     }

@@ -24,7 +24,7 @@ sys.path.insert(0, ROOT)
 import config  # noqa: E402
 from engine import (bwfeed, coupon, grade, ladder, mirror, model_generic,  # noqa: E402
                     parlay, pick, rating, results_store, score, settlement, signals,
-                    simulated, telegram)
+                    simulated, stake, telegram)
 from tools import collect_live, daily_report, fetch_window  # noqa: E402
 from tools import grade_predictions, heartbeat  # noqa: E402
 from tools import daily_results as tools_daily_results  # noqa: E402
@@ -1045,6 +1045,21 @@ class TestRegression(unittest.TestCase):
         self.assertLessEqual(len(clipped), 1000)
         self.assertEqual(clipped.count("<b>"), clipped.count("</b>"))
 
+        # AND THE REAL NOTICE HAS TO FIT INSIDE THAT CLIP. Clipping is safe, not free: it
+        # drops whole trailing lines, and the last thing in this caption is the bet-slip
+        # code — the one line the operator actually acts on. Adding a paragraph anywhere
+        # above it silently deletes it, with nothing failing to say so.
+        picks = [{"id": i, "score": 90 - i, "band": "yüksek", "odds": 1.2,
+                  "p1": "A", "p2": "B"} for i in range(1, 40)]
+        results = [{"hours": 48, "picks": picks, "matches": 900, "skipped": {}},
+                   {"hours": 24, "picks": picks[:20], "matches": 500, "skipped": {}}]
+        real = daily_report.build_notice(
+            results, "picks.html", host="betwinner2.example", host_source="ayna",
+            source_note="kaynak: card_today.json.gz", coupon_code="F44SR",
+            coupon_detail="39 bacak, fiyatlar doğrulandı",
+            staking=stake.plan(picks))
+        self.assertIn("F44SR", telegram.chunks(real, 1000)[0])
+
     def test_the_watcher_reads_the_format_instead_of_assuming_it(self):
         """The live watcher decides a match is over from the book's own format note.
 
@@ -1094,12 +1109,13 @@ class TestRegression(unittest.TestCase):
         self.assertFalse(collect_live.looks_finished(rec(n=None)))
         # Both sides at the target means we are reading a running total, not a final one.
         self.assertFalse(collect_live.looks_finished(rec(s1=4, s2=4)))
-        # A PERIOD sport is never settled by inference, however complete it looks. A
+        # A PERIOD sport is never settled by the SCORE, however complete it looks. A
         # football match at 1-0 in the second half satisfies every structural check and
         # may still finish 3-1, so recording it invents a scoreline. Being in the last
-        # period is not being finished, and nothing in the payload turns one into the
-        # other — so these are recorded only when the feed itself says so.
-        foot = {"sport": 1, "kind": "periods", "n": 2, "s1": 2, "s2": 1, "period": 2}
+        # period is not being finished, and no reading of the score turns one into the
+        # other — what says so is a different field entirely, the clock.
+        foot = {"sport": 1, "kind": "periods", "n": 2, "s1": 2, "s2": 1, "period": 2,
+                "cps": "2nd half", "ts": 3000, "sls": "50 minutes"}
         self.assertFalse(collect_live.looks_finished(foot))
         self.assertFalse(collect_live.looks_finished({**foot, "period": 9}))
         self.assertFalse(collect_live.looks_finished(
@@ -1123,6 +1139,110 @@ class TestRegression(unittest.TestCase):
         # And a period sport has no target to settle.
         self.assertIsNone(collect_live.settle_target(
             {"sport": 1, "kind": "periods", "n": None, "s1": 2, "s2": 1}).get("n"))
+
+    def test_every_selection_is_staked_the_same_and_the_day_has_a_ceiling(self):
+        """Sizing is a RISK rule here, and it must not become an edge claim by accident.
+
+        Kelly and every other proportional rule sizes by edge — how far the price is from
+        the truth — and this product does not claim one. Feeding the model's probability
+        in anyway would convert "the model is 86% sure" into "the model is 86% sure AND
+        the book is wrong", size the bets on that, and never say it out loud. So every
+        stake is the same, and the only lever is how many of them there are."""
+        picks = [{"id": i, "odds": 1.10 + i * 0.05} for i in range(1, 8)]
+        s = stake.plan(picks, unit_pct=1.0, cap=4)
+        self.assertEqual([p["stake"] for p in picks], [1, 1, 1, 1, 0, 0, 0])
+        # Confidence does not size anything, and neither does price. Same stake, always.
+        self.assertEqual({p["stake"] for p in picks if p["in_plan"]}, {1.0})
+        self.assertEqual((s["placed"], s["left_out"]), (4, 3))
+        self.assertEqual(s["risk_pct"], 4.0)
+        # The cap follows the SCORE order, which is the numbering, not the list order.
+        shuffled = [{"id": i, "odds": 1.5} for i in (5, 1, 4, 2, 3)]
+        stake.plan(shuffled, unit_pct=1.0, cap=2)
+        self.assertEqual({p["id"] for p in shuffled if p["in_plan"]}, {1, 2})
+        # Break-even is arithmetic on the book's own prices and asserts nothing: four
+        # legs at 2.00 return the stake at exactly half.
+        self.assertAlmostEqual(stake.break_even_rate([2.0, 2.0, 2.0, 2.0]), 0.5)
+        self.assertIsNone(stake.break_even_rate([]))
+        # And a settled day is measured on what was actually RISKED. A selection under
+        # the cap is still evidence about the model — it was predicted and it settled —
+        # so it counts in the hit rate; it was not funded, so it must not move the money.
+        graded = [{"result": grade.WIN, "odds": 2.0, "stake": 1.0},
+                  {"result": grade.LOSS, "odds": 2.0, "stake": 1.0},
+                  {"result": grade.LOSS, "odds": 2.0, "stake": 0.0}]
+        got = grade.summarize(graded)
+        self.assertEqual(got["staked"], 2.0)
+        self.assertEqual(got["returned"], 2.0)
+        self.assertEqual(got["roi_pct"], 0.0)
+        self.assertAlmostEqual(got["hit_rate"], 1 / 3)
+        # Rows logged before staking existed carry no stake and stay one unit, which is
+        # what they were reported as at the time.
+        old = grade.summarize([{"result": grade.WIN, "odds": 2.0}])
+        self.assertEqual((old["staked"], old["returned"]), (1.0, 2.0))
+
+    def test_the_clock_is_what_says_a_period_sport_is_over(self):
+        """The score cannot end a football match; the clock can.
+
+        Watched to the end on real fixtures: `TS` counts up to 5400 and stops, and `SLS`
+        — the minute in words, "84 minutes" — goes EMPTY at the same moment. Three matches
+        ended that way and only ONE of them ever displayed "Match finished", so two thirds
+        of finished football was being dropped by a collector that could see it was over.
+
+        Everything else about this rule is a fence around that one reading."""
+        def foot(**kw):
+            base = {"sport": 1, "kind": "periods", "n": 2, "s1": 2, "s2": 1, "period": 2,
+                    "cps": "2nd half", "ts": 5400, "sls": "", "note": ""}
+            base.update(kw)
+            return base
+
+        self.assertTrue(collect_live.looks_finished(foot()))
+        # 0-0 is a result, and the one this used to lose: `FS` omits a zero, so a goalless
+        # match looked like one that had not kicked off.
+        self.assertTrue(collect_live.looks_finished(foot(s1=0, s2=0)))
+        # A reported minute IS a running clock. This is the guard doing the real work.
+        self.assertFalse(collect_live.looks_finished(foot(sls="90 minutes")))
+        self.assertFalse(collect_live.looks_finished(foot(ts=5034, sls="84 minutes")))
+        # Regulation not reached, whatever the status says.
+        self.assertFalse(collect_live.looks_finished(foot(ts=2700)))
+        self.assertFalse(collect_live.looks_finished(foot(ts=0)))
+        # Extra time is still being played, and its goals are not the ones the markets we
+        # price settle on. Refused twice over: by the period, and by the status wording.
+        self.assertFalse(collect_live.looks_finished(foot(period=3)))
+        self.assertFalse(collect_live.looks_finished(foot(cps="Extra time 1st half")))
+        self.assertFalse(collect_live.looks_finished(foot(cps="Penalty shoot-out")))
+        # A DECLARED shorter game has a shorter regulation, and it is read, not assumed:
+        # an eighty-minute match is over at 4800 and is not still running at 5399.
+        self.assertTrue(collect_live.looks_finished(foot(ts=4800, note="2x40")))
+        self.assertFalse(collect_live.looks_finished(foot(ts=4700, note="2x40")))
+        # And a sport whose clock nobody has watched to the end stays refused. Basketball
+        # has a clock too; whether it counts up, down or resets each quarter is unknown
+        # here, and a rule that assumed would settle games at half time.
+        self.assertNotIn(3, collect_live.CLOCK_FINISH)
+        self.assertFalse(collect_live.looks_finished(
+            {"sport": 3, "kind": "periods", "n": 4, "s1": 91, "s2": 88, "period": 4,
+             "cps": "4th quarter", "ts": 2400, "sls": ""}))
+        # The vanish path also has to be able to PLACE the row, which for football means
+        # refusing the five-minute-half games filed under the same sport id. That used to
+        # be implied — every fixture this accepted was a race with a readable target — and
+        # is now asserted, because it no longer is.
+        short = foot(note="2x5")
+        self.assertTrue(collect_live.looks_finished(short))
+        self.assertFalse(collect_live.placeable(short))
+
+    def test_a_goalless_match_under_way_is_remembered(self):
+        """`FS` omits zeros, so 0-0 arrives as an empty score. The clock separates a
+        goalless match in progress from one that has not begun — and without that, every
+        0-0 was dropped, which is about one football match in twelve and a systematic tilt
+        upward in the goal distribution the model reads."""
+        game = {"I": 1, "O1": "A", "O2": "B", "S": 1_753_500_000,
+                "SC": {"FS": {}, "CP": 2, "CPS": "2nd half", "TS": 5400, "SLS": ""}}
+        rec = collect_live.snapshot(game, 1)
+        self.assertIsNotNone(rec)
+        self.assertEqual((rec["s1"], rec["s2"]), (0, 0))
+        self.assertEqual(rec["ts"], 5400)
+        self.assertTrue(collect_live.looks_finished(rec))
+        # Not started: no score AND no clock.
+        self.assertIsNone(collect_live.snapshot(
+            {**game, "SC": {"FS": {}, "CPS": "", "TS": 0}}, 1))
 
     def test_a_watched_result_carries_identity_and_its_own_rating_scale(self):
         """What the watcher stores has to be usable by the generic model unchanged.

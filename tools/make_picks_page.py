@@ -96,6 +96,7 @@ PAGE = """<!doctype html>
  .stat{{flex:1 1 92px}}
  .stat b{{display:block;font-size:19px;line-height:1.2}}
  .stat span{{font-size:11.5px;color:var(--muted)}}
+ tr.outplan{{opacity:.52}}
  table{{width:100%;border-collapse:collapse;font-size:13.5px}}
  th{{text-align:left;font-size:11.5px;color:var(--muted);text-transform:uppercase;
    letter-spacing:.04em;padding:7px 6px;border-bottom:1px solid var(--line);
@@ -167,6 +168,7 @@ PAGE = """<!doctype html>
   model güven eşiği %{floor} · maç başına tek seçim · iadeli bahisler kapalı</div>
 
 {coupon}
+{staking}
 {scorecard}
 {coverage}
 
@@ -358,10 +360,10 @@ apply(); refresh();
 
 ROW = """<tr data-sport="{sport_id}" data-window="{window}" data-score="{score}"
  data-odds="{odds}" data-id="{id}" data-match="{match_sort}" data-pick="{pick_sort}"
- data-start="{start_sort}" data-text="{text}" data-result="{result_key}" data-key="{key}">
+ data-start="{start_sort}" data-text="{text}" data-result="{result_key}" data-key="{key}"{plan_css}>
  <td class="id num"><label><input type="checkbox" class="sel"><span>{id}</span></label></td>
  <td><div class="match">{match}</div><div class="meta">{sport} · {league}</div></td>
- <td class="pickcell">{badge}{pick}<div class="meta">{where}{scope}{warn}{final}</div></td>
+ <td class="pickcell">{badge}{pick}<div class="meta">{where}{scope}{warn}{final}{plan}</div></td>
  <td class="num odds">{odds_txt}</td>
  <td class="num"><span class="score">{score_txt}</span>
    <div class="bar"><i style="width:{bar}%"></i></div>
@@ -376,7 +378,7 @@ SCORECARD = """<div class="scorecard">
   <div class="stat"><b style="color:var(--loss)">{loss}</b><span>kaybetti</span></div>
   <div class="stat"><b style="color:var(--push)">{push}</b><span>iade / yarım</span></div>
   <div class="stat"><b>{pending}</b><span>bekliyor</span></div>
-  <div class="stat"><b>{roi}</b><span>1 birimlik bahislerde getiri</span></div>
+  <div class="stat"><b>{roi}</b><span>{staked} birim üzerinden getiri</span></div>
 </div>{caveat}"""
 
 # The page is where the number is actually read, so the warning belongs here and not only
@@ -388,6 +390,49 @@ SMALL_SAMPLE = ("""<p class="note">Bu oran <b>{decided}</b> sonuçlanan seçime 
 
 # Below this many settled legs a hit rate is arithmetic, not evidence.
 MIN_MEANINGFUL = 20
+
+# THE DAY'S RISK, which the list on its own does not state. Thirty selections is not a
+# betting plan until it says how much goes on each one and what the day costs if it all
+# goes wrong — and those two numbers swing by a factor of two between a quiet card and a
+# busy one unless something fixes them.
+#
+# Every stake is the SAME SIZE. Sizing by confidence would be a Kelly-shaped rule, and
+# Kelly needs an EDGE — how far the price is from the truth — which this product
+# deliberately does not claim. Equal stakes assert nothing about the price at all.
+#
+# The break-even hit rate is the honest headline because it is arithmetic on the book's
+# own odds. It sits beside the REALISED hit rate in the scorecard below, never beside the
+# model's claimed confidence: one is measured and the other is the thing being tested.
+STAKING = """<div class="scorecard staking">
+  <div class="stat"><b>{placed} × {unit}</b><span>oynanacak seçim × birim</span></div>
+  <div class="stat"><b>%{risk}</b><span>bugün ortaya konan kasa</span></div>
+  <div class="stat"><b>%{upside}</b><span>hepsi tutarsa kâr</span></div>
+  <div class="stat"><b>%{breakeven}</b><span>başabaş için gereken isabet</span></div>
+  {rest}
+</div>{economics}{caveat}"""
+
+STAKING_REST = ('<div class="stat"><b>{left_out}</b>'
+                '<span>tavanın altında kalan (plan dışı)</span></div>')
+
+# The four numbers above can be read as "risk 10 to make 2", which overstates it: every
+# selection losing is an arithmetic bound, not a scenario. What the day actually turns on
+# is how far the hit rate lands from break-even, and on a list of short prices that is a
+# few points either way. So the sentence that makes the four numbers mean something goes
+# directly under them.
+STAKING_ECONOMICS = (
+    """<p class="note"><b>Bu listenin ekonomisi.</b> Kısa oranlarda gün, başabaşa çok"""
+    """ yakın bir yerde biter. Başabaş noktası <b>%{breakeven}</b> isabet; bunun"""
+    """ <b>1 puan</b> üstünde ya da altında bitmek kasada <b>%{per_point}</b> fark"""
+    """ ediyor. "Hepsi kaybederse %{risk}" bir senaryo değil, aritmetik bir sınır —"""
+    """ günü belirleyen şey birkaç puanlık isabet farkı. Karşılaştırılacak sayı"""
+    """ aşağıdaki karnedeki <b>gerçekleşen</b> isabet oranıdır; modelin kendi güveni"""
+    """ değil, çünkü test edilen şey o.</p>""")
+
+STAKING_PROVISIONAL = (
+    """<p class="note"><b>Birim ve tavan henüz onaylanmadı.</b> Şu an her seçime kasanın"""
+    """ %{unit}'i, günde en fazla {cap} seçim varsayılıyor — bu bir öneri değil, yerine"""
+    """ senin sayın konana kadar duran bir tutucu. Ne kadar oynanacağına model değil sen"""
+    """ karar verirsin; iki sayıyı söyle, kural onlara göre çalışsın.</p>""")
 
 # The whole list as ONE code. Typing five characters into the book's "load bet slip" box
 # drops every selection in at once — the alternative was opening thirty fixtures and
@@ -447,6 +492,7 @@ def build(report, out_path):
         for h in sorted(windows, reverse=True))
 
     floor_pct = (report.get("min_model_survival") or 0.75) * 100.0
+    st_plan = report.get("staking") or {}
     settled = [p for p in picks if p.get("result")]
     rows = []
     for p in picks:
@@ -457,7 +503,13 @@ def build(report, out_path):
         sport = str(names.get(p.get("sport_id"), p.get("sport_id") or ""))
         label, css = RESULTS_TR.get(p.get("result") or "", ("", ""))
         final = p.get("final_score")
+        # Outside the day's cap. Kept on the page, because a cap the operator set is one
+        # the operator is allowed to overrule — but not counted in the day's risk.
+        out_of_plan = st_plan.get("placed") and not p.get("in_plan")
         rows.append(ROW.format(
+            plan_css=' class="outplan"' if out_of_plan else "",
+            plan=(' · <b>plan dışı</b> (günlük tavanın altında)' if out_of_plan
+                  else (f' · {p["stake"]:g} birim' if p.get("stake") else "")),
             sport_id=p.get("sport_id", ""),
             window=first_seen.get(p.get("id"), longest),
             score=p.get("score") or 0,
@@ -516,7 +568,30 @@ def build(report, out_path):
             pending=len(picks) - len(settled),
             roi=(f"{summary['returned'] / summary['staked']:.3f}x"
                  if summary.get("staked") else "—"),
+            # The money is measured over what was STAKED, not over what was predicted.
+            # A selection under the day's cap still counts in the hit rate — it was
+            # predicted and it settled — but funding it is a separate question and the
+            # two numbers must not be quietly computed over the same set.
+            staked=f"{summary.get('staked') or 0:g}",
         )
+    staking = ""
+    if st_plan.get("placed"):
+        staking = STAKING.format(
+            placed=st_plan["placed"],
+            unit=f"%{st_plan['unit_pct']:g} kasa",
+            risk=f"{st_plan['risk_pct']:g}",
+            upside=f"{st_plan['if_all_win_pct']:g}",
+            breakeven=f"{(st_plan.get('break_even_rate') or 0) * 100:.1f}",
+            rest=(STAKING_REST.format(left_out=st_plan["left_out"])
+                  if st_plan.get("left_out") else ""),
+            economics=(STAKING_ECONOMICS.format(
+                breakeven=f"{(st_plan.get('break_even_rate') or 0) * 100:.1f}",
+                per_point=f"{st_plan['per_point_pct']:g}",
+                risk=f"{st_plan['risk_pct']:g}") if st_plan.get("per_point_pct") else ""),
+            caveat=(STAKING_PROVISIONAL.format(unit=f"{st_plan['unit_pct']:g}",
+                                               cap=st_plan.get("cap"))
+                    if st_plan.get("provisional") else ""))
+
     result_filter = ""
     if settled:
         result_filter = """
@@ -579,6 +654,7 @@ def build(report, out_path):
         sport_opts=sport_opts,
         window_opts=window_opts,
         result_filter=result_filter,
+        staking=staking,
         scorecard=scorecard,
         coupon=(COUPON.format(code=html.escape(str(report["coupon_code"])),
                               detail=html.escape(str(report.get("coupon_detail") or "")))

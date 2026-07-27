@@ -81,6 +81,12 @@ def as_report(day, rows):
             "selection": r.get("selection"),
             "selection_tr": r.get("selection_tr"),
             "odds": r.get("odds"),
+            # What was staked on this selection the morning it was offered. Read back off
+            # the log rather than recomputed, because the cap that produced it was the
+            # cap in force that day: re-deriving it here would restate an old day under
+            # today's settings and quietly rewrite what the operator was handed.
+            "stake": r.get("stake"),
+            "in_plan": r.get("in_plan"),
             "model_survival": r.get("model_survival"),
             "settlement": r.get("settlement"),
             "url": r.get("url"),
@@ -120,7 +126,8 @@ def build_notice(day, report, page_name, total, settled):
                 else f" — <i>örneklem çok küçük, {MIN_MEANINGFUL} sonuçlanan seçime "
                      f"kadar bu oranı bir performans olarak okumayın</i>")
              if hit is not None else "isabet: henüz hesaplanamıyor"),
-            f"1 birimlik bahislerde getiri <b>{s['returned'] / s['staked']:.3f}x</b>"
+            f"{s['staked']:g} birim oynandı, getiri "
+            f"<b>{s['returned'] / s['staked']:.3f}x</b>"
             if s.get("staked") else "",
         ]
     pending = total - settled
