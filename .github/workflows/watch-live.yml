@@ -32,15 +32,27 @@ name: watch-live
 # Saat basi ayri is, tek uzun is degil: durum her taramada diske, ama repoya ancak is
 # bitince yaziliyor, o yuzden bir cokme en fazla bir saat kaybettiriyor.
 
+# ZAMANLAMA GUVENILIR DEGIL, ve bu olculdu: cron "4 * * * *" olarak kuruldugunda uc
+# saatlik dilimden yalnizca biri ateslendi (22:04 ve 00:04 hic calismadi, 23:04 ise uc
+# dakika gecikmeli). GitHub zamanlanmis isleri "en iyi gayret" ile calistiriyor ve saat
+# basina yakin dakikalar en kalabalik olanlar. Iki onlem:
+#   1. Dakika 37 — herkesin kullandigi :00-:10 araligindan uzak.
+#   2. Is UZUN: her calistirma ~3 saat izliyor. Boylece dusen bir tetikleme bosluk
+#      yaratmiyor, cunku zaten calisan bir is var; tek bir basarili tetikleme uc saat
+#      kapsiyor. concurrency ayni anda ikinci bir isin baslamasini zaten engelliyor.
 on:
   schedule:
-    - cron: "4 * * * *"
+    - cron: "37 * * * *"
   workflow_dispatch:
     inputs:
       minutes:
-        description: "Pencere uzunlugu, dakika (0 = tek tarama)"
+        description: "Her dilimin uzunlugu, dakika (0 = tek tarama)"
         required: false
         default: "55"
+      slices:
+        description: "Kac dilim (her dilim sonunda commit edilir)"
+        required: false
+        default: "3"
       every:
         description: "Taramalar arasi saniye (olculen kalma suresi ~50-150 sn)"
         required: false
@@ -62,66 +74,62 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    # Bir sonraki saatin isi baslamadan bitmeli, yoksa concurrency kuyrugu buyur.
-    timeout-minutes: 57
+    # 3 x 55 dakika + commit paylari. GitHub'in ust siniri 360 dakika.
+    timeout-minutes: 185
     steps:
       - uses: actions/checkout@v4
 
-      - name: Sweep the live feed
+      # UZUN IS, AMA SAATLIK COMMIT. Tek bir 3 saatlik tarama, cokerse uc saatlik
+      # toplamayi birden goturur — izlenmis bir sonuc tekrar izlenemez, mac bitti. Bu
+      # yuzden is dilimlere bolunmus: her dilim ~55 dakika tariyor, modelleri tazeliyor ve
+      # sonuclari itiyor. Boylece dusen bir zamanlama bosluk yaratmiyor (is zaten
+      # calisiyor) ve bir cokme en fazla bir dilim kaybettiriyor.
+      - name: Sweep the live feed, committing after every slice
         run: |
-          python3 tools/collect_live.py \
-            --minutes "${{ github.event.inputs.minutes || '55' }}" \
-            --every "${{ github.event.inputs.every || '60' }}" \
-            --sports "${{ github.event.inputs.sports || '' }}"
-
-      # Modeller sadece yeni sonuc geldiginde yeniden kuruluyor. Bir spor ancak kendi
-      # tutulan kalibrasyonu gecerse kabul edilir; gecmezse build_generic_model nedenini
-      # soyler ve gunluk kosu bunu kapsam raporunda tekrarlar.
-      - name: Rebuild the models the sweep touched
-        run: |
-          CHANGED=$(git diff --name-only -- data/results | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p')
-          if [ -z "$CHANGED" ]; then
-            echo "yeni sonuc yok — model kurulmadi"
-            exit 0
-          fi
-          for SPORT in $CHANGED; do
-            python3 tools/build_generic_model.py --sport "$SPORT" \
-              || echo "spor $SPORT icin model kurulamadi"
-          done
-
-      - name: Commit
-        run: |
-          set -e
+          set -u
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/results data/models data/live_state.json || true
-          if git diff --cached --quiet; then
-            echo "degisiklik yok"
-            exit 0
-          fi
-          # Kendi satirlarimizin bir kopyasi. Cakisma olursa bunlari uzak duruma YENIDEN
-          # ISLEYECEGIZ: izlenmis bir sonuc tekrar izlenemez, mac bitti. "Bir sonraki
-          # calistirma yakalar" burada dogru degil — bir sonraki kosu temiz bir kaptan
-          # origin/main ile basliyor, gonderilemeyen satirlar kayboluyor.
-          mkdir -p /tmp/bwsave && cp -r data/results /tmp/bwsave/
-          git commit -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ)"
-          for i in 1 2 3; do
-            if git pull --rebase origin main && git push; then exit 0; fi
-            git rebase --abort 2>/dev/null || true
-            git fetch origin main
-            git reset --hard origin/main
-            python3 tools/merge_store.py /tmp/bwsave/results
-            CHANGED=$(git diff --name-only -- data/results \
-              | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p')
-            for SPORT in $CHANGED; do
-              python3 tools/build_generic_model.py --sport "$SPORT" >/dev/null 2>&1 || true
-            done
-            git add data/results data/models || true
+
+          commit_slice() {
+            git add data/results data/models data/live_state.json data/watch_log.jsonl || true
             if git diff --cached --quiet; then
-              echo "uzak durumda zaten var"
-              exit 0
+              echo "  degisiklik yok"
+              return 0
             fi
-            git commit -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ) (yeniden islendi)"
-            sleep $((i * 5))
+            # Kendi satirlarimizin kopyasi: cakisma olursa uzak duruma YENIDEN isliyoruz.
+            # "Bir sonraki kosu yakalar" burada dogru degil — bir sonraki kosu temiz bir
+            # kaptan origin/main ile basliyor ve gonderilemeyen satirlar kayboluyor.
+            rm -rf /tmp/bwsave && mkdir -p /tmp/bwsave && cp -r data/results /tmp/bwsave/
+            git commit -q -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ)"
+            for i in 1 2 3; do
+              if git pull --rebase -q origin main && git push -q; then return 0; fi
+              git rebase --abort 2>/dev/null || true
+              git fetch -q origin main && git reset --hard -q origin/main
+              python3 tools/merge_store.py /tmp/bwsave/results || true
+              for S in $(git diff --name-only -- data/results \
+                          | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p'); do
+                python3 tools/build_generic_model.py --sport "$S" >/dev/null 2>&1 || true
+              done
+              git add data/results data/models || true
+              git diff --cached --quiet && return 0
+              git commit -q -m "results: live sweep $(date -u +%Y-%m-%dT%H:%MZ) (yeniden islendi)"
+              sleep $((i * 5))
+            done
+            echo "  push basarisiz — satirlar bu kapla birlikte gidecek"
+            return 0
+          }
+
+          SLICES="${{ github.event.inputs.slices || '3' }}"
+          for N in $(seq 1 "$SLICES"); do
+            echo "=== dilim $N/$SLICES"
+            python3 tools/collect_live.py \
+              --minutes "${{ github.event.inputs.minutes || '55' }}" \
+              --every "${{ github.event.inputs.every || '60' }}" \
+              --sports "${{ github.event.inputs.sports || '' }}" || true
+            for S in $(git diff --name-only -- data/results \
+                        | sed -n 's#data/results/\([0-9]*\)\.jsonl#\1#p'); do
+              python3 tools/build_generic_model.py --sport "$S" >/dev/null 2>&1 \
+                || echo "  spor $S icin model kurulamadi"
+            done
+            commit_slice
           done
-          echo "push basarisiz — satirlar /tmp/bwsave altinda, bu kap silinince gider"
