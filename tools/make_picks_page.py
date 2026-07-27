@@ -166,6 +166,7 @@ PAGE = """<!doctype html>
 <div class="sub">{generated} · {n} seçim · min oran {min_odds} ·
   model güven eşiği %{floor} · maç başına tek seçim · iadeli bahisler kapalı</div>
 
+{coupon}
 {scorecard}
 {coverage}
 
@@ -388,6 +389,33 @@ SMALL_SAMPLE = ("""<p class="note">Bu oran <b>{decided}</b> sonuçlanan seçime 
 # Below this many settled legs a hit rate is arithmetic, not evidence.
 MIN_MEANINGFUL = 20
 
+# The whole list as ONE code. Typing five characters into the book's "load bet slip" box
+# drops every selection in at once — the alternative was opening thirty fixtures and
+# finding thirty markets by hand. The button copies it so nothing has to be typed twice.
+COUPON = """<div class="scorecard coupon">
+  <div class="stat"><b id="cc">{code}</b><span>kupon kodu · {detail}</span></div>
+  <div class="stat"><button type="button" id="ccbtn">Kodu kopyala</button>
+    <span>Betwinner &rsaquo; Kuponu yükle &rsaquo; kodu yapıştır</span></div>
+</div>
+<script>
+(function(){{
+  var b=document.getElementById('ccbtn'), c=document.getElementById('cc');
+  if(!b||!c) return;
+  b.addEventListener('click',function(){{
+    var t=c.textContent.trim();
+    var done=function(){{ b.textContent='Kopyalandı ✓';
+      setTimeout(function(){{ b.textContent='Kodu kopyala'; }},1800); }};
+    if(navigator.clipboard&&navigator.clipboard.writeText){{
+      navigator.clipboard.writeText(t).then(done,function(){{}});
+    }} else {{
+      var i=document.createElement('input'); i.value=t; document.body.appendChild(i);
+      i.select(); try{{document.execCommand('copy');done();}}catch(e){{}}
+      document.body.removeChild(i);
+    }}
+  }});
+}})();
+</script>"""
+
 
 def _fmt_pct(x):
     return "—" if x is None else f"%{100.0 * x:.1f}"
@@ -552,6 +580,9 @@ def build(report, out_path):
         window_opts=window_opts,
         result_filter=result_filter,
         scorecard=scorecard,
+        coupon=(COUPON.format(code=html.escape(str(report["coupon_code"])),
+                              detail=html.escape(str(report.get("coupon_detail") or "")))
+                if report.get("coupon_code") else ""),
         coverage=cov_note,
         rows="\n".join(rows),
         footer="<br>".join(foot),

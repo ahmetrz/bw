@@ -232,6 +232,12 @@ def normalize(data, book="betwinner"):
                     line_key = p
                 rows.append({
                     "fixture_id": ci,
+                    # THE OTHER ID. `CI` is the constant id the deep link uses; `I` is the
+                    # game id the BETSLIP uses, and they are different numbers for the same
+                    # fixture. Sending CI to the coupon service returns "events in the
+                    # downloaded bet slip have finished", which reads like a stale card and
+                    # is actually an unknown id.
+                    "game_id": gm.get("I"),
                     "p1": gm.get("O1"),
                     "p2": gm.get("O2"),
                     # The book's own participant ids, present on every fixture it lists.

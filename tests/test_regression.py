@@ -22,7 +22,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
-from engine import (bwfeed, grade, ladder, mirror, model_generic,  # noqa: E402
+from engine import (bwfeed, coupon, grade, ladder, mirror, model_generic,  # noqa: E402
                     parlay, pick, rating, results_store, score, settlement, signals,
                     simulated, telegram)
 from tools import collect_live, daily_report, fetch_window  # noqa: E402
@@ -1257,6 +1257,47 @@ class TestRegression(unittest.TestCase):
             simulated.save({(2, "RHL"): "why"}, path)
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
+
+    def test_a_coupon_leg_carries_the_line_the_backed_side_sees(self):
+        """The bet-slip event must express the line from the BACKED side's point of view.
+
+        engine/bwfeed normalizes handicaps to the line as the HOME side sees them, so that
+        both sides of one market share a key and the hold is computable. The book's slip
+        wants what the feed originally published for that outcome. Backing Cuiaba +1.5 at
+        1.197 and sending the stored -1.5 produced a slip the book priced at 9.00 — the
+        OPPOSITE handicap, loaded silently, at a price nobody would take. That is the
+        failure a one-tap slip has to be proof against, because the operator sees a code
+        and not a payload."""
+        away = coupon.event_of({
+            "game_id": 738575246, "outcome_id": 8, "odds": 1.197,
+            "market_key": (1, "2|-1.5")})
+        self.assertEqual(away["Param"], 1.5)         # flipped back to the backed view
+        self.assertEqual(away["GameId"], 738575246)
+        home = coupon.event_of({
+            "game_id": 738575246, "outcome_id": 7, "odds": 4.2,
+            "market_key": (1, "2|-1.5")})
+        self.assertEqual(home["Param"], -1.5)        # home side keeps the stored sign
+
+        # Set handicaps are NOT normalized by bwfeed, so they must pass through untouched.
+        sets = coupon.event_of({
+            "game_id": 739350819, "outcome_id": 733, "odds": 1.25,
+            "market_key": (1, "109|1.5")})
+        self.assertEqual(sets["Param"], 1.5)
+        # Totals have no side to flip.
+        total = coupon.event_of({
+            "game_id": 1, "outcome_id": 10, "odds": 1.12, "market_key": (1, "17|4.5")})
+        self.assertEqual(total["Param"], 4.5)
+        # Everything pre-match is Kind 3; live is a different product this never emits.
+        self.assertEqual(total["Kind"], coupon.KIND_PREMATCH)
+
+        # THE GAME ID IS `I`, NOT `CI`. A pick without it cannot become a slip event, and
+        # must be dropped rather than sent with the deep-link id — the service answers
+        # "events have finished" for an id it does not know, which reads like a stale card.
+        self.assertIsNone(coupon.event_of({
+            "outcome_id": 10, "odds": 1.12, "market_key": (1, "17|4.5")}))
+        rows = bwfeed.normalize(_sample())
+        self.assertTrue(any(r.get("game_id") for r in rows))
+        self.assertTrue(any(r.get("game_id") != r.get("fixture_id") for r in rows))
 
     def test_a_rung_is_denominated_in_the_unit_the_model_measures(self):
         """The ladder must offer markets counted in what the sport is SCORED in.

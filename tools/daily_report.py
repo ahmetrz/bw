@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, mirror, model_elo, model_football,  # noqa: E402
+from engine import (bwfeed, coupon, mirror, model_elo, model_football,  # noqa: E402
                     model_generic, model_tt, parlay, pick, rating, results_store,
                     score, setka, settlement, simulated, telegram, tr)
 from tools import collect_live, fetch_window, make_picks_page  # noqa: E402
@@ -319,7 +319,8 @@ def number(results):
     return results
 
 
-def build_notice(results, page_name, host=None, host_source="", source_note=""):
+def build_notice(results, page_name, host=None, host_source="", source_note="",
+                 coupon_code=None, coupon_detail=""):
     """The short Telegram message. The list itself travels as the attached page.
 
     Nine messages of selections could not be sorted, filtered or searched, and scrolling
@@ -352,6 +353,14 @@ def build_notice(results, page_name, host=None, host_source="", source_note=""):
             "her satırda bahsin bağlantısı var.",
             "",
         ]
+        if coupon_code:
+            lines += [
+                f"🎟 <b>Kupon kodu: <code>{html.escape(coupon_code)}</code></b>",
+                f"Betwinner'da <i>Kuponu yükle</i> kutusuna bu kodu girin — "
+                f"{html.escape(coupon_detail)} tek seferde kupona düşer. Tekli mi "
+                f"kombine mi oynayacağınızı kupon ekranında siz seçersiniz.",
+                "",
+            ]
     lines += ["<i>Yön modelden gelir, orandan değil; oran yalnızca 1.10 eşiğinde okunur. "
               "Puan tamamen analizden hesaplanır, kitabın fiyatı puana girmez.</i>"]
     if host:
@@ -444,6 +453,8 @@ def main():
     ap.add_argument("--out", default="daily_report.json")
     ap.add_argument("--page", default="picks.html")
     ap.add_argument("--simulated-out", default=simulated.STORE)
+    ap.add_argument("--no-coupon", action="store_true",
+                    help="do not ask the book for a bet-slip code")
     ap.add_argument("--no-telegram", action="store_true")
     ap.add_argument("--only-if-new", action="store_true",
                     help="skip the Telegram send when every selection was already logged "
@@ -598,6 +609,18 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
     print(f"wrote {args.out}")
 
+    # ONE CODE FOR THE WHOLE LIST. The book's own share-a-slip endpoint takes a set of
+    # events and returns a five-character code; typing it into "load bet slip" drops every
+    # selection in at once. See engine/coupon.py for how it is verified before it is handed
+    # over — a slip that loads the wrong bet in one tap is worse than no slip.
+    coupon_code, coupon_detail = (None, "")
+    if not args.no_coupon:
+        widest_picks = (max(results, key=lambda r: r["hours"])["picks"] if results else [])
+        coupon_code, coupon_detail = coupon.create(widest_picks)
+        print(f"kupon kodu: {coupon_code or '—'} ({coupon_detail})")
+    payload["coupon_code"] = coupon_code
+    payload["coupon_detail"] = coupon_detail
+
     n = make_picks_page.build(payload, args.page)
     print(f"wrote {args.page} — {n} selections")
 
@@ -606,7 +629,8 @@ def main():
 
     notice = build_notice(results, os.path.basename(args.page), host=host,
                           host_source=host_source,
-                          source_note=f"kaynak: {os.path.basename(args.input)}")
+                          source_note=f"kaynak: {os.path.basename(args.input)}",
+                          coupon_code=coupon_code, coupon_detail=coupon_detail)
     if args.no_telegram:
         print("\n--- notice preview ---\n")
         print(notice)
