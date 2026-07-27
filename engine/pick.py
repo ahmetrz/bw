@@ -260,11 +260,32 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
         probs, name_score, source = resolve(sample, index, elo_model, min_name_score,
                                            tt, generic)
         if not probs:
+            # The biggest bucket on a real card by a long way, and the one the coverage
+            # report has to break down by sport: it is not "we did not look", it is "we
+            # looked and our history does not contain these two teams". Those are opposite
+            # problems with opposite fixes.
             skipped["no_model"] += 1
+            skipped.setdefault("no_model_by_sport", {})
+            skipped["no_model_by_sport"][sport] = (
+                skipped["no_model_by_sport"].get(sport, 0) + 1)
+            # And WHICH competitions, because that is the actionable half. On a real card
+            # the answer is Pro League table tennis, ITF qualifying, Finnish fourth-tier
+            # football and Uruguayan second-division basketball — lower-tier, youth,
+            # women's and qualifying events that no free archive covers at all. Knowing
+            # that is what stops the next week being spent hunting for one.
+            league = sample.get("league")
+            if league:
+                skipped.setdefault("no_model_leagues", {})
+                key = f"{sport}|{league}"
+                skipped["no_model_leagues"][key] = (
+                    skipped["no_model_leagues"].get(key, 0) + 1)
             continue
         chosen = best(match_rows, sample["sport_id"], probs, min_odds, min_survival)
         if not chosen:
             skipped["no_confident_rung"] += 1
+            skipped.setdefault("no_rung_by_sport", {})
+            skipped["no_rung_by_sport"][sport] = (
+                skipped["no_rung_by_sport"].get(sport, 0) + 1)
             continue
         chosen["name_match"] = round(name_score, 3)
         chosen["model_source"] = source

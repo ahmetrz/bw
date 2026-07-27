@@ -224,6 +224,12 @@ def coverage(rows, results, generic, card_path=None):
     for p in full["picks"]:
         sid = p.get("sport_id")
         picked[sid] = picked.get(sid, 0) + 1
+    # Where the matches we DID look at went. On a real card this is the whole story: of
+    # 1,227 head-to-head fixtures, 858 were in sports we model and were dropped because
+    # the model does not know the two participants. That is not a filter to loosen, it is
+    # history we do not have yet, and it belongs in the report per sport.
+    unknown = (full.get("skipped") or {}).get("no_model_by_sport") or {}
+    no_rung = (full.get("skipped") or {}).get("no_rung_by_sport") or {}
 
     excluded = getattr(config, "EXCLUDED_SPORTS", set())
     multi_day = getattr(config, "MULTI_DAY_SPORTS", set())
@@ -248,6 +254,10 @@ def coverage(rows, results, generic, card_path=None):
             "sport": tr.sport(sid, str(sid)),
             "matches": len(matches),
             "picks": picked.get(sid, 0),
+            # Of this sport's matches: how many the model could not identify the teams
+            # for, and how many it priced but found no rung above the gates.
+            "unknown_teams": unknown.get(sid, 0),
+            "no_rung": no_rung.get(sid, 0),
             "state": state,
             "detail": detail,
         })
@@ -506,8 +516,27 @@ def main():
           f"{sum(1 for c in cov if c['state'] == 'modelled')} modelled, "
           f"{reach}/{total} matches reachable")
     for c in cov[:14]:
+        # "tanınmadı" is the number that matters on a modelled sport: every one of those
+        # matches WAS examined and was dropped because our history does not contain the
+        # two participants. Loosening a gate would not recover a single one of them.
+        gap = (f" · {c['unknown_teams']} tanınmadı" if c.get("unknown_teams") else "")
+        gap += (f" · {c['no_rung']} eşik geçmedi" if c.get("no_rung") else "")
         print(f"  {c['sport'][:22]:<22} {c['matches']:>5} maç  {c['picks']:>4} seçim  "
-              f"{c['state']:<10} {c['detail']}")
+              f"{c['state']:<10} {c['detail']}{gap}")
+    checked = sum(c["matches"] for c in cov if c["state"] == "modelled")
+    unknown_total = sum(c.get("unknown_teams", 0) for c in cov)
+    norung_total = sum(c.get("no_rung", 0) for c in cov)
+    picks_total = sum(c["picks"] for c in cov)
+    print(f"\n  modellenen sporlarda {checked} maç incelendi: "
+          f"{unknown_total} taraflar tanınmadı · {norung_total} eşikleri geçemedi · "
+          f"{picks_total} seçim")
+    widest = max(results, key=lambda r: r["hours"]) if results else {}
+    leagues = (widest.get("skipped") or {}).get("no_model_leagues") or {}
+    if leagues:
+        print("  en çok tanınmayan müsabakalar (geçmişimizde yoklar):")
+        for key, n in sorted(leagues.items(), key=lambda kv: -kv[1])[:8]:
+            sid, _, name = key.partition("|")
+            print(f"    {n:>4}  {tr.sport(int(sid), sid)} — {name}")
 
     payload = {
         "generated": datetime.now(timezone.utc).isoformat(),
