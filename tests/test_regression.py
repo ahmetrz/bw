@@ -1213,6 +1213,21 @@ class TestRegression(unittest.TestCase):
         # an eighty-minute match is over at 4800 and is not still running at 5399.
         self.assertTrue(collect_live.looks_finished(foot(ts=4800, note="2x40")))
         self.assertFalse(collect_live.looks_finished(foot(ts=4700, note="2x40")))
+        # Both note spellings, taken off a live card. The Australian FFSA match ended at
+        # TS=5400/SLS='' with no note; a Student League match ended at TS=1800 on "2
+        # Halves of 15 minutes"; an Indian FAO fixture declaring "2 halves of 40 minutes"
+        # vanished at TS=4796 with SLS='79 minutes' and must be REFUSED — that is a
+        # mid-match feed drop four seconds short of its own regulation.
+        self.assertEqual(collect_live.regulation_seconds(
+            {"sport": 1, "note": "2 Halves of 15 minutes"}), 1800)
+        self.assertEqual(collect_live.regulation_seconds(
+            {"sport": 1, "note": "2 halves of 40 minutes"}), 4800)
+        self.assertEqual(collect_live.regulation_seconds({"sport": 1, "note": ""}), 5400)
+        india = foot(ts=4796, sls="79 minutes", note="2 halves of 40 minutes", s1=1, s2=7)
+        self.assertFalse(collect_live.looks_finished(india))
+        # A countdown is still a clock. The book writes both "9 minutes" and
+        # "10 min remaining"; neither is an empty SLS and neither may settle anything.
+        self.assertFalse(collect_live.looks_finished(foot(sls="10 min remaining")))
         # And a sport whose clock nobody has watched to the end stays refused. Basketball
         # has a clock too; whether it counts up, down or resets each quarter is unknown
         # here, and a rule that assumed would settle games at half time.
