@@ -503,8 +503,13 @@ def main():
                       for h in windows])
 
     for r in results:
+        # The per-league breakdown lives in the coverage section below; dumping the whole
+        # dict here buried the run's own log under a hundred competition names.
+        sk = r.get("skipped") or {}
         print(f"  {r['hours']}h: {r['matches']} matches -> {len(r['picks'])} picks "
-              f"(skipped: {r.get('skipped')})")
+              f"(taraflar tanınmadı {sk.get('no_model', 0)} · "
+              f"eşik geçmedi {sk.get('no_confident_rung', 0)} · "
+              f"modelsiz spor {sk.get('unmodelled_sport', 0)})")
 
     host, host_source = mirror.current(getattr(config, "REFERRAL_URL", None))
     print(f"link host: {host} ({host_source})")

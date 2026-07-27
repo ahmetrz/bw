@@ -59,6 +59,7 @@ and so is every plus-handicap. So the ladder is built over the unfiltered row se
 the main-line-only scan.
 """
 import config
+from engine import units
 
 FOOTBALL = 1
 ICE_HOCKEY = 2
@@ -73,8 +74,14 @@ G_DOUBLE_CHANCE = 8
 G_HANDICAP = 2
 G_ASIAN_HANDICAP = 2854
 G_TOTAL = 17
-G_SET_HANDICAP_TENNIS = 109
+G_SET_HANDICAP_TENNIS = 109   # tennis AND volleyball, badminton, padel — verified live
 G_SET_HANDICAP_TT = 7099
+G_MAP_HANDICAP = 2438         # esports
+G_TOTAL_SETS_TENNIS = 182     # tennis, volleyball
+G_TOTAL_SETS_TT = 2604
+G_TOTAL_FRAMES = 876          # snooker
+G_TOTAL_MAPS = 2436           # esports
+
 
 # Every group a rung can be built on. Declared so the GRADER can be checked against it: a
 # rung nobody can score is a prediction that never enters the hit rate, which is worse
@@ -82,7 +89,8 @@ G_SET_HANDICAP_TT = 7099
 # exactly that for weeks.
 LADDER_GROUPS = frozenset({
     G_1X2, G_MONEYLINE_2WAY, G_DOUBLE_CHANCE, G_HANDICAP, G_ASIAN_HANDICAP, G_TOTAL,
-    G_SET_HANDICAP_TENNIS, G_SET_HANDICAP_TT,
+    G_SET_HANDICAP_TENNIS, G_SET_HANDICAP_TT, G_MAP_HANDICAP,
+    G_TOTAL_SETS_TENNIS, G_TOTAL_SETS_TT, G_TOTAL_FRAMES, G_TOTAL_MAPS,
 })
 
 # --- outcome ids within those groups ---
@@ -96,6 +104,42 @@ O_ASIAN_HANDICAP = {"home": 3829, "away": 3830}
 O_SET_HANDICAP_TENNIS = {"home": 732, "away": 733}
 O_SET_HANDICAP_TT = {"home": 5749, "away": 5750}
 O_OVER, O_UNDER = 9, 10
+
+# WHICH GROUPS CARRY THE UNIT A SPORT IS SCORED IN. Group 17 is the match total in every
+# sport, but what it COUNTS is not the same thing: rallies in volleyball, points in table
+# tennis, frames-worth-of-points in snooker. A model fitted on sets cannot answer any of
+# them, so offering group 17 to a set-scored sport builds a ladder whose every rung is
+# refused — a correct model producing nothing, for a reason invisible from the outside.
+#
+# Keyed on the UNIT rather than on the sport, so a sport added to engine/units.py gets the
+# right markets without another table to remember.
+_HANDICAP_BY_UNIT = {
+    "sets": (G_SET_HANDICAP_TENNIS, O_SET_HANDICAP_TENNIS),
+    "maps": (G_MAP_HANDICAP, {"home": 2826, "away": 2827}),
+    "frames": (G_HANDICAP, {"home": 7, "away": 8}),   # snooker quotes frames on group 2
+}
+_TOTAL_BY_UNIT = {
+    "sets": G_TOTAL_SETS_TENNIS,
+    "maps": G_TOTAL_MAPS,
+    "frames": G_TOTAL_FRAMES,
+}
+
+# And the over/under ids WITHIN each total group, because they are not 9/10 outside group
+# 17. Reading the group right and the outcome wrong builds an empty ladder just as surely
+# as reading the group wrong: every one of these sports came back with zero over/under
+# rungs until this table existed, on a card that was quoting all four markets.
+_TOTAL_OUTCOMES = {
+    G_TOTAL: (9, 10),
+    G_TOTAL_SETS_TENNIS: (971, 972),
+    G_TOTAL_SETS_TT: (3150, 3151),
+    G_TOTAL_FRAMES: (1850, 1851),
+    G_TOTAL_MAPS: (2824, 2825),
+}
+
+# Table tennis prices its set handicap and total sets on its own groups rather than the
+# ones tennis and volleyball share, so it is the one sport that overrides by id.
+_HANDICAP_BY_SPORT = {TABLE_TENNIS: (G_SET_HANDICAP_TT, O_SET_HANDICAP_TT)}
+_TOTAL_BY_SPORT = {TABLE_TENNIS: G_TOTAL_SETS_TT}
 
 # Sports whose result market has no draw, so the result IS the safe base and may sit at
 # the top of a side ladder. Football is absent by construction.
@@ -183,9 +227,11 @@ def _rungs_set_sport_side(rows, side, sport):
     a set" bet. In a best-of-5 that rung is +2.5 and +1.5 means "wins at least two", so
     both are offered in line order and the gate decides which survives.
     """
-    group, outcomes = ((G_SET_HANDICAP_TENNIS, O_SET_HANDICAP_TENNIS)
-                       if sport == TENNIS
-                       else (G_SET_HANDICAP_TT, O_SET_HANDICAP_TT))
+    group, outcomes = _HANDICAP_BY_SPORT.get(
+        sport, _HANDICAP_BY_UNIT.get(units.of(sport), (G_HANDICAP, O_HANDICAP)))
+    # The rung's own words, in the unit it is actually denominated in: "+1.5 frames" on a
+    # snooker fixture, not "+1.5 sets". The label reaches the operator through the page.
+    noun = units.of(sport)
     ladder = [
         _rung(0.0, r, f"{side} wins the match", "match")
         for r in rows
@@ -197,7 +243,7 @@ def _rungs_set_sport_side(rows, side, sport):
             continue
         if r.get("outcome_id") != outcomes[side]:
             continue
-        ladder.append(_rung(1.0 + line, r, f"{side} +{line:g} sets", "match"))
+        ladder.append(_rung(1.0 + line, r, f"{side} +{line:g} {noun}", "match"))
     return sorted(ladder, key=lambda t: t["rank"])
 
 
@@ -219,7 +265,8 @@ def _rungs_two_way_side(rows, side, scope, handicap_scope):
 
 def _rungs_total(rows, direction, scope, group=G_TOTAL):
     """Totals ladder. Over gets safer as the line falls; under as it rises."""
-    want = O_OVER if direction == "over" else O_UNDER
+    over, under = _TOTAL_OUTCOMES.get(group, (O_OVER, O_UNDER))
+    want = over if direction == "over" else under
     out = []
     for r in rows:
         g, line = _group_line(r)
@@ -252,18 +299,28 @@ def build(rows, sport_id, direction):
     happens to be there.
     """
     if direction in ("over", "under"):
-        # Group 17 is the match total in every sport checked — what it COUNTS differs
-        # (goals, points, games, sets), but the over/under structure and the direction of
-        # safety do not, so the ladder generalizes even where the settlement scope is not
-        # yet known.
-        return _rungs_total(rows, direction, _TOTALS_SCOPE.get(sport_id, "unknown"))
+        # The over/under structure and the direction of safety are the same everywhere,
+        # but the GROUP has to match the unit the sport is scored in. Group 17 is the
+        # match total in every sport and counts rallies in volleyball, points in table
+        # tennis, frames-worth-of-points in snooker — none of which a model fitted on
+        # sets, frames or maps can answer. Offering it to those sports built a ladder
+        # whose every rung was then refused, which is indistinguishable from having no
+        # opinion. Goals, points and runs stay on 17, where they belong.
+        scope = _TOTALS_SCOPE.get(sport_id, "unknown")
+        group = _TOTAL_BY_SPORT.get(sport_id,
+                                    _TOTAL_BY_UNIT.get(units.of(sport_id), G_TOTAL))
+        return _rungs_total(rows, direction, scope, group)
 
     if direction not in ("home", "away"):
         return []
 
     if sport_id == FOOTBALL:
         return _rungs_football_side(rows, direction)
-    if sport_id in (TENNIS, TABLE_TENNIS):
+    # Every sport scored in sets, frames or maps takes the set-sport ladder: match winner
+    # first, then the handicap denominated in its own unit. Tennis and table tennis were
+    # named here explicitly, which quietly left volleyball, badminton, snooker, padel and
+    # esports with a points ladder their models cannot price.
+    if sport_id in (TENNIS, TABLE_TENNIS) or units.of(sport_id) in _HANDICAP_BY_UNIT:
         return _rungs_set_sport_side(rows, direction, sport_id)
     if sport_id == BASKETBALL:
         # Full-game basketball markets include overtime across the 1xBet family, but the

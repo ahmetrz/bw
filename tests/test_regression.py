@@ -1258,6 +1258,55 @@ class TestRegression(unittest.TestCase):
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
 
+    def test_a_rung_is_denominated_in_the_unit_the_model_measures(self):
+        """The ladder must offer markets counted in what the sport is SCORED in.
+
+        Group 17 is the match total in every sport, but it counts rallies in volleyball,
+        points in table tennis and frames-worth-of-points in snooker. A model fitted on
+        sets cannot answer any of those, so offering group 17 to a set-scored sport builds
+        a ladder whose every rung is then refused — which from the outside is
+        indistinguishable from the model having no opinion. Volleyball's model is days
+        away; without this it would have arrived, been correct, and produced nothing.
+
+        Reading the group right and the OUTCOME wrong fails exactly the same way: the
+        over/under ids are 9/10 only inside group 17. Every one of these sports returned
+        zero total rungs on a card that was quoting all four markets until that was
+        fixed."""
+        def total_row(group, oid, line):
+            return {"market_key": (1, f"{group}|{line}"), "outcome_id": oid,
+                    "odds": 1.5, "p1": "A", "p2": "B"}
+
+        cases = [
+            (4, ladder.G_TOTAL_SETS_TENNIS, 971),    # tennis — total sets
+            (6, ladder.G_TOTAL_SETS_TENNIS, 971),    # volleyball shares them
+            (10, ladder.G_TOTAL_SETS_TT, 3150),      # table tennis has its own
+            (30, ladder.G_TOTAL_FRAMES, 1850),       # snooker — frames
+            (40, ladder.G_TOTAL_MAPS, 2824),         # esports — maps
+            (1, ladder.G_TOTAL, 9),                  # football stays on 17
+            (3, ladder.G_TOTAL, 9),                  # and so does basketball
+        ]
+        for sport, group, oid in cases:
+            rows = [total_row(group, oid, "2.5"), total_row(17, 9, "180.5")]
+            got = ladder.build(rows, sport, "over")
+            self.assertTrue(got, f"sport {sport} built no over rung on group {group}")
+            built = {int(str(r["row"]["market_key"][1]).split("|")[0]) for r in got}
+            self.assertEqual(built, {group},
+                             f"sport {sport} should ladder on {group}, got {built}")
+
+        # Side rungs follow the same rule: a set-scored sport gets the SET handicap, not
+        # the points one. Volleyball, badminton, padel and esports were all silently on
+        # the points ladder because only tennis and table tennis were named.
+        side = [{"market_key": (1, "109|1.5"), "outcome_id": 732, "odds": 1.4,
+                 "p1": "A", "p2": "B"}]
+        for sport in (4, 6, 16, 282):
+            got = ladder.build(side, sport, "home")
+            self.assertTrue(got, f"sport {sport} built no set-handicap rung")
+        # And every group the ladder can now reach is still one the grader can settle.
+        settleable = (set(grade.HANDICAP_GROUPS) | set(grade.TOTAL_GROUPS)
+                      | set(grade.TEAM_TOTAL_GROUPS) | {1, 8, 101})
+        for group in ladder.LADDER_GROUPS:
+            self.assertIn(group, settleable, group)
+
     def test_the_wait_for_a_sport_is_measured_not_asserted(self):
         """"When do the other sports show up" is answered from the collection ledger.
 
