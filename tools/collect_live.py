@@ -182,6 +182,56 @@ def fetch(sport):
                 f"&partner=159&getEmpty=true")
 
 
+# THE SHORTEST PERIOD A REAL MATCH OF THIS SPORT IS PLAYED OVER, in minutes. Only checked
+# when the book DECLARES a period length, which it does for anything non-standard.
+#
+# Sport 1 is not one game. On a live card it carries "Short Football 3x3" at two halves of
+# five minutes, "Subsoccer" at 2x5, "MLS+" at 2x10, "Student League" at 2x15 — alongside
+# China Foshan La Liga at 2x40 and ordinary football, which declares nothing at all. They
+# are all filed as football and they do not produce the same scorelines: a five-minute half
+# and a forty-five-minute half are different games with different goal distributions.
+#
+# Storing them together would corrupt the very thing the model reads. 138,835 results of
+# ninety-minute football teach nothing about a ten-minute one, and the model cannot tell
+# from a stored row which it was looking at.
+MIN_PERIOD_MINUTES = {
+    1: 30,     # football — real halves are 40 or 45; everything short-sided is well below
+    2: 10,     # ice hockey — 15 or 20
+    3: 8,      # basketball — 10 or 12
+    8: 20,     # handball — 30
+    14: 15,    # futsal — 20
+    17: 5,     # water polo — 8
+}
+
+# "2 halves of 20 minutes" and "2x10" — the two ways a period length is declared.
+_PERIOD_MINUTES = re.compile(r'^(\d+)\s*(?:[x×]\s*(\d+)|\s*halves?\s+of\s+(\d+))', re.I)
+
+
+def period_minutes(note):
+    """Declared minutes per period, or None when the note does not state one."""
+    m = _PERIOD_MINUTES.match((note or "").strip())
+    if not m:
+        return None
+    mins = m.group(2) or m.group(3)
+    try:
+        return int(mins)
+    except (TypeError, ValueError):
+        return None
+
+
+def real_format(sport, note):
+    """False when the book declares a period far shorter than the sport is really played.
+
+    A declared length is the book telling us this is a different product. Absent, we
+    assume the standard game, which is what ordinary football does — it declares nothing.
+    """
+    need = MIN_PERIOD_MINUTES.get(sport)
+    if not need:
+        return True
+    got = period_minutes(note)
+    return got is None or got >= need
+
+
 # "7 Games Match (4 Games up to win)" — the explicit form, and the one to trust.
 _UP_TO_WIN = re.compile(r"(\d+)\s+\w+\s+up\s+to\s+win", re.I)
 # "7 Games Match", "35 Legs Matches", "5 Sets Match"
@@ -276,6 +326,11 @@ def placeable(rec):
     one where the feed stated the match was over. Knowing the score is not enough; we also
     have to know what it was a race to.
     """
+    # A game the book declares as much shorter than the real sport is a DIFFERENT product
+    # filed under the same id — five-minute halves do not produce ninety-minute
+    # scorelines, and nothing in a stored row would say which it had been.
+    if not real_format(rec["sport"], rec.get("note")):
+        return False
     if rec["kind"] != "target":
         # A period sport is placed by its format note where the format changes the
         # distribution, and by nothing where it does not.

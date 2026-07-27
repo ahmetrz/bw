@@ -1258,6 +1258,38 @@ class TestRegression(unittest.TestCase):
             self.assertEqual(simulated.load(path), {(2, "RHL"): "why"})
         self.assertEqual(simulated.load("/nonexistent/sim.json"), {})
 
+    def test_short_format_football_is_not_stored_as_football(self):
+        """Sport 1 is not one game, and the book says so when it is not the usual one.
+
+        A live card carries "Short Football 3x3" at two halves of five minutes,
+        "Subsoccer" at 2x5, "MLS+" at 2x10 and "Student League" at 2x15, all filed under
+        football, alongside China Foshan La Liga at 2x40 and ordinary football, which
+        declares no format at all. They do not produce the same scorelines, and 138,835
+        results of ninety-minute football teach nothing about a ten-minute one — worse,
+        once stored, no row says which it was.
+
+        The declared period length is the book telling us this is a different product. No
+        declaration means the standard game, which is what real football does."""
+        for note in ("2x5", "2x10", "2x12", "2 Halves of 15 minutes"):
+            self.assertFalse(collect_live.real_format(1, note), note)
+        for note in ("2x40", "2 halves of 40 minutes", "", None):
+            self.assertTrue(collect_live.real_format(1, note), repr(note))
+        # Each sport judged against its own game: twenty-minute hockey periods are real,
+        # five-minute ones are not; ten-minute basketball quarters are real, four are not.
+        self.assertTrue(collect_live.real_format(2, "3x20"))
+        self.assertFalse(collect_live.real_format(2, "3x5"))
+        self.assertTrue(collect_live.real_format(3, "4x10"))
+        self.assertFalse(collect_live.real_format(3, "4x4"))
+        # A sport with no declared minimum is unaffected — table tennis notes a race, not
+        # a clock, and must not be caught by a rule about period lengths.
+        self.assertTrue(collect_live.real_format(10, "7 Games Match"))
+
+        # And the guard is wired into the refusal, on both recording paths.
+        short = {"sport": 1, "kind": "periods", "n": 2, "s1": 3, "s2": 2,
+                 "note": "2x5", "league": "Short Football 3x3"}
+        self.assertFalse(collect_live.placeable(short))
+        self.assertTrue(collect_live.placeable({**short, "note": ""}))
+
     def test_a_missing_day_is_reported_and_a_quiet_one_is_not(self):
         """A workflow that does not run produces no failure to notice.
 
