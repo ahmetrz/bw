@@ -12,8 +12,17 @@ name: daily
 #   TELEGRAM_CHAT_ID     mesajin gidecegi sohbet id'si
 
 on:
+  # UC DENEME, CUNKU BIR TANESI YETMIYOR. GitHub zamanlanmis isleri "en iyi gayret" ile
+  # calistiriyor ve bugun 06:10 hic ateslenmedi — elle tetiklemeseydim gunun listesi hic
+  # gitmeyecekti. Saat basina yakin dakikalar platformun en kalabalik dilimleri, o yuzden
+  # hem dakika 43'e tasindi hem de iki yedek eklendi.
+  #
+  # Yedekler --only-if-new ile calisiyor: ilk kosu basarili olduysa butun secimler zaten
+  # tahmin gunlugunde olur, yedek de gondermez. Ayni kart icin iki bildirim cikmaz.
   schedule:
-    - cron: "10 6 * * *"
+    - cron: "43 6 * * *"
+    - cron: "43 7 * * *"
+    - cron: "43 8 * * *"
   workflow_dispatch:
     inputs:
       windows:
@@ -95,10 +104,17 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           W: ${{ inputs.windows || '24,48' }}
           DRY: ${{ inputs.dry_run || 'false' }}
+          SCHED: ${{ github.event.schedule }}
         run: |
           set -o pipefail
           FLAG=""
           if [ "${DRY}" = "true" ]; then FLAG="--no-telegram"; fi
+          # Hangi cron'un atesledigini github.event.schedule soyluyor; elle tetiklemede
+          # bos gelir. Gunun ILK zamanlanmis kosusu (06:43) her zaman gonderir, 07:43 ve
+          # 08:43 yedekleri ancak ondan once bir kosu olmadiysa gonderir.
+          case "${SCHED}" in
+            "43 7 * * *"|"43 8 * * *") FLAG="${FLAG} --only-if-new" ;;
+          esac
           python3 tools/daily_report.py \
             --input data/betwinner_daily.json.gz \
             --windows "${W}" \

@@ -440,6 +440,9 @@ def main():
     ap.add_argument("--page", default="picks.html")
     ap.add_argument("--simulated-out", default=simulated.STORE)
     ap.add_argument("--no-telegram", action="store_true")
+    ap.add_argument("--only-if-new", action="store_true",
+                    help="skip the Telegram send when every selection was already logged "
+                         "(for backstop runs behind a schedule that may have fired)")
     args = ap.parse_args()
 
     data = load(args.input)
@@ -598,6 +601,17 @@ def main():
     if args.no_telegram:
         print("\n--- notice preview ---\n")
         print(notice)
+        return 0
+
+    # A BACKSTOP RUN MUST NOT SEND THE SAME LIST TWICE. GitHub drops scheduled fires
+    # often enough that the daily run needs more than one attempt in the morning — today's
+    # 06:10 never fired at all, and without a manual trigger no list would have gone out.
+    # More than one cron then risks two notifications for one card, so the later ones pass
+    # --only-if-new: if every selection was already in the prediction log, the earlier run
+    # succeeded and this one has nothing to announce.
+    if args.only_if_new and not logged:
+        print("bu kartın tüm seçimleri zaten kayıtlı — daha önceki koşu gönderdi, "
+              "yedek koşu göndermiyor")
         return 0
 
     # The page goes as the attachment and the notice as its caption, so the whole daily
