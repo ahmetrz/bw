@@ -141,5 +141,38 @@ jobs:
             data/scoreboard.json data/simulated_leagues.json data/results data/models \
             || true
           git commit -m "daily: $(date -u +%Y-%m-%d) analizi" || echo "degisiklik yok"
-          git pull --rebase origin main || true
-          git push || echo "push atlandi"
+
+          # BU KOSUNUN CIKTISI YENIDEN URETILEMEZ. picks.html ve daily_report.json her gun
+          # yeniden kurulabilir, ama data/predictions.jsonl kurulamaz: tahmin, SEÇİM
+          # YAPILDIĞI ANDA, o anda gecerli oranla yaziliyor ve sonradan yeniden yazilan bir
+          # kayit "ne secerdik"in kaydi olur — backtest'in kendini kandirma bicimi. Canli
+          # izleyici artik saat basi ayni dala yaziyor, yani carpisma nadir degil.
+          #
+          # Bu yuzden tek deneme yetmez. Cakisirsak uzak durumu aliyoruz ve SADECE BIZE AIT
+          # dosyalari geri koyuyoruz; data/results ve data/models izleyicinin, onlari
+          # oldugu gibi birakiyoruz.
+          MINE="daily_report.json picks.html method.html data/predictions.jsonl \
+                data/scoreboard.json data/simulated_leagues.json"
+          rm -rf /tmp/bwdaily && mkdir -p /tmp/bwdaily
+          for f in $MINE; do
+            [ -f "$f" ] && install -D "$f" "/tmp/bwdaily/$f"
+          done
+          for i in 1 2 3 4; do
+            if git pull --rebase origin main && git push; then
+              echo "push tamam"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main && git reset --hard origin/main
+            for f in $MINE; do
+              [ -f "/tmp/bwdaily/$f" ] && install -D "/tmp/bwdaily/$f" "$f"
+            done
+            git add $MINE || true
+            if git diff --cached --quiet; then
+              echo "uzak durumda zaten var"
+              exit 0
+            fi
+            git commit -m "daily: $(date -u +%Y-%m-%d) analizi (yeniden islendi)"
+            sleep $((i * 5))
+          done
+          echo "push basarisiz — BUGUNUN TAHMIN KAYDI KAYIP, isabet olcumu bir gun eksik"

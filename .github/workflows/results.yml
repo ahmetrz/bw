@@ -80,9 +80,21 @@ jobs:
             exit 0
           fi
           git commit -m "results: $(date -u +%Y-%m-%d) sonuclari"
-          # Gunluk is ve toplayici da ayni dala yaziyor; rebase ile carpismayi onle.
+          # Gunluk is ve canli izleyici de ayni dala yaziyor; rebase ile carpismayi onle.
+          # Basarisiz bir rebase repoyu yarim birakiyor, o yuzden tekrar denemeden ONCE
+          # abort etmek gerekiyor — abort olmadan ikinci ve ucuncu deneme de ayni yerde
+          # takiliyordu, yani uc deneme aslinda birdi.
           for i in 1 2 3; do
             git pull --rebase origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main && git reset --hard origin/main
             sleep $((i * 5))
+            # Notlandirma tamamen depodan yeniden turetilebiliyor, tahminler gibi
+            # kaybolmuyor: uzak durumu alip yeniden calistirmak dogru cevabi verir.
+            python3 tools/grade_predictions.py >/dev/null 2>&1 || true
+            git add results.html data/predictions.jsonl data/scoreboard.json \
+              data/results_sent.json || true
+            git diff --cached --quiet && exit 0
+            git commit -m "results: $(date -u +%Y-%m-%d) sonuclari (yeniden islendi)"
           done
-          echo "push basarisiz — bir sonraki calistirma yakalar"
+          echo "push basarisiz — bir sonraki calistirma yakalar (notlandirma yeniden turetilebilir)"
