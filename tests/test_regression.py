@@ -1140,6 +1140,68 @@ class TestRegression(unittest.TestCase):
         self.assertIsNone(collect_live.settle_target(
             {"sport": 1, "kind": "periods", "n": None, "s1": 2, "s2": 1}).get("n"))
 
+    def test_a_results_site_names_players_differently_from_the_book(self):
+        """"Fritz T." and "Taylor Harry Fritz" are the same person and neither string
+        normalizes to the other, so an exact index misses every row from a source that
+        abbreviates — which is every live-score site there is. Tennis had no other source
+        at all, so without this bridge the sport stays permanently ungraded."""
+        gp = grade_predictions
+        self.assertEqual(gp.abbreviated("Fritz T."), (("fritz",), "t"))
+        self.assertEqual(gp.abbreviated("Van Assche L."), (("van", "assche"), "l"))
+        # A club name never ends in a lone letter, so the index this feeds stays empty for
+        # football without anyone listing which sports are played by people.
+        self.assertIsNone(gp.abbreviated("Manchester United"))
+        self.assertIsNone(gp.abbreviated("Bahia"))
+
+        rows = [("2026-07-27", (("fritz",), "t"), (("bergs",), "z"), 2, 0),
+                ("2026-07-28", (("dellien",), "h"), (("martinez",), "p"), 2, 0)]
+        self.assertEqual(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
+                                          "2026-07-27T14:00:00+00:00"), (2, 0))
+        # Either way round, with the score swapped to match — there is no home player.
+        self.assertEqual(gp.lookup_abbrev(rows, "Zizou Bergs", "Taylor Harry Fritz",
+                                          "2026-07-27T14:00:00+00:00"), (0, 2))
+        # A SPANISH DOUBLE SURNAME is why the surname is matched as a contiguous run
+        # rather than as a suffix: the site prints "Martinez" for "Pedro Martinez
+        # Portero", and a suffix test lost seven real matches on one card.
+        self.assertEqual(gp.lookup_abbrev(rows, "Pedro Martinez Portero", "Hugo Dellien",
+                                          "2026-07-28T12:00:00+00:00"), (0, 2))
+        # The initial still has to agree, or every player sharing a surname matches.
+        self.assertIsNone(gp.lookup_abbrev(rows, "Ricardo Fritz", "Zizou Bergs",
+                                           "2026-07-27T14:00:00+00:00"))
+        # And the date: these circuits replay the same pairing constantly.
+        self.assertIsNone(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
+                                           "2026-07-20T14:00:00+00:00"))
+
+    def test_a_fuzzy_result_match_refuses_the_two_ways_it_could_be_wrong(self):
+        """Grading football from a source that spells clubs its own way — "Carrarese" for
+        "Carrarese Calcio", "Aalesund" for "Aalesunds". It is the last route tried and the
+        only one that JUDGES rather than identifies, so both of its failure modes are
+        fenced: a variant is a different team, and an ambiguous name is no team at all."""
+        gp = grade_predictions
+        day = "2026-07-26T18:00:00+00:00"
+        rows = [("2026-07-26", "Carrarese", "Napoli", 1, 3),
+                ("2026-07-26", "Aalesund", "Viking", 1, 1)]
+        self.assertEqual(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio", day), (3, 1))
+        self.assertEqual(gp.lookup_fuzzy(rows, "Aalesunds", "Viking", day), (1, 1))
+
+        # A VARIANT IS A DIFFERENT TEAM. "Corinthians Paulista (Women)" shares every
+        # meaningful token with "Corinthians", and the model once priced four selections
+        # off the men's side for exactly that reason. A grader repeating it would settle
+        # the bet against another team's result.
+        wom = [("2026-07-26", "Corinthians", "Bahia", 1, 1)]
+        self.assertIsNone(gp.lookup_fuzzy(wom, "Corinthians Paulista (Women)", "Bahia", day))
+        self.assertEqual(gp.lookup_fuzzy(wom, "Corinthians Paulista", "Bahia", day), (1, 1))
+
+        # AMBIGUITY IS REFUSED OUTRIGHT. Two candidates within 0.05 mean the name does not
+        # identify one fixture, and taking the higher by a hair is how a wrong result gets
+        # written down as a right one. On a real card this declined 3 of 38.
+        twins = [("2026-07-26", "Atletico GO", "Bahia", 1, 0),
+                 ("2026-07-26", "Atletico MG", "Bahia", 0, 2)]
+        self.assertIsNone(gp.lookup_fuzzy(twins, "Atletico", "Bahia", day))
+        # And the date still bounds it, as everywhere else in this grader.
+        self.assertIsNone(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio",
+                                          "2026-07-20T18:00:00+00:00"))
+
     def test_every_selection_is_staked_the_same_and_the_day_has_a_ceiling(self):
         """Sizing is a RISK rule here, and it must not become an edge claim by accident.
 

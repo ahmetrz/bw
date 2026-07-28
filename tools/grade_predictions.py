@@ -47,7 +47,10 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from engine import grade, results_store  # noqa: E402
-from engine.model_elo import _norm  # noqa: E402  (same normalizer the model matches with)
+from engine.model_elo import _norm, _similarity, _tokens, variant  # noqa: E402
+# The same normalizer, similarity and variant guard the MODEL matches names with. A
+# grader that judged two names alike by a different rule from the one that priced them
+# would settle fixtures the model never thought it was pricing.
 
 FDCOUK = "https://www.football-data.co.uk/mmz4281"
 UA = "bw-scanner/1.0 (result grading; contact via repo)"
@@ -250,6 +253,126 @@ def lookup_abbrev(rows, home, away, start, tolerance_days=1, elapsed_hours=None)
     return _nearest(hits, start, tolerance_days, elapsed_hours)
 
 
+# ---------------------------------------------------------------- flashscore, grading only
+#
+# The last gap, and the one no archive reaches. football-data.co.uk carries 22 European
+# divisions at a few days' lag, and its "extra" files — Brazil, China, Denmark, Sweden,
+# Norway — are YEARS stale: Brazil ends 31/10/2023, China 2022, Norway 2021. So a pick in
+# Brasileirao Serie A or the Chinese Super League was never going to be graded from it at
+# any lag at all, and Club Friendlies are in no archive by definition.
+#
+# Flashscore's own feed carries ~570 finished football matches a day, every competition.
+# robots.txt, checked by our crawler's name on 2026-07-28: www.flashscore.com disallows
+# only /standings/, /draw/ and /newsfeed/, and the data hosts (local-global.flashscore.ninja,
+# d.flashscore.com) serve no robots.txt at all — 404, nothing disallowed. Qualified on the
+# BODY per hard rule 10: the page HTML is useless (711 KB and zero score markup, all of it
+# rendered client-side), while the feed returns 270 KB that parses to real fixtures.
+#
+# IT IS DELIBERATELY NOT WRITTEN TO THE RESULTS STORE. Grading needs it; the models must
+# not have it. Its competition names would land beside football-data's division codes as
+# separate pools, splitting a club's history across two rating scales for no gain. This is
+# the same shape as `football_results` above, which has always been a grading-time table.
+FS_FEED = "https://local-global.flashscore.ninja/2/x/feed/f_{sport}_{day}_3_en_1"
+FS_SIGN = "SW9D1eZo"          # the feed answers 401 without it; it is a constant, not a key
+
+
+def _get(url, headers=None, timeout=40):
+    head = {"User-Agent": UA}
+    head.update(headers or {})
+    try:
+        req = urllib.request.Request(url, headers=head)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError,
+            OSError, ValueError):
+        return None
+
+
+def _fs_block(block):
+    out = {}
+    for kv in block.split("¬"):
+        key, _, value = kv.partition("÷")
+        if key:
+            out[key] = value
+    return out
+
+
+def flashscore_results(days=4, sport=1):
+    """[(date, home, away, home score, away score)] for finished fixtures."""
+    from datetime import datetime as dt
+    rows = []
+    for back in range(days):
+        raw = _get(FS_FEED.format(sport=sport, day=-back),
+                   headers={"x-fsign": FS_SIGN, "Referer": "https://www.flashscore.com/"})
+        if not raw:
+            continue
+        for block in raw.split("~"):
+            d = _fs_block(block)
+            # AB=3 is "finished". AE/AF are the two sides, AG/AH the score, AD the start.
+            if d.get("AB") != "3" or not d.get("AE") or d.get("AG", "") == "":
+                continue
+            try:
+                stamp = dt.utcfromtimestamp(int(d.get("AD") or 0)).strftime("%Y-%m-%d")
+                rows.append((stamp, d["AE"], d.get("AF", ""),
+                             int(d["AG"]), int(d.get("AH") or 0)))
+            except (ValueError, OSError):
+                continue
+    return rows
+
+
+def lookup_fuzzy(rows, home, away, start, cutoff=0.80, tolerance_days=1):
+    """Settle from a source that spells the clubs differently. The LAST route of all.
+
+    "Carrarese Calcio" against "Carrarese", "Aalesunds" against "Aalesund" — one source
+    writing a fuller name than the other is the whole problem, and it is the one
+    `engine.model_elo._similarity` was built for, so the same function is reused rather
+    than a second one invented.
+
+    Three guards, and they are the reason this is allowed to be fuzzy at all:
+      * the VARIANT must agree. "Corinthians Paulista (Women)" and "Corinthians" share
+        every meaningful token; the model once priced four selections off the men's side
+        because of exactly that, and a grader making the same mistake would settle a bet
+        against a different team's result.
+      * the date must be the fixture's own, within a day.
+      * an AMBIGUOUS match is refused outright. If the two best candidates are within 0.05
+        the name does not identify one fixture, and picking the higher by a hair is how a
+        wrong result gets written down as a right one. On a real card that refused 3 of 38.
+    """
+    from datetime import date as _date
+    want = (start or "")[:10]
+    if not want:
+        return None
+    try:
+        want_day = _date.fromisoformat(want)
+    except ValueError:
+        return None
+    ht, at = _tokens(_norm(home)), _tokens(_norm(away))
+    hv, av = variant(home), variant(away)
+
+    scored = []
+    for stamp, rh, ra, hs, as_ in rows:
+        try:
+            if abs((_date.fromisoformat(stamp) - want_day).days) > tolerance_days:
+                continue
+        except ValueError:
+            continue
+        rht, rat = _tokens(_norm(rh)), _tokens(_norm(ra))
+        if variant(rh) == hv and variant(ra) == av:
+            s = min(_similarity(ht, rht), _similarity(at, rat))
+            if s >= cutoff:
+                scored.append((s, stamp, hs, as_))
+        if variant(rh) == av and variant(ra) == hv:
+            s = min(_similarity(ht, rat), _similarity(at, rht))
+            if s >= cutoff:
+                scored.append((s, stamp, as_, hs))
+    if not scored:
+        return None
+    scored.sort(key=lambda x: -x[0])
+    if len(scored) > 1 and scored[0][0] - scored[1][0] < 0.05:
+        return None                       # does not identify one fixture — decline
+    return scored[0][2], scored[0][3]
+
+
 def lookup_by_id(table, home_id, away_id, start, tolerance_days=1, elapsed_hours=None):
     """The exact match: same two participants, as the book numbers them, near that date.
 
@@ -372,6 +495,8 @@ def main():
     ap.add_argument("--predictions", default="data/predictions.jsonl")
     ap.add_argument("--out", default="data/scoreboard.json")
     ap.add_argument("--season", default="2526")
+    ap.add_argument("--flashscore-days", type=int, default=4,
+                    help="how many days of the flashscore feed to read for football")
     args = ap.parse_args()
 
     preds = load_jsonl(args.predictions)
@@ -390,9 +515,11 @@ def main():
     sports = sorted({p.get("sport_id") for p in pending if p.get("sport_id")})
     store = {sid: store_results(sid) for sid in sports}
     abbrev = {sid: abbrev_rows(sid) for sid in sports}
+    results_fs = flashscore_results(args.flashscore_days) if 1 in sports else []
     print(f"result rows available: store "
           f"{ {sid: len(n) for sid, (_i, n) in sorted(store.items())} }, "
-          f"football-data {len(results_fb)}, tt collector {len(results_tt)}")
+          f"football-data {len(results_fb)}, tt collector {len(results_tt)}, "
+          f"flashscore {len(results_fs)}")
 
     now = datetime.now(timezone.utc).isoformat()
     newly = skipped_future = still_running = 0
@@ -431,6 +558,11 @@ def main():
             score = lookup_abbrev(abbrev.get(p.get("sport_id")) or [], p.get("p1"),
                                   p.get("p2"), p.get("start"), elapsed_hours=elapsed)
             route = "abbrev name"
+        if not score and p.get("sport_id") == 1 and results_fs:
+            # Last of all, and only for football: a source that spells the clubs its own
+            # way. Everything above identifies a fixture exactly; this one judges it.
+            score = lookup_fuzzy(results_fs, p.get("p1"), p.get("p2"), p.get("start"))
+            route = "flashscore"
         if not score:
             continue
         row = {"market_key": (0, p["market_line"]), "outcome_id": p.get("outcome_id")}
