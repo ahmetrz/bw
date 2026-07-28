@@ -1511,6 +1511,12 @@ class TestRegression(unittest.TestCase):
             if path == "SaveCoupon":
                 sent.update(body)
                 return {"Success": True, "Value": "ABC12"}
+            # A code is scoped to the partner that wrote it, and a mismatch answers
+            # "Yanlış kod" — which from the operator's side is indistinguishable from a
+            # broken code. Saved under 159 it opened for 159 and nothing else.
+            if (body.get("partner") != coupon.COUPON_PARTNER
+                    and sent.get("partner") != coupon.COUPON_PARTNER):
+                return {"Success": False, "Error": "Yanlış kod"}
             return {"Success": True, "Value": {
                 "Vid": sent.get("Vid"),
                 # The service returns no combined price for a singles slip; an
@@ -1525,7 +1531,24 @@ class TestRegression(unittest.TestCase):
             code, detail = coupon.create(picks)
             self.assertEqual(code, "ABC12")
             self.assertEqual(sent["Vid"], coupon.VID_SINGLES)
+            self.assertEqual(sent["partner"], coupon.COUPON_PARTNER)
             self.assertIn("tekli", detail)
+
+            # A slip only its own author can open is refused. Measured over partner ids
+            # 0-260: saved under 159 it was readable by [159] alone, and under 1 by about
+            # twenty ids including 159. The operator's client is not 159, so the code
+            # they were handed could never have loaded.
+            def narrow(path, body, timeout=25):
+                out = fake(path, body, timeout)
+                if path != "SaveCoupon" and body.get("partner") != coupon.COUPON_PARTNER:
+                    return {"Success": False, "Error": "Yanlış kod"}
+                return out
+
+            coupon._post = narrow
+            code, detail = coupon.create(picks)
+            self.assertIsNone(code)
+            self.assertIn("kendi partner", detail)
+            coupon._post = fake
 
             # And if the book stores it as anything else, no code is handed over. A wrong
             # bet type loaded in one tap is worse than no slip, and this is the check that

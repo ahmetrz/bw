@@ -82,6 +82,36 @@ KIND_PREMATCH = 3
 # into no code at all, which is the failure this module is built to prefer.
 VID_SINGLES = 2
 
+# WHICH PARTNER THE SLIP IS SAVED UNDER, and this is what made the book say "Yanlış kod".
+#
+# A code is scoped to a partner. Saved under 159 — the id this project uses everywhere
+# else, because it is the one that returns Betwinner's full line — `GetCoupon` answers
+# "Incorrect code" / "Yanlış kod" for EVERY other partner id, and the operator's client
+# is evidently not 159. That error is indistinguishable from a typo or an expired code
+# from the outside, which is why it read as "the code is broken" rather than as a scope
+# mismatch.
+#
+# Measured over partner ids 0-260, saving the same two legs each time:
+#   saved under 159 -> readable by [159]
+#   saved under 169 -> readable by [169]          (Betwinner's other id, same behaviour)
+#   saved under 2   -> readable by [2]
+#   saved under 1   -> readable by ~20 ids, INCLUDING 159, 7, 36, 55, 57, 61, 71, 76,
+#                      89, 90, 104, 108, 132, 135, 156, 185, 234, 235, 243
+# So 1 is the only value that does not bind the code to a single client, and it still
+# covers the id we read the line with. Saving with no partner at all binds it to 0, which
+# is worse: readable only by a client sending no partner.
+#
+# It is NOT proven that the operator's client is inside that set — it cannot be seen from
+# here. What is proven is that 159 excluded everything except 159, so this strictly widens
+# the door. If a code still comes back rejected, the operator's partner id is the one fact
+# missing, and `COUPON_PARTNER` is where it goes.
+COUPON_PARTNER = 1
+
+# The partner we read the line with. The read-back checks the slip is visible to this one
+# too, so a change in the book's scoping shows up as a refused code rather than as a code
+# that silently only works somewhere we cannot see.
+LINE_PARTNER = 159
+
 # How far a leg's price may have moved between the pick and the slip before the slip is
 # refused. Odds drift between the morning fetch and the operator loading it; a leg that
 # has moved further than this is more likely the WRONG leg than a repriced one.
@@ -146,17 +176,24 @@ def create(picks, verify=True):
     if not events:
         return None, "kupona konulabilecek seçim yok"
 
-    saved = _post("SaveCoupon", {"Events": events, "lng": "en", "partner": 159,
-                                 "Vid": VID_SINGLES})
+    saved = _post("SaveCoupon", {"Events": events, "lng": "en",
+                                 "partner": COUPON_PARTNER, "Vid": VID_SINGLES})
     code = saved.get("Value")
     if not saved.get("Success") or not code:
         return None, f"kupon kaydedilemedi: {saved.get('Error') or 'bilinmeyen hata'}"
     if not verify:
         return code, f"{len(events)} tekli bahis"
 
-    got = _post("GetCoupon", {"guid": code, "lng": "en", "partner": 159})
+    got = _post("GetCoupon", {"guid": code, "lng": "en", "partner": COUPON_PARTNER})
     if not got.get("Success"):
         return None, f"kupon geri okunamadı: {got.get('Error') or 'bilinmeyen hata'}"
+    # And visible to the partner we read the line with, which is a different client from
+    # the one that wrote it. A code only its own author can open is the failure that
+    # reached the operator, and it looked exactly like a broken code from their side.
+    reach = _post("GetCoupon", {"guid": code, "lng": "en", "partner": LINE_PARTNER})
+    if not reach.get("Success"):
+        return None, (f"kupon yalnızca kendi partner'ıyla açılıyor "
+                      f"({reach.get('Error') or 'okunamadı'}) — kod verilmiyor")
     value = got.get("Value") or {}
     back = value.get("Events") or []
 
