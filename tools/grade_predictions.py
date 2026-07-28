@@ -37,6 +37,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -180,6 +181,75 @@ def store_results(sport_id):
     return by_id, by_name
 
 
+# A RESULTS SITE PRINTS "Fritz T." AND THE BOOK PRINTS "Taylor Harry Fritz".
+#
+# Both name the same player and neither normalizes to the other, so an exact-name index
+# misses every row from a source that abbreviates — which is every live-score site there
+# is. Tennis is where this bites: the book's card carries full names, tennisexplorer's
+# results carry surname plus initial, and without a bridge the whole sport stays ungraded.
+#
+# The bridge is a containment test rather than a key, so it cannot be a dict lookup:
+#   * every token of the page's SURNAME must appear as a contiguous run in the book's
+#     name — "Martinez" inside "Pedro Martinez Portero", which is how a Spanish double
+#     surname survives being printed with only its first half;
+#   * and the book's first token must start with the page's INITIAL.
+# Both sides must match for both players before a row settles anything.
+_WORD = re.compile(r"[^a-z]+")
+
+
+def _tokens_of(name):
+    return [t for t in _WORD.split((name or "").lower()) if t]
+
+
+def abbreviated(name):
+    """(surname tokens, initial) for "Fritz T.", or None when the name is not abbreviated.
+
+    The trailing single letter IS the test. A football club never ends in one, so an index
+    built on this quietly stays empty for the sports where surname matching would be
+    nonsense — no list of which sports are played by people is needed.
+    """
+    parts = _tokens_of(name)
+    if len(parts) >= 2 and len(parts[-1]) == 1:
+        return tuple(parts[:-1]), parts[-1]
+    return None
+
+
+def _same_person(full, abbrev):
+    surname, initial = abbrev
+    book = _tokens_of(full)
+    if not book or not surname or len(book) < len(surname):
+        return False
+    n = len(surname)
+    if not any(tuple(book[i:i + n]) == surname for i in range(len(book) - n + 1)):
+        return False
+    return book[0][:1] == initial
+
+
+def abbrev_rows(sport_id):
+    """Store rows whose participants are printed in the abbreviated form."""
+    out = []
+    for r in results_store.load(sport_id):
+        h, a = abbreviated(r.get("home")), abbreviated(r.get("away"))
+        if h and a:
+            out.append((r["date"], h, a, r["home_score"], r["away_score"]))
+    return out
+
+
+def lookup_abbrev(rows, home, away, start, tolerance_days=1, elapsed_hours=None):
+    """Scan abbreviated rows for this fixture, either way round. The LAST route tried.
+
+    Deliberately last: it is the weakest identification here, so it may only answer where
+    the book's own ids and an exact name have both failed, never override them.
+    """
+    hits = []
+    for date, h, a, hs, as_ in rows:
+        if _same_person(home, h) and _same_person(away, a):
+            hits.append((date, hs, as_))
+        elif _same_person(home, a) and _same_person(away, h):
+            hits.append((date, as_, hs))
+    return _nearest(hits, start, tolerance_days, elapsed_hours)
+
+
 def lookup_by_id(table, home_id, away_id, start, tolerance_days=1, elapsed_hours=None):
     """The exact match: same two participants, as the book numbers them, near that date.
 
@@ -317,8 +387,9 @@ def main():
     results_fb = football_results(divisions, args.season) if divisions else {}
     results_tt = tt_results()
     # The store, per sport, loaded once for the sports actually waiting on it.
-    store = {sid: store_results(sid)
-             for sid in sorted({p.get("sport_id") for p in pending if p.get("sport_id")})}
+    sports = sorted({p.get("sport_id") for p in pending if p.get("sport_id")})
+    store = {sid: store_results(sid) for sid in sports}
+    abbrev = {sid: abbrev_rows(sid) for sid in sports}
     print(f"result rows available: store "
           f"{ {sid: len(n) for sid, (_i, n) in sorted(store.items())} }, "
           f"football-data {len(results_fb)}, tt collector {len(results_tt)}")
@@ -353,6 +424,13 @@ def main():
             score = lookup_result(table, p.get("p1"), p.get("p2"), p.get("start"),
                                   elapsed_hours=elapsed)
             route = "football-data" if p.get("sport_id") == 1 else "tt collector"
+        if not score:
+            # Last, and weakest: a source that prints "Fritz T." where the book prints
+            # "Taylor Harry Fritz". Only reached once the ids and the exact name have
+            # both failed, so it can never overrule a stronger identification.
+            score = lookup_abbrev(abbrev.get(p.get("sport_id")) or [], p.get("p1"),
+                                  p.get("p2"), p.get("start"), elapsed_hours=elapsed)
+            route = "abbrev name"
         if not score:
             continue
         row = {"market_key": (0, p["market_line"]), "outcome_id": p.get("outcome_id")}

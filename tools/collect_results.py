@@ -21,6 +21,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -328,10 +329,84 @@ def baseball(start=2016, end=2026):
         time.sleep(0.4)
 
 
+# ------------------------------------------------------- tennis, current (sport 4)
+
+TE_DAY = "https://www.tennisexplorer.com/results/?type=all&year={y}&month={m}&day={d}"
+
+# One finished match is two <tr> rows sharing an id: "r10" then "r10b". Each carries the
+# player's link, then <td class="result"> — the SETS won, which is exactly the unit this
+# sport is scored in — then the games in each set, which we do not need.
+_TE_PAIR = re.compile(r'<tr id="r(\d+)"[^>]*>(.*?)</tr>\s*<tr id="r\1b"[^>]*>(.*?)</tr>',
+                      re.S)
+_TE_NAME = re.compile(r'<td class="t-name"><a href="/player/([^/"]+)/">([^<]+)</a>')
+_TE_SETS = re.compile(r'<td class="result">(\d+|&nbsp;|)</td>')
+
+
+def _te_side(html):
+    name, sets = _TE_NAME.search(html), _TE_SETS.search(html)
+    if not (name and sets) or not sets.group(1).strip().isdigit():
+        return None                        # unfinished, retired or a header row
+    return name.group(2).strip(), name.group(1).strip(), int(sets.group(1))
+
+
+def tennis_current(days=7, today=None):
+    """tennisexplorer.com's day pages — the CURRENT results the archive does not have.
+
+    Why a second tennis source. TML is the archive and it is six months behind: its 2026
+    file ends on 17 January with 137 matches in it, so this week's ATP Washington is not
+    in it and will not be. The live watcher cannot cover for that either, because the book
+    publishes no format note for tennis. Without this the sport has no source at all and
+    every tennis prediction stays pending for ever.
+
+    robots.txt checked by our crawler's name, 2026-07-28: `User-agent: *` disallows only
+    /redirect/, /terms-of-use/ and /contact/. Results pages are allowed. Qualified on the
+    BODY as hard rule 10 demands, not on the 200: a real page is ~730 KB and parses to 599
+    matches with per-set scores, and it is not a challenge page or a placeholder.
+
+    Sources checked at the same time and REFUSED: worldfootball.net and atptour.com both
+    name ClaudeBot with `Disallow: /`; sofascore.com, api.sofascore.com, besoccer.com and
+    footballdatabase.eu answer 403/406 to robots.txt itself, so the question of permission
+    never arises. thesportsdb.com allows crawling but sends `Content-Signal: ai-input=no`,
+    which is exactly what this would be, so it is not used either.
+
+    NAMES ARE ABBREVIATED — "Fritz T." where the book says "Taylor Harry Fritz". They are
+    emitted as printed rather than guessed at; `grade_predictions.lookup_abbrev` is the
+    bridge, and it is the LAST route tried so a weaker identification never displaces the
+    book's own ids.
+    """
+    from datetime import date, timedelta
+    end = today or date.today()
+    for back in range(days):
+        d = end - timedelta(days=back)
+        raw = fetch(TE_DAY.format(y=d.year, m=f"{d.month:02d}", d=f"{d.day:02d}"),
+                    accept="text/html")
+        if not raw:
+            continue
+        body = raw.decode("utf-8", "replace")
+        for m in _TE_PAIR.finditer(body):
+            a, b = _te_side(m.group(2)), _te_side(m.group(3))
+            if not a or not b or a[2] == b[2]:
+                continue                   # a tennis match cannot end level
+            yield {
+                "date": d.strftime("%Y-%m-%d"),
+                "home": a[0], "away": b[0],
+                "home_id": a[1], "away_id": b[1],   # the site's player slug, stable
+                "home_score": a[2], "away_score": b[2],
+                # Best-of-three and best-of-five are different bets for a set handicap, so
+                # they are different pools. The SCORE says which: nothing best-of-three
+                # reaches three sets, and that holds whoever is playing.
+                "pool": "bo5" if max(a[2], b[2]) >= 3 else "bo3",
+                "neutral": True,           # no home court on tour
+                "unit": "sets", "source": "tennisexplorer",
+            }
+        time.sleep(1.0)                    # a small site; one page a second
+
+
 ADAPTERS = {
     "football": (1, football),
     "euroleague": (3, basketball),
     "tml": (4, tennis),
+    "tennisexplorer": (4, tennis_current),
     "mlb": (5, baseball),
     "setka": (10, table_tennis),
 }
