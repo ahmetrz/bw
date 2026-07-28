@@ -437,10 +437,15 @@ STAKING_PROVISIONAL = (
 # The whole list as ONE code. Typing five characters into the book's "load bet slip" box
 # drops every selection in at once — the alternative was opening thirty fixtures and
 # finding thirty markets by hand. The button copies it so nothing has to be typed twice.
+#
+# It says TEKLİ on its face because the first slip that reached the operator did not load
+# that way: the bet type was never sent, the book defaults to accumulator, and twenty
+# correct legs became one combo at 85.19 where a single loss pays nothing.
 COUPON = """<div class="scorecard coupon">
   <div class="stat"><b id="cc">{code}</b><span>kupon kodu · {detail}</span></div>
   <div class="stat"><button type="button" id="ccbtn">Kodu kopyala</button>
     <span>Betwinner &rsaquo; Kuponu yükle &rsaquo; kodu yapıştır</span></div>
+  <div class="stat"><b>TEKLİ</b><span>kombine değil — her seçim ayrı bahis</span></div>
 </div>
 <script>
 (function(){{

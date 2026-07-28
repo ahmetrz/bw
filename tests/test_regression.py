@@ -1490,6 +1490,59 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(any(r.get("game_id") for r in rows))
         self.assertTrue(any(r.get("game_id") != r.get("fixture_id") for r in rows))
 
+    def test_the_slip_is_singles_and_the_book_is_made_to_confirm_it(self):
+        """Twenty right legs can still be the wrong bet.
+
+        The bet type was never sent and the service defaults it to 1. Read back, the
+        twenty-leg slip the operator actually loaded carried `Coef: 85.190907` — the exact
+        product of all twenty prices, i.e. an ACCUMULATOR, where one loss pays nothing on
+        the other nineteen. The list behind it is twenty independent equal stakes. Every
+        leg matched and the price check passed, because it compared each leg and never
+        asked what the slip as a whole WAS.
+
+        So the type is sent AND checked on the way back. Measured on three legs whose
+        product is 1.4705: Vid=1 returns 1.470534, Vid=3 returns 1.414 (a system average)
+        and Vid=2 returns 0 — no combined price, which is what a set of singles has."""
+        picks = [{"game_id": 1, "outcome_id": 10, "odds": 1.2, "market_key": (0, "17|4.5")},
+                 {"game_id": 2, "outcome_id": 10, "odds": 1.5, "market_key": (0, "17|2.5")}]
+        sent = {}
+
+        def fake(path, body, timeout=25):
+            if path == "SaveCoupon":
+                sent.update(body)
+                return {"Success": True, "Value": "ABC12"}
+            return {"Success": True, "Value": {
+                "Vid": sent.get("Vid"),
+                # The service returns no combined price for a singles slip; an
+                # accumulator would answer with the product, 1.8.
+                "Coef": 0 if sent.get("Vid") == coupon.VID_SINGLES else 1.8,
+                "Events": [{"GameId": p["game_id"], "Type": p["outcome_id"],
+                            "Param": float(p["market_key"][1].split("|")[1]),
+                            "Coef": p["odds"]} for p in picks]}}
+
+        real, coupon._post = coupon._post, fake
+        try:
+            code, detail = coupon.create(picks)
+            self.assertEqual(code, "ABC12")
+            self.assertEqual(sent["Vid"], coupon.VID_SINGLES)
+            self.assertIn("tekli", detail)
+
+            # And if the book stores it as anything else, no code is handed over. A wrong
+            # bet type loaded in one tap is worse than no slip, and this is the check that
+            # would have caught the accumulator before it reached the operator.
+            def combo(path, body, timeout=25):
+                out = fake(path, body, timeout)
+                if path != "SaveCoupon":
+                    out["Value"]["Vid"], out["Value"]["Coef"] = 1, 1.8
+                return out
+
+            coupon._post = combo
+            code, detail = coupon.create(picks)
+            self.assertIsNone(code)
+            self.assertIn("tekli olarak kaydedilmedi", detail)
+        finally:
+            coupon._post = real
+
     def test_a_rung_is_denominated_in_the_unit_the_model_measures(self):
         """The ladder must offer markets counted in what the sport is SCORED in.
 

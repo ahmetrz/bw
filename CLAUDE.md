@@ -30,11 +30,16 @@ does not place bets.
 - **Adding to the slip:** `service-api/LiveBet/Open` takes a set of events and returns a
   five-character code; typing it into the book's "load bet slip" box drops the whole plan
   in at once. `engine/coupon.py` builds it and then READS IT BACK before handing it over,
-  because a slip that loads the wrong bet in one tap is worse than no slip: two bugs got
-  that far, sending `CI` (the constant id) where the slip wants `I` (the game id), and
-  sending a home-normalized `-1.5` that priced the OPPOSITE handicap at 9.00 instead of
-  1.197. It carries the selections inside the day's cap only. The page keeps tick-then-
-  repeat as the fallback, progress remembered per day in localStorage.
+  because a slip that loads the wrong bet in one tap is worse than no slip: three bugs got
+  that far, sending `CI` (the constant id) where the slip wants `I` (the game id), sending
+  a home-normalized `-1.5` that priced the OPPOSITE handicap at 9.00 instead of 1.197, and
+  — the one that reached the operator — omitting `Vid`, which the service defaults to 1,
+  so twenty correct legs loaded as ONE ACCUMULATOR at 85.19 where a single loss pays
+  nothing on the other nineteen. `Vid=2` is singles and the read-back now checks it: a
+  slip that comes back carrying a combined coefficient is refused. The per-leg price check
+  could never have caught this — it compared each leg and never asked what the slip WAS.
+  It carries the selections inside the day's cap only. The page keeps tick-then-repeat as
+  the fallback, progress remembered per day in localStorage.
 - **How much to bet:** flat. Every selection in the plan gets the SAME stake, and the only
   lever is the daily cap on how many there are (`engine/stake.py`). Kelly and every other
   proportional rule sizes by EDGE — how far the price is from the truth — and this product

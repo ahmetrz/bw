@@ -20,7 +20,7 @@ Neither is marked `isUseXAuth` in that table, and neither needs a session. They 
 book's own share-a-slip feature, which is exactly what we want: we are not placing a bet
 or touching an account, we are writing a slip and handing over its code.
 
-TWO DETAILS COST AN HOUR EACH AND BOTH FAIL SILENTLY IF WRONG.
+THREE DETAILS FAIL SILENTLY IF WRONG, AND THE THIRD REACHED THE OPERATOR.
 
   * THE GAME ID IS `I`, NOT `CI`. The feed publishes both. `CI` is the constant id the
     deep link uses and what `fixture_id` holds; `I` is what the slip keys on. Send `CI`
@@ -33,9 +33,17 @@ TWO DETAILS COST AN HOUR EACH AND BOTH FAIL SILENTLY IF WRONG.
     outcome. Backing Cuiaba +1.5 at 1.197 and sending -1.5 produced a slip the book
     priced at 9.00 — the opposite handicap, silently, at a price nobody would take.
 
-So the code is verified before it is handed over: the slip is read back and every leg's
-price compared against the price the pick was made at. A slip that does not match is not
-offered, because a wrong slip loaded in one tap is worse than no slip at all.
+  * THE BET TYPE IS `Vid`, AND NOT SENDING IT MEANS ACCUMULATOR. This one shipped. The
+    first slip the operator actually loaded was a twenty-leg combo at 85.19 — the product
+    of all twenty prices — where one loss pays nothing on the other nineteen. The list it
+    was built from is twenty independent equal stakes. Every leg was correct and the bet
+    was wrong, which is why the price check alone did not catch it: it compared each leg
+    and never asked what the slip as a whole WAS.
+
+So the code is verified before it is handed over: the slip is read back, every leg's price
+compared against the price the pick was made at, AND the bet type confirmed to be singles.
+A slip that does not match is not offered, because a wrong slip loaded in one tap is worse
+than no slip at all.
 """
 import json
 import urllib.error
@@ -51,6 +59,28 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 # pre-match by construction — hard rule 7 — so there is one value here and it is stated
 # rather than passed around.
 KIND_PREMATCH = 3
+
+# THE SLIP'S BET TYPE, and getting this wrong loads a bet the product never recommended.
+#
+# `Vid` was not being sent at all, and the service defaults it to 1. Read back, a 20-leg
+# slip saved that way returns `Coef: 85.190907` — the exact product of all twenty prices.
+# That is an ACCUMULATOR: one leg loses and the whole day pays nothing. This product
+# recommends twenty INDEPENDENT equal stakes (engine/stake.py), so the slip was loading
+# the one bet the staking rule exists to rule out.
+#
+# Measured across 1, 2, 3, 4, 5 on the same three legs (product 1.4705):
+#   Vid=1 -> Coef 1.470534  the product. Accumulator.
+#   Vid=2 -> Coef 0         no combined price at all, which is what a set of singles has.
+#   Vid=3 -> Coef 1.414     an average. System.
+#   Vid=4 -> Coef 0
+#   Vid=5 -> Coef 1.470534  the product again.
+# Vid=0 is normalised to 1 by the service.
+#
+# So 2 is the singles mode, and the read-back CHECKS it rather than trusting it: a slip
+# whose returned Vid is not 2, or which comes back carrying a combined coefficient, is
+# refused. If the book ever renumbers these, that check turns a silently wrong bet type
+# into no code at all, which is the failure this module is built to prefer.
+VID_SINGLES = 2
 
 # How far a leg's price may have moved between the pick and the slip before the slip is
 # refused. Odds drift between the morning fetch and the operator loading it; a leg that
@@ -116,17 +146,26 @@ def create(picks, verify=True):
     if not events:
         return None, "kupona konulabilecek seçim yok"
 
-    saved = _post("SaveCoupon", {"Events": events, "lng": "en", "partner": 159})
+    saved = _post("SaveCoupon", {"Events": events, "lng": "en", "partner": 159,
+                                 "Vid": VID_SINGLES})
     code = saved.get("Value")
     if not saved.get("Success") or not code:
         return None, f"kupon kaydedilemedi: {saved.get('Error') or 'bilinmeyen hata'}"
     if not verify:
-        return code, f"{len(events)} bahis"
+        return code, f"{len(events)} tekli bahis"
 
     got = _post("GetCoupon", {"guid": code, "lng": "en", "partner": 159})
     if not got.get("Success"):
         return None, f"kupon geri okunamadı: {got.get('Error') or 'bilinmeyen hata'}"
-    back = (got.get("Value") or {}).get("Events") or []
+    value = got.get("Value") or {}
+    back = value.get("Events") or []
+
+    # THE BET TYPE IS CHECKED, not assumed. A combined coefficient coming back means the
+    # book stored this as an accumulator or a system, and handing that over would load a
+    # bet where one loss kills the other nineteen — the exact opposite of a flat plan.
+    if value.get("Vid") != VID_SINGLES or float(value.get("Coef") or 0) != 0.0:
+        return None, (f"kupon tekli olarak kaydedilmedi (Vid={value.get('Vid')}, "
+                      f"Coef={value.get('Coef')}) — kod verilmiyor")
 
     # Every leg the book kept must be the leg we asked for, at the price we asked for.
     # This is the check that makes a one-tap slip safe to hand over: the handicap sign
@@ -146,7 +185,7 @@ def create(picks, verify=True):
                       f"farklı geldi, kod verilmiyor")
 
     dropped = len(events) - len(back)
-    detail = f"{len(back)} bahis"
+    detail = f"{len(back)} tekli bahis"
     if dropped > 0:
         detail += f" · {dropped} tanesi kitap tarafından alınmadı (başlamış veya kapalı)"
     if skipped:

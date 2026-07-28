@@ -393,8 +393,9 @@ def build_notice(results, page_name, host=None, host_source="", source_note="",
             lines += [
                 f"🎟 <b>Kupon kodu: <code>{html.escape(coupon_code)}</code></b>",
                 f"Betwinner'da <i>Kuponu yükle</i> kutusuna bu kodu girin — "
-                f"{html.escape(coupon_detail)} tek seferde kupona düşer. Tekli mi "
-                f"kombine mi oynayacağınızı kupon ekranında siz seçersiniz.",
+                f"{html.escape(coupon_detail)} tek seferde kupona düşer, her biri "
+                f"AYRI bahis olarak. Kombine değil: plan her seçime aynı miktarı "
+                f"koymak, biri kaybederse diğerlerinin ayakta kalması üzerine kurulu.",
                 "",
             ]
     lines += ["<i>Yön modelden gelir, orandan değil; oran yalnızca 1.10 eşiğinde okunur. "
