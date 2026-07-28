@@ -434,6 +434,53 @@ def settle_target(rec):
     return rec
 
 
+# TENNIS DOES NOT DECLARE ITS FORMAT, AND WITHOUT ONE NOTHING IS EVER COLLECTED.
+#
+# Every other race sport states the target somewhere — "7 Games Match", "Best of 3 maps",
+# "5 Sets Match to 11 points". Tennis states nothing: on a live card of 74 fixtures the
+# format note was empty on 61 and read "3rd set champ tiebreak" on the other 13, and the
+# whole `MIS` block is venue, surface, round, seeding and weather. So `format_of` returns
+# no target, `placeable` refuses the row, and the sport is uncollectable except in the
+# narrow case where the feed itself announces the finish and `settle_target` reads the
+# target off the completed score. Ten rows in four days, against 29,774 from the archive
+# — and the archive is six months stale (TML's 2026 file ends on 17 January), so tennis
+# has no working source at all.
+#
+# What can be said truthfully: best-of-five is Grand Slam men's singles and nothing else.
+# Every ATP 250/500/1000, every WTA event at every level, every Challenger and every ITF
+# is best of three — TML's entire 2026 file is best_of=3 for all 137 matches. That is the
+# sport's rulebook, and it is the same kind of fact as "football has two halves", which
+# this file already encodes for twenty other sports.
+#
+# Two guards, because a name list is a weaker thing than a read:
+#   * a Grand Slam by name is REFUSED on this path rather than assumed to be five, since
+#     2-0 there is a lead and not a result. The feed-says-finished path still takes them.
+#   * ANY score reaching three sets cannot be a best-of-three, whatever the competition is
+#     called, so the score itself overrides the default. A Grand Slam we failed to
+#     recognise is caught by arithmetic instead of by spelling.
+BEST_OF_FIVE = ("australian open", "roland garros", "french open", "wimbledon",
+                "us open", "davis cup")
+SPORT_TENNIS = 4
+
+
+def with_target(rec):
+    """Fill in tennis's unstated target. Everything else keeps whatever it declared.
+
+    Sits on the VANISH path, where `settle_target` cannot help: that one reads the target
+    off a score the feed has confirmed is final, and here nothing has confirmed anything.
+    """
+    if rec["sport"] != SPORT_TENNIS or rec["kind"] != "target" or rec.get("n"):
+        return rec
+    # No best-of-three reaches three sets, so a score that does settles its own format,
+    # whatever the competition is called. Checked FIRST, so it applies to the Grand Slams
+    # too — 3-1 at Wimbledon is a finished match and there is nothing to guess about it.
+    if max(rec["s1"], rec["s2"]) >= 3:
+        return dict(rec, n=3)
+    if any(name in (rec.get("league") or "").lower() for name in BEST_OF_FIVE):
+        return rec                         # 2-0 there is a lead; refuse rather than guess
+    return dict(rec, n=2)
+
+
 def looks_finished(rec):
     """Does this last-seen score look like a completed match for its own format?
 
@@ -560,6 +607,7 @@ def sweep(state, ids, quiet, round_no, fake=None):
             waiting += 1
             continue
         state.pop(gid, None)
+        rec = with_target(rec)
         # `placeable` matters on this path now. It used to be implied — the only fixtures
         # `looks_finished` accepted were races with a readable target, which is what
         # `placeable` asks of them — but a period sport reaching the clock rule does not

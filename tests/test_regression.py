@@ -1243,6 +1243,57 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(collect_live.looks_finished(short))
         self.assertFalse(collect_live.placeable(short))
 
+    def test_tennis_is_collectable_even_though_it_states_no_format(self):
+        """The one race sport the book never declares, and so the one it never collected.
+
+        Every other race states its target — "7 Games Match", "Best of 3 maps". On a live
+        card of 74 tennis fixtures the format note was EMPTY on 61 and read "3rd set champ
+        tiebreak" on the rest; the whole MIS block is venue, surface, round, seeding and
+        weather. So every fixture was refused, and four days of watching produced ten
+        rows. The archive cannot cover for it either: TML's 2026 file ends on 17 January.
+
+        What can be said truthfully is the rulebook — best-of-five is Grand Slam men's
+        singles and nothing else, and TML's whole 2026 file is best_of=3 for all 137
+        matches. The name list is the weaker half of the rule, so the SCORE overrides it:
+        anything reaching three sets cannot be a best-of-three, whoever is playing."""
+        def t(league, s1, s2):
+            return collect_live.with_target(
+                {"sport": 4, "kind": "target", "n": None, "s1": s1, "s2": s2,
+                 "league": league, "note": "", "period": 0})
+
+        done = t("ATP. Washington", 2, 0)
+        self.assertEqual(done["n"], 2)
+        self.assertTrue(collect_live.placeable(done))
+        self.assertTrue(collect_live.looks_finished(done))
+        self.assertEqual(collect_live.to_result(
+            {**done, "p1": "A", "p2": "B", "start": 1_753_500_000}, 0)["pool"], "bo3")
+        self.assertTrue(collect_live.looks_finished(t("Challenger. Samsun", 2, 1)))
+        # Mid-match is still mid-match.
+        self.assertFalse(collect_live.looks_finished(t("WTA. Targu Mures", 1, 1)))
+        self.assertFalse(collect_live.looks_finished(t("WTA. Targu Mures", 1, 0)))
+        # A Grand Slam at 2-0 is a LEAD, so it is refused here and left to the path where
+        # the feed states the finish itself.
+        slam = t("Wimbledon", 2, 0)
+        self.assertIsNone(slam["n"])
+        self.assertFalse(collect_live.placeable(slam))
+        self.assertFalse(collect_live.looks_finished(slam))
+        # But three sets is three sets. At Wimbledon it settles, and on a tour event it
+        # says the competition was a best-of-five we did not recognise by name — which is
+        # the guard that stops a mislabelled major being filed on the wrong scale.
+        self.assertEqual(t("Wimbledon", 3, 1)["n"], 3)
+        stray = t("Some Cup", 3, 1)
+        self.assertEqual(stray["n"], 3)
+        self.assertEqual(collect_live.to_result(
+            {**stray, "p1": "A", "p2": "B", "start": 1_753_500_000}, 0)["pool"], "bo5")
+        # And it touches nothing else: a table tennis fixture with no readable format is
+        # still refused, because that sport DOES declare one and an absent note means the
+        # payload was not what we thought.
+        tt = collect_live.with_target(
+            {"sport": 10, "kind": "target", "n": None, "s1": 3, "s2": 1,
+             "league": "Setka Cup", "note": "", "period": 0})
+        self.assertIsNone(tt["n"])
+        self.assertFalse(collect_live.looks_finished(tt))
+
     def test_a_goalless_match_under_way_is_remembered(self):
         """`FS` omits zeros, so 0-0 arrives as an empty score. The clock separates a
         goalless match in progress from one that has not begun — and without that, every
