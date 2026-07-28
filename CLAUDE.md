@@ -217,9 +217,25 @@ so the next attempt starts from the end of this one rather than the beginning.
   * Something REQUIRED is still missing and the `errors` object comes back empty. 42 more
     names were swept against a bound `dateFrom`/`dateTo` pair — sportId, champId, gr, ref,
     partner, country, lng, page, take, mode, platform, brandId and the rest — and not one
-    changed the answer. So the missing field is either outside that vocabulary, or it is
-    not a query parameter at all: a header, or a body the route accepts despite advertising
-    `allow: GET`.
+    changed the answer.
+  * **It is not a header.** Eighteen were tried against the bound pair — Referer and Origin
+    set to the site, Accept-Language, X-Requested-With, X-Auth, Authorization, X-Whence,
+    X-Partner, X-Country-Id, X-Project-Id and the rest. Every one still answered
+    `invalidvalidationexception`. That closes the larger of the two remaining doors.
+  * **The resource decides the version, not the service.** `games` is v3, but `sports` and
+    `champs` are **v2** — they answer `UnsupportedApiVersion` at v3 and the generic
+    bad-request at v2. `game` (singular) exists at v1 and v2. Anyone sweeping one version
+    across the whole API will read "not supported" and conclude the route is wrong.
+  * **A `mobile` client path exists and is a decoy.** `result/mobile/api/v1/games` returns
+    **HTTP 200**, accepts ISO and `yyyy-MM-dd` dates where the web path rejects them, and
+    is the only branch that ever answers 200 at all. It is worthless: `sports`, `champs`
+    and `games` under it ALL return the same `{"count":0}` — with any parameters, with
+    none, for any date. A canned body, not an empty result set. Hard rule 10, arrived at
+    from the other direction: the 200 here is more misleading than any of the 400s.
+  So the missing field is not a header and not in that vocabulary, which leaves a body the
+  route accepts despite advertising `allow: GET`, or a parameter whose name is not guessable
+  — and the site's own request still cannot be read, because `/en/results/` 302s to
+  `betwinner2.com` and that host's robots.txt is `Disallow: /`.
   * The app bundle does not carry the path as a string, and `/en/results/` 302s to
     `betwinner2.com`, whose robots.txt is `Disallow: /` — so the real request cannot be
     read off the site.
