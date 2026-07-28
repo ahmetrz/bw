@@ -2,21 +2,16 @@
  {
   "sport_id": 2,
   "league": "RHL",
-  "why": "12 katılımcı, bir öncekini bitirmesi mümkün olmadan (40 dk arayla, en az 120 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+  "why": "13 katılımcı, bir öncekini bitirmesi mümkün olmadan (40 dk arayla, en az 120 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  },
  {
   "sport_id": 6,
   "league": "UPVL. Nations League",
-  "why": "4 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+  "why": "3 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  },
  {
   "sport_id": 6,
   "league": "UPVL. Nations League. Women",
-  "why": "3 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
- },
- {
-  "sport_id": 16,
-  "league": "Yonex Taipei Open. Women. Doubles",
-  "why": "3 katılımcı, bir öncekini bitirmesi mümkün olmadan (0 dk arayla, en az 24 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+  "why": "4 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  }
 ]
