@@ -1,61 +1,61 @@
 {
-  "updated": "2026-07-29T14:38:46.983256+00:00",
+  "updated": "2026-07-29T22:27:25.525267+00:00",
   "overall": {
-    "graded": 146,
-    "win": 124,
+    "graded": 170,
+    "win": 143,
     "half": 0,
     "push": 0,
-    "loss": 22,
-    "hit_rate": 0.8493150684931506,
-    "staked": 132.0,
-    "returned": 138.586,
-    "roi_pct": 4.99
+    "loss": 27,
+    "hit_rate": 0.8411764705882353,
+    "staked": 152.0,
+    "returned": 160.281,
+    "roi_pct": 5.45
   },
   "by_day": {
     "2026-07-26": {
-      "graded": 70,
-      "win": 60,
+      "graded": 73,
+      "win": 63,
       "half": 0,
       "push": 0,
       "loss": 10,
-      "hit_rate": 0.8571428571428571,
-      "staked": 70.0,
-      "returned": 72.45,
-      "roi_pct": 3.5
+      "hit_rate": 0.863013698630137,
+      "staked": 73.0,
+      "returned": 75.802,
+      "roi_pct": 3.84
     },
     "2026-07-27": {
-      "graded": 42,
-      "win": 36,
+      "graded": 43,
+      "win": 37,
       "half": 0,
       "push": 0,
       "loss": 6,
-      "hit_rate": 0.8571428571428571,
-      "staked": 42.0,
-      "returned": 46.035,
-      "roi_pct": 9.61
+      "hit_rate": 0.8604651162790697,
+      "staked": 43.0,
+      "returned": 47.295,
+      "roi_pct": 9.99
     },
     "2026-07-28": {
-      "graded": 33,
-      "win": 27,
+      "graded": 35,
+      "win": 29,
       "half": 0,
       "push": 0,
       "loss": 6,
-      "hit_rate": 0.8181818181818182,
-      "staked": 19.0,
-      "returned": 19.001,
-      "roi_pct": 0.01
+      "hit_rate": 0.8285714285714286,
+      "staked": 21.0,
+      "returned": 21.401,
+      "roi_pct": 1.91
     },
     "2026-07-29": {
-      "graded": 1,
-      "win": 1,
+      "graded": 19,
+      "win": 14,
       "half": 0,
       "push": 0,
-      "loss": 0,
-      "hit_rate": 1.0,
-      "staked": 1.0,
-      "returned": 1.1,
-      "roi_pct": 10.0
+      "loss": 5,
+      "hit_rate": 0.7368421052631579,
+      "staked": 15.0,
+      "returned": 15.783,
+      "roi_pct": 5.22
     }
   },
-  "pending": 97
+  "pending": 73
 }
