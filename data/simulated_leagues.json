@@ -1,13 +1,8 @@
 [
  {
-  "sport_id": 1,
-  "league": "UEFA Europa League. Team vs Player",
-  "why": "4 katılımcı, bir öncekini bitirmesi mümkün olmadan (0 dk arayla, en az 105 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
- },
- {
   "sport_id": 2,
   "league": "RHL",
-  "why": "5 katılımcı, bir öncekini bitirmesi mümkün olmadan (40 dk arayla, en az 120 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+  "why": "3 katılımcı, bir öncekini bitirmesi mümkün olmadan (40 dk arayla, en az 120 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  },
  {
   "sport_id": 6,
@@ -17,6 +12,6 @@
  {
   "sport_id": 6,
   "league": "UPVL. Nations League. Women",
-  "why": "5 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+  "why": "4 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  }
 ]
