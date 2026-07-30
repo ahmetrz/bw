@@ -249,3 +249,5 @@
 {"home_score": 2, "away_score": 0, "date": "2026-07-30", "home": "HeliX0", "away": "K3vlar", "home_id": "9601149", "away_id": "9767567", "pool": "bo3", "unit": "maps", "league": "Dota 2. Berserk League", "source": "betwinner-live"}
 {"home_score": 0, "away_score": 2, "date": "2026-07-30", "home": "HeliX0", "away": "R3lic", "home_id": "9601149", "away_id": "10615990", "pool": "bo3", "unit": "maps", "league": "Dota 2. Berserk League", "source": "betwinner-live"}
 {"home_score": 2, "away_score": 0, "date": "2026-07-30", "home": "K3vlar", "away": "HeliX0", "home_id": "9767567", "away_id": "9601149", "pool": "bo3", "unit": "maps", "league": "Dota 2. Berserk League", "source": "betwinner-live"}
+{"home_score": 0, "away_score": 2, "date": "2026-07-30", "home": "K3vlar", "away": "R3lic", "home_id": "9767567", "away_id": "10615990", "pool": "bo3", "unit": "maps", "league": "Dota 2. Berserk League", "source": "betwinner-live"}
+{"home_score": 2, "away_score": 0, "date": "2026-07-30", "home": "R3lic", "away": "K3vlar", "home_id": "10615990", "away_id": "9767567", "pool": "bo3", "unit": "maps", "league": "Dota 2. Berserk League", "source": "betwinner-live"}
