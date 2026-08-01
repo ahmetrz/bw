@@ -5,6 +5,11 @@
   "why": "2 katılımcı, bir öncekini bitirmesi mümkün olmadan (0 dk arayla, en az 105 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
  },
  {
+  "sport_id": 2,
+  "league": "RHL",
+  "why": "13 katılımcı, bir öncekini bitirmesi mümkün olmadan (40 dk arayla, en az 120 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
+ },
+ {
   "sport_id": 6,
   "league": "UPVL. Nations League",
   "why": "2 katılımcı, bir öncekini bitirmesi mümkün olmadan (60 dk arayla, en az 75 dk sürer) tekrar sahaya çıkıyor — üretilmiş fikstür"
