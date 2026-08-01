@@ -1719,6 +1719,64 @@ class TestRegression(unittest.TestCase):
         self.assertIn("KOMBİNE", page)
         self.assertIn("TEKLİ", page)
 
+    def test_the_slip_obeys_the_rules_about_what_may_be_combined(self):
+        """The slip loads as an accumulator, so what may not be combined is not cosmetic —
+        one barred leg makes the whole thing unplaceable, and the book says so with no
+        error at all. Every rule here was measured against it, not assumed."""
+        sent = {}
+
+        def responder(flags=(), keep=None):
+            def fake(path, body, timeout=25):
+                if path == "SaveCoupon":
+                    sent.clear()
+                    sent.update(body)
+                    return {"Success": True, "Value": "ABC12"}
+                evs = list(sent.get("Events") or [])[:keep] if keep else list(
+                    sent.get("Events") or [])
+                out = [dict(e, Opp1="A", Opp2="B") for e in evs]
+                for i, f in flags:
+                    out[i][f] = True if f != "IsRelation" else 1
+                return {"Success": True, "Value": {
+                    "Vid": coupon.VID_ACCUMULATOR, "Coef": 1.8, "Events": out,
+                    "HasRemoveEvents": bool(keep)}}
+            return fake
+
+        real = coupon._post
+        try:
+            # ONE SELECTION PER EVENT. Two outcomes on one GameId come back as ONE leg
+            # with HasRemoveEvents set — the book keeps the first and drops the rest
+            # silently, so we would claim two and deliver one without knowing which went.
+            # Deduplicated here so the count we report is the count the operator gets.
+            dupes = [{"game_id": 5, "outcome_id": 9, "odds": 1.2,
+                      "market_key": (0, "17|2.5")},
+                     {"game_id": 5, "outcome_id": 10, "odds": 1.8,
+                      "market_key": (0, "17|2.5")},
+                     {"game_id": 6, "outcome_id": 9, "odds": 1.3,
+                      "market_key": (0, "17|3.5")}]
+            coupon._post = responder()
+            code, detail = coupon.create(dupes)
+            self.assertEqual(code, "ABC12")
+            self.assertEqual([e["GameId"] for e in sent["Events"]], [5, 6])
+            self.assertIn("aynı maçtan", detail)
+
+            # Each of the book's own barred-leg flags refuses the code, and NAMES the leg
+            # — "which one" is the question the operator will have.
+            fine = [{"game_id": 1, "outcome_id": 9, "odds": 1.2, "market_key": (0, "17|2.5")},
+                    {"game_id": 2, "outcome_id": 9, "odds": 1.3, "market_key": (0, "17|3.5")}]
+            for flag in coupon.BANNED_FLAGS:
+                coupon._post = responder(flags=[(1, flag)])
+                code, detail = coupon.create(fine)
+                self.assertIsNone(code, flag)
+                self.assertIn("kombineye girmeyen", detail)
+                self.assertIn("A / B", detail)
+
+            # All clear is all clear.
+            coupon._post = responder()
+            code, _ = coupon.create(fine)
+            self.assertEqual(code, "ABC12")
+        finally:
+            coupon._post = real
+
     def test_a_rung_is_denominated_in_the_unit_the_model_measures(self):
         """The ladder must offer markets counted in what the sport is SCORED in.
 

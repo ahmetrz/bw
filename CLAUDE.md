@@ -8,9 +8,14 @@ claim** — it ranks selections within Betwinner's own prices. It emits a report
 does not place bets.
 
 ## Trigger → Transformation → Output
-- **Trigger:** the DAILY run (`.github/workflows/daily.yml`, cron 06:10 UTC, operator-
-  approved cadence: once a day) fetches the next 48 hours of Betwinner's pre-match card
-  via GitHub Actions; the operator's machine blocks the site. Manual dispatch also works.
+- **Trigger:** the DAILY run (`.github/workflows/daily.yml`, 06:43 UTC with 07:43/08:43
+  backstops, operator-approved cadence: once a day) fetches the next **24 hours** of
+  Betwinner's pre-match card via GitHub Actions; the operator's machine blocks the site.
+  The backstops check the prediction log FIRST and exit before rewriting anything — a
+  later run that rebuilt the page would hand over a different list from the one that was
+  announced, with fresh prices and a new slip code. The 48-hour window is gone: a
+  selection 40 hours out is not today's bet, its price will move, and it reappears on
+  tomorrow's card anyway. Manual dispatch also works.
 - **Transformation:** normalize → drop outrights and multi-day sports → model assigns a
   DIRECTION → ladder converts it to its safest form → odds gate at 1.10 → confidence
   floor → one selection per match. The composite score still ranks by within-book
@@ -22,24 +27,65 @@ does not place bets.
   only says it exists. The scan path separately writes `report.json` and, on demand,
   `coupon.html` — that one ranks by within-book cheapness, NOT by the model, so it is
   deliberately not produced by the daily run.
-- **Result loop:** `.github/workflows/results.yml` (21:30 / 04:30 / 12:30 UTC) grades what
-  has finished and rebuilds the SAME page as `results.html`, each selection marked
-  KAZANDI / KAYBETTİ / İADE with a hit-rate strip. It notifies only when that day's settled
-  count GREW, because football results come from football-data.co.uk a few times a week —
-  a fixed nightly send would deliver a mostly empty scorecard and call it the day's result.
+- **Result loop:** `.github/workflows/results.yml` runs **hourly** (:30). It grades what
+  has finished, rebuilds the SAME page as `results.html` with each selection marked
+  KAZANDI / KAYBETTİ / İADE, rebuilds `stats.html`, and refreshes the bet-slip code. Hourly
+  because a bet's outcome is known when it ends and the sources now say so within the hour
+  — the live watcher records a match as it finishes, flashscore carries ~570 football
+  results through the day, tennisexplorer publishes the same day's sets. It notifies only
+  when that day's settled count GREW, so hourly running is not hourly notifying.
+- **The record across days:** `stats.html` (`tools/make_stats_page.py`), rebuilt every hour
+  from `data/predictions.jsonl` alone so it cannot drift from the log. One day is 20-odd
+  bets and its hit rate swings twenty points on noise; the cumulative number is the only
+  one with authority and it lived nowhere but in a terminal. It carries the headline, the
+  CALIBRATION table — the only one that can say the model is WRONG rather than unlucky —
+  break-even against realised, and breakdowns by day, sport, market and odds band.
 - **Adding to the slip:** `service-api/LiveBet/Open` takes a set of events and returns a
   five-character code; typing it into the book's "load bet slip" box drops the whole plan
-  in at once. `engine/coupon.py` builds it and then READS IT BACK before handing it over,
-  because a slip that loads the wrong bet in one tap is worse than no slip: three bugs got
-  that far, sending `CI` (the constant id) where the slip wants `I` (the game id), sending
-  a home-normalized `-1.5` that priced the OPPOSITE handicap at 9.00 instead of 1.197, and
-  — the one that reached the operator — omitting `Vid`, which the service defaults to 1,
-  so twenty correct legs loaded as ONE ACCUMULATOR at 85.19 where a single loss pays
-  nothing on the other nineteen. `Vid=2` is singles and the read-back now checks it: a
-  slip that comes back carrying a combined coefficient is refused. The per-leg price check
-  could never have caught this — it compared each leg and never asked what the slip WAS.
-  It carries the selections inside the day's cap only. The page keeps tick-then-repeat as
-  the fallback, progress remembered per day in localStorage.
+  in at once. `engine/coupon.py` builds it and READS IT BACK before handing it over,
+  because a slip that loads the wrong bet in one tap is worse than no slip. Four bugs got
+  that far: sending `CI` (the constant id) where the slip wants `I` (the game id); sending
+  a home-normalized `-1.5` that priced the OPPOSITE handicap at 9.00 instead of 1.197;
+  saving under `partner=159`, which scopes the code so tightly that every other client
+  answers **"Yanlış kod"** (`partner=1` is the only value readable by ~20 partner ids
+  including 159); and claiming a bet type the payload cannot carry — see below.
+- **What the book will not combine** (measured against it, not assumed — the slip loads as
+  an ACCUMULATOR, so a barred leg makes the whole thing unplaceable and the book says so
+  with no error at all):
+  * **Fifty events, hard.** Past that, SaveCoupon answers *"The number of events on the bet
+    slip must not exceed 50"* and refuses the WHOLE slip rather than trimming it, so the
+    trim has to happen before the call. `coupon.MAX_EVENTS`, and `stake.DAILY_CAP_UNITS`
+    is set to the same number so the day's plan and the day's slip hold the same bets.
+  * **One selection per event.** Two outcomes on one `GameId` — two lines of a market, or
+    its two sides — come back as ONE leg with `HasRemoveEvents` set. The book does not
+    refuse, it silently keeps the first and drops the rest, which is how a slip claims
+    fifty and delivers forty-nine. `engine/pick.py` already emits one pick per match, so
+    the dedup in `coupon.create` should never fire; it is there because the failure is
+    silent.
+  * **`IsBannedExpress`** — the book's own per-leg flag for "may not be in an accumulator".
+    **`IsRelation`** — dependent events (an outright beside a match in the same
+    competition; hard rule 7 already drops outrights). **`Block`** — suspended. None of the
+    three appear on the pre-match card; they exist only in the coupon read-back, which is
+    where `coupon.BANNED_FLAGS` reads them. On a real 50-leg card all 48 surviving legs
+    were clean on all three.
+  * **A started fixture is dropped and the slip REBUILT**, not filtered — which is why a
+    code cannot be minted once with the morning list. `tools/refresh_coupon.py` rebuilds it
+    hourly from fixtures that have not started. Codes also expire outright: every one
+    minted three days ago now answers "Incorrect code".
+  * **The bet type cannot be set at all.** `Vid` looked like a clean enum — on three legs
+    whose product was 1.4705, `Vid=1` returned exactly that, `Vid=3` returned 1.414, and
+    `Vid=2` returned 0, which is what a set of singles has. It is not: pushed to forty legs
+    the service names them itself, `Vid=2` and `Vid=4` answering *"Invalid number of events
+    in System bet"* while every other value is stored as 1. So `Vid=2` is a SYSTEM bet whose
+    combination was invalid and the slips shipped as "20 tekli bahis" were systems. Singles
+    is a MODE in the book's own slip screen, chosen after the code loads, so the page and
+    the notice say **"KOMBİNE gelir — kupon ekranından TEKLİ'ye çevir"** instead of
+    claiming otherwise. One control, once.
+  * Not readable to us: the book's written rules. `/en/rules` and every guessed path 404s,
+    the sitemap carries no rules entry, the site footer links only to bonus rules, and the
+    full rulebook lives on `betwinner2.com`, whose robots.txt is `Disallow: /`. Everything
+    above therefore comes from the API's own behaviour, which is the stronger evidence
+    anyway — it is what the slip will actually do.
 - **How much to bet:** flat. Every selection in the plan gets the SAME stake, and the only
   lever is the daily cap on how many there are (`engine/stake.py`). Kelly and every other
   proportional rule sizes by EDGE — how far the price is from the truth — and this product

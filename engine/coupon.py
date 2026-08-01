@@ -103,6 +103,33 @@ VID_ACCUMULATOR = 1
 # events on the bet slip must not exceed 50". Fifty is accepted.
 MAX_EVENTS = 50
 
+# WHAT MAY NOT BE COMBINED, measured against the book rather than assumed. The slip loads
+# as an accumulator, so these are not cosmetic: a leg the book will not combine makes the
+# whole slip unplaceable, and it says so with no error at all.
+#
+#  1. ONE SELECTION PER EVENT. Two outcomes on the same GameId — two lines of one market,
+#     or the two sides of it — come back as ONE leg with HasRemoveEvents set. The book
+#     does not refuse the slip, it silently keeps the first and drops the rest, which is
+#     exactly the failure this module exists to catch: we would claim fifty and hand over
+#     forty-nine without knowing which one went. engine/pick.py already emits one pick per
+#     match, so this guard should never fire — and a guard that never fires is the cheap
+#     kind, while the bug it prevents is silent.
+#
+#  2. `IsBannedExpress` — the book's own per-leg flag for "this selection may not be in an
+#     accumulator". Not published on the pre-match card; it appears only in the coupon
+#     read-back, which is why it is checked there.
+#
+#  3. `IsRelation` — the marker for dependent events, the classic case being an outright
+#     alongside a match in the same competition. Hard rule 7 already drops outrights, so
+#     this should stay zero; it is read because it is the field that would say otherwise.
+#
+#  4. `Block` — the selection is suspended. A blocked leg cannot be placed at all.
+#
+# On a real fifty-leg card every one of these was clean: 48 legs, all IsBannedExpress
+# false, IsRelation 0, Block false. That is the expected state, not a reason to stop
+# looking — the flags cost one read of a response we already fetch.
+BANNED_FLAGS = ("IsBannedExpress", "IsRelation", "Block")
+
 # WHICH PARTNER THE SLIP IS SAVED UNDER, and this is what made the book say "Yanlış kod".
 #
 # A code is scoped to a partner. Saved under 159 — the id this project uses everywhere
@@ -196,6 +223,19 @@ def create(picks, verify=True):
             skipped += 1
     if not events:
         return None, "kupona konulabilecek seçim yok"
+
+    # ONE SELECTION PER EVENT, because the book enforces it by SILENTLY dropping the extra
+    # one. Deduplicated here so the count we report is the count the operator gets, and so
+    # the leg that goes is the lower-scored one rather than whichever the book picked.
+    seen, unique = set(), []
+    for e in events:
+        if e["GameId"] in seen:
+            continue
+        seen.add(e["GameId"])
+        unique.append(e)
+    duplicates = len(events) - len(unique)
+    events = unique
+
     # The book refuses the whole slip past its ceiling rather than trimming it, so trimming
     # here is the difference between fifty legs and no code at all. The list is already in
     # score order, so what goes is the weakest end of it.
@@ -223,6 +263,17 @@ def create(picks, verify=True):
     value = got.get("Value") or {}
     back = value.get("Events") or []
 
+    # A LEG THE BOOK WILL NOT COMBINE MAKES THE WHOLE SLIP UNPLACEABLE, and the slip loads
+    # as an accumulator. The book states this per leg and only in the read-back, so it is
+    # read here — and named rather than counted, because "which one" is the question the
+    # operator will have.
+    barred = [f"{e.get('Opp1')} / {e.get('Opp2')}" for e in back
+              if any(e.get(f) for f in BANNED_FLAGS)]
+    if barred:
+        return None, ("kombineye girmeyen bahis var, kod verilmiyor: "
+                      + ", ".join(barred[:3])
+                      + (f" (+{len(barred) - 3})" if len(barred) > 3 else ""))
+
     # A DROPPED LEG IS REPORTED, NOT REFUSED. The book removes anything that has started
     # or been suspended and says so with `HasRemoveEvents`; forty-nine legs the operator
     # can still place beats no code because one fixture kicked off. What must not happen
@@ -249,6 +300,8 @@ def create(picks, verify=True):
     detail = f"{len(back)} bahis"
     if over:
         detail += f" · kitabın {MAX_EVENTS} bacak sınırı, en düşük {over} seçim dışarıda"
+    if duplicates:
+        detail += f" · {duplicates} seçim aynı maçtan olduğu için çıkarıldı"
     if dropped > 0:
         detail += f" · {dropped} tanesi kitap tarafından alınmadı (başlamış veya kapalı)"
     if skipped:
