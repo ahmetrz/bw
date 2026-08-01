@@ -33,28 +33,32 @@ THREE DETAILS FAIL SILENTLY IF WRONG, AND THE THIRD REACHED THE OPERATOR.
     outcome. Backing Cuiaba +1.5 at 1.197 and sending -1.5 produced a slip the book
     priced at 9.00 — the opposite handicap, silently, at a price nobody would take.
 
-  * A SLIP THAT LOSES A LEG STOPS BEING SINGLES. This is the one that made the feature
-    look broken for days after the bet type was fixed. Verifying at creation is not a
-    guarantee that survives: the book does not FILTER a slip when a fixture starts, it
-    REBUILDS it, and the rebuild takes the default bet type. Measured — five live legs
-    saved as Vid=2 read back Vid=2 / Coef=0; the same five plus one started fixture read
-    back Vid=1 / Coef=1.93 with HasRemoveEvents true. So a code minted at 06:43 and opened
-    at midday has lost the legs that kicked off in between and arrives as an accumulator,
-    correctly labelled "20 tekli bahis" by a page that checked it hours earlier. A coupon
-    therefore has to be rebuilt from fixtures that have NOT started (tools/refresh_coupon.py),
-    and codes expire anyway — every code from three days ago now answers "Incorrect code".
+  * A SHARED SLIP CANNOT SAY "SINGLES", AND BELIEVING IT COULD COST TWO ROUNDS. `Vid`
+    looked like the bet type and the numbers looked like they decoded: on three legs
+    whose product was 1.4705, Vid=1 returned exactly that, Vid=3 returned 1.414, and
+    Vid=2 returned 0 — no combined price, which is what a set of singles has. It is not.
+    Pushed to forty legs the service names the type itself: Vid=2 and Vid=4 both answer
+    "Invalid number of events in System bet", and every other value is stored as 1. So
+    Vid=2 is a SYSTEM bet whose combination was never valid, the zero was a missing
+    coefficient rather than an absent one, and the slips shipped under the label
+    "20 tekli bahis" were systems. Singles is a MODE in the book's own slip screen, not
+    something the shared payload carries — so the page has to say "switch it to Tekli",
+    which is one control, once, and is the honest version of one tap.
 
-  * THE BET TYPE IS `Vid`, AND NOT SENDING IT MEANS ACCUMULATOR. This one shipped. The
-    first slip the operator actually loaded was a twenty-leg combo at 85.19 — the product
-    of all twenty prices — where one loss pays nothing on the other nineteen. The list it
-    was built from is twenty independent equal stakes. Every leg was correct and the bet
-    was wrong, which is why the price check alone did not catch it: it compared each leg
-    and never asked what the slip as a whole WAS.
+  * FIFTY IS THE CEILING, and the book states it: past fifty events SaveCoupon answers
+    "The number of events on the bet slip must not exceed 50". Fifty is accepted.
 
-So the code is verified before it is handed over: the slip is read back, every leg's price
-compared against the price the pick was made at, AND the bet type confirmed to be singles.
-A slip that does not match is not offered, because a wrong slip loaded in one tap is worse
-than no slip at all.
+  * A CODE DECAYS. The book does not FILTER a slip when a fixture starts, it REBUILDS it
+    without that leg and reports `HasRemoveEvents`. Codes also expire outright — every one
+    minted three days ago now answers "Incorrect code". So a code cannot be minted once
+    with the morning list; tools/refresh_coupon.py rebuilds it hourly from fixtures that
+    have not started.
+
+So the code is verified before it is handed over: the slip is read back and every leg's
+price compared against the price the pick was made at. A slip that does not match is not
+offered, because a wrong slip loaded in one tap is worse than no slip at all. What is NOT
+claimed is the bet type — the payload cannot carry it, and saying otherwise on the page
+was the error that outlived two correct fixes.
 """
 import json
 import urllib.error
@@ -71,27 +75,33 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 # rather than passed around.
 KIND_PREMATCH = 3
 
-# THE SLIP'S BET TYPE, and getting this wrong loads a bet the product never recommended.
+# THE BET TYPE, AND WHAT THE PAYLOAD CAN AND CANNOT SAY.
 #
-# `Vid` was not being sent at all, and the service defaults it to 1. Read back, a 20-leg
-# slip saved that way returns `Coef: 85.190907` — the exact product of all twenty prices.
-# That is an ACCUMULATOR: one leg loses and the whole day pays nothing. This product
-# recommends twenty INDEPENDENT equal stakes (engine/stake.py), so the slip was loading
-# the one bet the staking rule exists to rule out.
+# Sent as 1 — an accumulator — because that is the only value the service reliably stores
+# and it is the only one that takes fifty legs. This is NOT what the product recommends:
+# engine/stake.py plans fifty INDEPENDENT equal stakes, and an accumulator is the one bet
+# where a single loss pays nothing on the other forty-nine.
 #
-# Measured across 1, 2, 3, 4, 5 on the same three legs (product 1.4705):
-#   Vid=1 -> Coef 1.470534  the product. Accumulator.
-#   Vid=2 -> Coef 0         no combined price at all, which is what a set of singles has.
-#   Vid=3 -> Coef 1.414     an average. System.
-#   Vid=4 -> Coef 0
-#   Vid=5 -> Coef 1.470534  the product again.
-# Vid=0 is normalised to 1 by the service.
+# The shared payload simply cannot say "singles", and two rounds were spent believing it
+# could. On three legs whose product was 1.4705 the values looked like a clean enum —
+# Vid=1 returned 1.470534, Vid=3 returned 1.414, Vid=2 returned 0, and a set of singles is
+# exactly what has no combined price. Pushed to forty legs the service names them itself:
 #
-# So 2 is the singles mode, and the read-back CHECKS it rather than trusting it: a slip
-# whose returned Vid is not 2, or which comes back carrying a combined coefficient, is
-# refused. If the book ever renumbers these, that check turns a silently wrong bet type
-# into no code at all, which is the failure this module is built to prefer.
-VID_SINGLES = 2
+#   Vid=2, Vid=4  ->  "Invalid number of events in System bet"
+#   0, 1, 3, 5, 6, 7  ->  stored as Vid=1, Coef = the product of every price
+#
+# So 2 is a SYSTEM bet whose combination happened to be invalid, and its zero coefficient
+# was a missing number rather than a meaningful one. The slips shipped under the label
+# "20 tekli bahis" were systems.
+#
+# Singles is a MODE in the book's own bet-slip screen, chosen after the slip loads. The
+# page therefore says so instead of claiming it: one control, once, which is the honest
+# version of one tap.
+VID_ACCUMULATOR = 1
+
+# The book's own ceiling, in its own words: past this, SaveCoupon answers "The number of
+# events on the bet slip must not exceed 50". Fifty is accepted.
+MAX_EVENTS = 50
 
 # WHICH PARTNER THE SLIP IS SAVED UNDER, and this is what made the book say "Yanlış kod".
 #
@@ -186,14 +196,19 @@ def create(picks, verify=True):
             skipped += 1
     if not events:
         return None, "kupona konulabilecek seçim yok"
+    # The book refuses the whole slip past its ceiling rather than trimming it, so trimming
+    # here is the difference between fifty legs and no code at all. The list is already in
+    # score order, so what goes is the weakest end of it.
+    over = max(0, len(events) - MAX_EVENTS)
+    events = events[:MAX_EVENTS]
 
     saved = _post("SaveCoupon", {"Events": events, "lng": "en",
-                                 "partner": COUPON_PARTNER, "Vid": VID_SINGLES})
+                                 "partner": COUPON_PARTNER, "Vid": VID_ACCUMULATOR})
     code = saved.get("Value")
     if not saved.get("Success") or not code:
         return None, f"kupon kaydedilemedi: {saved.get('Error') or 'bilinmeyen hata'}"
     if not verify:
-        return code, f"{len(events)} tekli bahis"
+        return code, f"{len(events)} bahis"
 
     got = _post("GetCoupon", {"guid": code, "lng": "en", "partner": COUPON_PARTNER})
     if not got.get("Success"):
@@ -208,23 +223,11 @@ def create(picks, verify=True):
     value = got.get("Value") or {}
     back = value.get("Events") or []
 
-    # THE BET TYPE IS CHECKED, not assumed. A combined coefficient coming back means the
-    # book stored this as an accumulator or a system, and handing that over would load a
-    # bet where one loss kills the other nineteen — the exact opposite of a flat plan.
-    if value.get("Vid") != VID_SINGLES or float(value.get("Coef") or 0) != 0.0:
-        return None, (f"kupon tekli olarak kaydedilmedi (Vid={value.get('Vid')}, "
-                      f"Coef={value.get('Coef')}) — kod verilmiyor")
-
-    # AND NOTHING MAY HAVE BEEN DROPPED, because dropping is what undoes the line above.
-    # Measured: five live legs saved as Vid=2 read back Vid=2 / Coef=0; the same five plus
-    # ONE started fixture read back Vid=1 / Coef=1.93 with HasRemoveEvents true. The book
-    # does not filter the slip, it REBUILDS it, and the rebuild takes the default bet type.
-    # So a slip that already lost a leg at creation is an accumulator whatever we asked
-    # for, and this is the check that says so instead of shipping the label "tekli".
-    if value.get("HasRemoveEvents"):
-        return None, ("kupon bacak kaybetmiş — kitap kaybeden kuponu KOMBİNE olarak "
-                      "yeniden kuruyor, kod verilmiyor")
-
+    # A DROPPED LEG IS REPORTED, NOT REFUSED. The book removes anything that has started
+    # or been suspended and says so with `HasRemoveEvents`; forty-nine legs the operator
+    # can still place beats no code because one fixture kicked off. What must not happen
+    # is claiming fifty when the slip holds forty-nine, so the count below is the one the
+    # book returned rather than the one we sent.
     # Every leg the book kept must be the leg we asked for, at the price we asked for.
     # This is the check that makes a one-tap slip safe to hand over: the handicap sign
     # bug produced a slip that loaded cleanly and held the OPPOSITE bet at 9.00.
@@ -243,7 +246,9 @@ def create(picks, verify=True):
                       f"farklı geldi, kod verilmiyor")
 
     dropped = len(events) - len(back)
-    detail = f"{len(back)} tekli bahis"
+    detail = f"{len(back)} bahis"
+    if over:
+        detail += f" · kitabın {MAX_EVENTS} bacak sınırı, en düşük {over} seçim dışarıda"
     if dropped > 0:
         detail += f" · {dropped} tanesi kitap tarafından alınmadı (başlamış veya kapalı)"
     if skipped:

@@ -33,10 +33,16 @@ the model's confidence is the thing under test. Putting the model's number besid
 break-even one would be a value claim wearing a risk rule's clothes.
 """
 
-# Provisional. These belong to the operator, and until they are confirmed the report says
-# so on its face rather than presenting them as a recommendation.
-UNIT_PCT = 0.5          # one unit = 0.5% of bankroll
-DAILY_CAP_UNITS = 20    # at most 20 units running in one day = 10% of bankroll
+# The unit is still PROVISIONAL and the report says so on its face. The cap is not: the
+# operator set it at fifty, which is also the book's own ceiling for one bet slip
+# (engine/coupon.MAX_EVENTS), so the day's plan and the day's slip now hold the same
+# selections instead of the slip carrying a fifth of the list.
+#
+# Fifty at half a percent is 25% of bankroll on the table each day, and that number is
+# reported rather than smoothed: it is the unit that has to move if it is too much, not
+# the count, because the count is what the operator chose.
+UNIT_PCT = 0.5          # one unit = 0.5% of bankroll — PROVISIONAL, operator to confirm
+DAILY_CAP_UNITS = 50    # operator's number, and the book's slip ceiling
 
 
 def break_even_rate(odds):
@@ -92,5 +98,6 @@ def plan(picks, unit_pct=UNIT_PCT, cap=DAILY_CAP_UNITS):
         "if_all_win_pct": round(win_units * unit_pct, 2),
         "break_even_rate": be,
         "per_point_pct": round(per_point, 3) if per_point else None,
-        "provisional": (unit_pct == UNIT_PCT and cap == DAILY_CAP_UNITS),
+        # Only the UNIT is still unset. The cap is the operator's own number.
+        "provisional": unit_pct == UNIT_PCT,
     }

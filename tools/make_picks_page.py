@@ -438,14 +438,18 @@ STAKING_PROVISIONAL = (
 # drops every selection in at once — the alternative was opening thirty fixtures and
 # finding thirty markets by hand. The button copies it so nothing has to be typed twice.
 #
-# It says TEKLİ on its face because the first slip that reached the operator did not load
-# that way: the bet type was never sent, the book defaults to accumulator, and twenty
-# correct legs became one combo at 85.19 where a single loss pays nothing.
+# It says KOMBİNE GELİR on its face because that is the truth and two rounds were spent
+# claiming otherwise. The shared payload cannot encode "singles": Vid=2 and Vid=4 are
+# SYSTEM bets — at forty legs the service says so in those words — and every other value
+# is stored as an accumulator. Singles is a mode in the book's own slip screen, chosen
+# after the code loads. One control, once, and the page has to say which one rather than
+# labelling a system bet "20 tekli bahis".
 COUPON = """<div class="scorecard coupon">
   <div class="stat"><b id="cc">{code}</b><span>kupon kodu · {detail}</span></div>
   <div class="stat"><button type="button" id="ccbtn">Kodu kopyala</button>
     <span>Betwinner &rsaquo; Kuponu yükle &rsaquo; kodu yapıştır</span></div>
-  <div class="stat"><b>TEKLİ</b><span>kombine değil — her seçim ayrı bahis</span></div>
+  <div class="stat"><b>&#9888; KOMBİNE gelir</b><span>yükledikten sonra kupon ekranından
+    <b>TEKLİ</b>'ye çevir — plan her bahsi ayrı oynamak üzerine kurulu</span></div>
 </div>
 <script>
 (function(){{

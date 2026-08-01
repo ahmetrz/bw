@@ -1639,54 +1639,68 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(any(r.get("game_id") for r in rows))
         self.assertTrue(any(r.get("game_id") != r.get("fixture_id") for r in rows))
 
-    def test_the_slip_is_singles_and_the_book_is_made_to_confirm_it(self):
-        """Twenty right legs can still be the wrong bet.
+    def test_the_slip_is_an_accumulator_and_the_page_says_so(self):
+        """The shared payload cannot say "singles", and two rounds were spent believing it
+        could. `Vid` looked like a clean enum — on three legs whose product was 1.4705,
+        Vid=1 returned exactly that, Vid=3 returned 1.414, and Vid=2 returned 0, which is
+        what a set of singles has. Pushed to forty legs the service names them itself:
+        Vid=2 and Vid=4 answer "Invalid number of events in System bet" and everything
+        else is stored as 1. So Vid=2 was a SYSTEM bet with no valid combination, and the
+        slips shipped as "20 tekli bahis" were systems.
 
-        The bet type was never sent and the service defaults it to 1. Read back, the
-        twenty-leg slip the operator actually loaded carried `Coef: 85.190907` — the exact
-        product of all twenty prices, i.e. an ACCUMULATOR, where one loss pays nothing on
-        the other nineteen. The list behind it is twenty independent equal stakes. Every
-        leg matched and the price check passed, because it compared each leg and never
-        asked what the slip as a whole WAS.
-
-        So the type is sent AND checked on the way back. Measured on three legs whose
-        product is 1.4705: Vid=1 returns 1.470534, Vid=3 returns 1.414 (a system average)
-        and Vid=2 returns 0 — no combined price, which is what a set of singles has."""
-        picks = [{"game_id": 1, "outcome_id": 10, "odds": 1.2, "market_key": (0, "17|4.5")},
-                 {"game_id": 2, "outcome_id": 10, "odds": 1.5, "market_key": (0, "17|2.5")}]
+        What the code CAN promise is the legs and their prices. The bet type is the
+        operator's one control on the slip screen, and the page says which one."""
+        picks = [{"game_id": i, "outcome_id": 10, "odds": 1.2,
+                  "market_key": (0, "17|4.5")} for i in range(1, 61)]
         sent = {}
 
         def fake(path, body, timeout=25):
             if path == "SaveCoupon":
+                sent.clear()
                 sent.update(body)
+                # The book's own ceiling, in its own words.
+                if len(body.get("Events") or []) > coupon.MAX_EVENTS:
+                    return {"Success": False,
+                            "Error": "The number of events on the bet slip must not "
+                                     "exceed 50"}
                 return {"Success": True, "Value": "ABC12"}
-            # A code is scoped to the partner that wrote it, and a mismatch answers
-            # "Yanlış kod" — which from the operator's side is indistinguishable from a
-            # broken code. Saved under 159 it opened for 159 and nothing else.
             if (body.get("partner") != coupon.COUPON_PARTNER
                     and sent.get("partner") != coupon.COUPON_PARTNER):
                 return {"Success": False, "Error": "Yanlış kod"}
+            evs = sent.get("Events") or []
             return {"Success": True, "Value": {
-                "Vid": sent.get("Vid"),
-                # The service returns no combined price for a singles slip; an
-                # accumulator would answer with the product, 1.8.
-                "Coef": 0 if sent.get("Vid") == coupon.VID_SINGLES else 1.8,
-                "Events": [{"GameId": p["game_id"], "Type": p["outcome_id"],
-                            "Param": float(p["market_key"][1].split("|")[1]),
-                            "Coef": p["odds"]} for p in picks]}}
+                "Vid": coupon.VID_ACCUMULATOR, "Coef": 1.8, "Events": evs}}
 
         real, coupon._post = coupon._post, fake
         try:
+            # SIXTY SELECTIONS MUST STILL PRODUCE A CODE. The book refuses the whole slip
+            # past fifty rather than trimming it, so trimming here is the difference
+            # between fifty legs and none. The list is in score order, so what goes is
+            # its weakest end — and the detail SAYS how many were dropped.
             code, detail = coupon.create(picks)
             self.assertEqual(code, "ABC12")
-            self.assertEqual(sent["Vid"], coupon.VID_SINGLES)
+            self.assertEqual(len(sent["Events"]), coupon.MAX_EVENTS)
+            self.assertIn("50 bahis", detail)
+            self.assertIn("10 seçim dışarıda", detail)
             self.assertEqual(sent["partner"], coupon.COUPON_PARTNER)
-            self.assertIn("tekli", detail)
 
-            # A slip only its own author can open is refused. Measured over partner ids
-            # 0-260: saved under 159 it was readable by [159] alone, and under 1 by about
-            # twenty ids including 159. The operator's client is not 159, so the code
-            # they were handed could never have loaded.
+            # A dropped leg is REPORTED, not refused: forty-nine the operator can place
+            # beats no code because one fixture kicked off.
+            def lost_a_leg(path, body, timeout=25):
+                out = fake(path, body, timeout)
+                if path != "SaveCoupon":
+                    out["Value"]["Events"] = out["Value"]["Events"][:-1]
+                    out["Value"]["HasRemoveEvents"] = True
+                return out
+
+            coupon._post = lost_a_leg
+            code, detail = coupon.create(picks)
+            self.assertEqual(code, "ABC12")
+            self.assertIn("49 bahis", detail)
+            self.assertIn("alınmadı", detail)
+
+            # A slip only its own author can open is still refused — that one is not a
+            # smaller slip, it is a code that loads nothing.
             def narrow(path, body, timeout=25):
                 out = fake(path, body, timeout)
                 if path != "SaveCoupon" and body.get("partner") != coupon.COUPON_PARTNER:
@@ -1697,40 +1711,13 @@ class TestRegression(unittest.TestCase):
             code, detail = coupon.create(picks)
             self.assertIsNone(code)
             self.assertIn("kendi partner", detail)
-
-            # A SLIP THAT LOST A LEG IS NOT SINGLES ANY MORE, whatever was asked for. The
-            # book does not filter a slip when a fixture starts, it REBUILDS it, and the
-            # rebuild takes the default bet type: five live legs saved as Vid=2 came back
-            # Vid=2 / Coef=0, and the same five plus one started fixture came back Vid=1 /
-            # Coef=1.93 with HasRemoveEvents true. Verifying at creation is therefore not
-            # a guarantee that survives, and this is the check that refuses to pretend.
-            def lost_a_leg(path, body, timeout=25):
-                out = fake(path, body, timeout)
-                if path != "SaveCoupon":
-                    out["Value"]["HasRemoveEvents"] = True
-                return out
-
-            coupon._post = lost_a_leg
-            code, detail = coupon.create(picks)
-            self.assertIsNone(code)
-            self.assertIn("bacak kaybetmiş", detail)
-            coupon._post = fake
-
-            # And if the book stores it as anything else, no code is handed over. A wrong
-            # bet type loaded in one tap is worse than no slip, and this is the check that
-            # would have caught the accumulator before it reached the operator.
-            def combo(path, body, timeout=25):
-                out = fake(path, body, timeout)
-                if path != "SaveCoupon":
-                    out["Value"]["Vid"], out["Value"]["Coef"] = 1, 1.8
-                return out
-
-            coupon._post = combo
-            code, detail = coupon.create(picks)
-            self.assertIsNone(code)
-            self.assertIn("tekli olarak kaydedilmedi", detail)
         finally:
             coupon._post = real
+
+        # And the page must not claim the bet type it cannot set. It warns instead.
+        page = make_picks_page.COUPON
+        self.assertIn("KOMBİNE", page)
+        self.assertIn("TEKLİ", page)
 
     def test_a_rung_is_denominated_in_the_unit_the_model_measures(self):
         """The ladder must offer markets counted in what the sport is SCORED in.
