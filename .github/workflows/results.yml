@@ -2,25 +2,23 @@ name: results
 
 # Gunun secimlerini sonuclandirir ve isaretlenmis sayfayi Telegram'a yollar.
 #
-# NEDEN GUNDE BIRKAC KEZ VE NEDEN GECE YARISI DEGIL: futbol sonuclari
-# football-data.co.uk'ten geliyor ve haftada birkac kez yayinlaniyor. Bu aksam oynanan
-# bir kart cogu zaman ayni gece notlandirilamiyor. Sabit bir "gece yarisi gonder" kurali
-# bu yuzden cogunlukla bos bir karneyi "gunun sonucu" diye yollardi.
+# NEDEN SAAT BASI: bir bahis bittigi anda sonucu bellidir, ertesi gun degil. Gunde uc
+# kez calisirken bir aksam maci sekiz saat "bekliyor" gorunuyordu; oysa canli izleyici
+# maci biter bitmez kaydediyor, flashscore feed'i ~570 futbol macini gun icinde tasiyor
+# ve tennisexplorer ayni gunun setlerini yayinliyor. Notlandirilacak sey saatler once
+# hazir oluyordu, onu okuyan hicbir sey yoktu.
 #
-# Bunun yerine: her calismada notlandirilabilecek ne varsa notlandirilir, sayfa yeniden
-# uretilir ve Telegram'a SADECE o gune ait sonuclanan sayi bir oncekine gore ARTTIYSA
-# bildirim gider (tools/daily_results.py, data/results_sent.json). Yeni bir sey yoksa
-# sessizce gecer.
+# Telegram YINE de sadece o gune ait sonuclanan sayi ARTTIYSA bildiriyor
+# (tools/daily_results.py, data/results_sent.json), yani saat basi calismak saat basi
+# bildirim demek degil: yeni sonuc yoksa sessizce geciyor. Sayfa ve toplu istatistik her
+# calismada tazeleniyor.
 #
-# 21:30 UTC  Avrupa aksam maclari bitmis olur, ilk karne.
-# 04:30 UTC  gece ve Amerika maclari + football-data.co.uk'in gunluk guncellemesi.
-# 12:30 UTC  gec gelen sonuclar icin son yoklama.
+# Depo public, Actions dakikasi sinirsiz; maliyeti olan tek sey kaynaklara giden istek
+# ve o da saatte bir sweep.
 
 on:
   schedule:
-    - cron: "30 21 * * *"
-    - cron: "30 4 * * *"
-    - cron: "30 12 * * *"
+    - cron: "30 * * * *"
   workflow_dispatch:
     inputs:
       date:
@@ -68,13 +66,34 @@ jobs:
           if [ -n "${D}" ]; then FLAGS="${FLAGS} --date ${D}"; fi
           python3 tools/daily_results.py --out results.html ${FLAGS}
 
+      # BIRIKMIS ISTATISTIK. results.html BIR GUNU isaretler; bu sayfa butun gunleri
+      # toplar. Bir gunun isabet orani 20 bahiste yirmi puan oynar, yani tek gunluk sayi
+      # hicbir seye karar verdirmez — kumulatif olan verdirir, ve o simdiye kadar yalnizca
+      # terminalde vardi. Tamami data/predictions.jsonl'den yeniden turetiliyor, hicbir ozet
+      # dosyasi tasinmiyor: silinse bir sonraki kosu aynisini uretir.
+      - name: Rebuild the cumulative statistics
+        run: python3 tools/make_stats_page.py --out stats.html
+
+      # KUPON KODU SAAT BASI TAZELENIR, LISTE GUNDE BIR KEZ URETILIR. Ikisi ayri omurlu
+      # nesneler. Bir fikstur baslar baslamaz kitap kuponu FILTRELEMIYOR, yeniden KURUYOR
+      # ve yeniden kurulan kupon varsayilan bahis turunu aliyor: 06:43'te dogrulanmis 20
+      # tekli bahis, oglen acildiginda 13 bacakli KOMBINE olarak geliyor, ustelik sayfada
+      # hala "20 tekli bahis" yaziyor. Kodlarin omru de birkac gun; uc gun onceki her kod
+      # artik "Incorrect code" donuyor.
+      #
+      # Bu adim listeye dokunmuyor: gunun planini aliyor, baslamis olanlari cikariyor ve
+      # kalanlar icin kitaptan yeni bir kod istiyor.
+      - name: Refresh the bet-slip code from fixtures that have not started
+        run: python3 tools/refresh_coupon.py --report daily_report.json --page picks.html
+             || echo "kupon tazelenemedi — liste etkilenmedi"
+
       - name: Commit
         if: always()
         run: |
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add results.html data/predictions.jsonl data/scoreboard.json data/results_sent.json || true
+          git add results.html stats.html picks.html data/predictions.jsonl data/scoreboard.json data/results_sent.json || true
           if git diff --cached --quiet; then
             echo "yeni sonuc yok"
             exit 0
@@ -92,8 +111,9 @@ jobs:
             # Notlandirma tamamen depodan yeniden turetilebiliyor, tahminler gibi
             # kaybolmuyor: uzak durumu alip yeniden calistirmak dogru cevabi verir.
             python3 tools/grade_predictions.py >/dev/null 2>&1 || true
-            git add results.html data/predictions.jsonl data/scoreboard.json \
-              data/results_sent.json || true
+            python3 tools/make_stats_page.py --out stats.html >/dev/null 2>&1 || true
+            git add results.html stats.html picks.html data/predictions.jsonl \
+              data/scoreboard.json data/results_sent.json || true
             git diff --cached --quiet && exit 0
             git commit -m "results: $(date -u +%Y-%m-%d) sonuclari (yeniden islendi)"
           done

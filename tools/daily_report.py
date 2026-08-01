@@ -408,6 +408,29 @@ def build_notice(results, page_name, host=None, host_source="", source_note="",
     return "\n".join(lines)
 
 
+def logged_today(path, day=None):
+    """Has a list already been recorded for today? The permanent log is the only witness.
+
+    Deliberately not "did a file get written" — picks.html and daily_report.json are
+    rebuilt by anything that runs, while a prediction row is written once and never
+    reconstructed. It is the one artefact that answers "was the operator given a list".
+    """
+    day = day or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    if not os.path.exists(path):
+        return False
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                if json.loads(line).get("date") == day:
+                    return True
+            except json.JSONDecodeError:
+                continue
+    return False
+
+
 def log_predictions(results, path, host=None):
     """Append every selection to the permanent prediction log, for later grading.
 
@@ -472,6 +495,7 @@ def log_predictions(results, path, host=None):
                 "ladder_rung": p.get("ladder_rung"),
                 "direction": p.get("direction"),
                 "odds": p.get("odds"),
+                "game_id": p.get("game_id"),
                 # What was actually going to be RISKED on this selection. Recorded with
                 # the pick, because the evening scorecard measures the day the operator
                 # was handed and that day had a cap on it: an ROI computed over
@@ -503,6 +527,16 @@ def main():
                     help="skip the Telegram send when every selection was already logged "
                          "(for backstop runs behind a schedule that may have fired)")
     args = ap.parse_args()
+
+    # ONE LIST A DAY, AND THE BACKSTOPS MUST NOT REWRITE IT. The morning has three
+    # scheduled attempts because GitHub drops fires — 06:10 once never ran at all — but
+    # only the first of them is meant to produce anything. Checked HERE rather than at the
+    # send, because a later run that rebuilt the page would hand the operator a different
+    # list from the one they were notified about: fresh prices, a new bet-slip code, and
+    # fixtures that have since dropped inside the 24-hour window.
+    if args.only_if_new and logged_today(args.predictions_log):
+        print("bugünün listesi zaten üretilmiş — yedek koşu hiçbir şeyi yeniden yazmıyor")
+        return 0
 
     data = load(args.input)
     if not bwfeed.is_bwfeed(data):
@@ -649,6 +683,12 @@ def main():
                         "odds": p["odds"],
                         "stake": p.get("stake"),
                         "in_plan": p.get("in_plan"),
+                        # The BETSLIP id, which is not the deep-link id. Written into the
+                        # report because the bet-slip code has to be rebuilt hourly from
+                        # fixtures that have not started yet, long after this run is over.
+                        "game_id": p.get("game_id"),
+                        "market_key": list(p["market_key"]),
+                        "outcome_id": p.get("outcome_id"),
                         "model_survival": p["model_survival"],
                         "settlement": p.get("settlement"),
                         "url": parlay.betwinner_url(p, host),

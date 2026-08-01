@@ -1140,6 +1140,42 @@ class TestRegression(unittest.TestCase):
         self.assertIsNone(collect_live.settle_target(
             {"sport": 1, "kind": "periods", "n": None, "s1": 2, "s2": 1}).get("n"))
 
+    def test_the_slip_code_is_rebuilt_from_fixtures_that_have_not_started(self):
+        """The list is a document and the bet slip is a live object; they cannot share a
+        lifetime. A code minted with the 06:43 list has lost every fixture that kicked off
+        before the operator opened it, and the book rebuilds what remains as an
+        ACCUMULATOR — so the page went on saying "20 tekli bahis" about a 13-leg combo.
+        The refresher takes the day's plan, drops what has begun, and asks for a new one.
+
+        It may never add a selection: the list is the operator's, and a code that quietly
+        contained something they had not been shown would be a different product."""
+        from datetime import datetime, timezone
+        from tools import refresh_coupon
+        now = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
+        report = {"windows": [{"hours": 24, "picks": [
+            {"id": 1, "game_id": 11, "outcome_id": 7, "odds": 1.2,
+             "market_key": [0, "2|1.5"], "start": "2026-08-01T18:00:00+00:00"},
+            # started three hours ago — gone
+            {"id": 2, "game_id": 12, "outcome_id": 7, "odds": 1.3,
+             "market_key": [0, "2|1.5"], "start": "2026-08-01T09:00:00+00:00"},
+            # kicks off inside the margin — treated as gone, because the book suspends a
+            # market before the whistle and one late leg refuses the whole slip
+            {"id": 3, "game_id": 13, "outcome_id": 7, "odds": 1.4,
+             "market_key": [0, "2|1.5"], "start": "2026-08-01T12:05:00+00:00"},
+            # below the daily cap: never in the code, whatever the clock says
+            {"id": 4, "game_id": 14, "outcome_id": 7, "odds": 1.5, "in_plan": False,
+             "market_key": [0, "2|1.5"], "start": "2026-08-01T20:00:00+00:00"},
+            # no betslip id: cannot be expressed as an event at all
+            {"id": 5, "outcome_id": 7, "odds": 1.6,
+             "market_key": [0, "2|1.5"], "start": "2026-08-01T20:00:00+00:00"},
+        ]}]}
+        got = refresh_coupon.open_picks(report, now=now)
+        self.assertEqual([p["game_id"] for p in got], [11])
+        # And when the whole day has started there is no code to give. A five-character
+        # code that loads nothing is worse than no code, so the page loses it.
+        late = datetime(2026, 8, 2, 0, 0, tzinfo=timezone.utc)
+        self.assertEqual(refresh_coupon.open_picks(report, now=late), [])
+
     def test_a_results_site_names_players_differently_from_the_book(self):
         """"Fritz T." and "Taylor Harry Fritz" are the same person and neither string
         normalizes to the other, so an exact index misses every row from a source that
@@ -1661,6 +1697,23 @@ class TestRegression(unittest.TestCase):
             code, detail = coupon.create(picks)
             self.assertIsNone(code)
             self.assertIn("kendi partner", detail)
+
+            # A SLIP THAT LOST A LEG IS NOT SINGLES ANY MORE, whatever was asked for. The
+            # book does not filter a slip when a fixture starts, it REBUILDS it, and the
+            # rebuild takes the default bet type: five live legs saved as Vid=2 came back
+            # Vid=2 / Coef=0, and the same five plus one started fixture came back Vid=1 /
+            # Coef=1.93 with HasRemoveEvents true. Verifying at creation is therefore not
+            # a guarantee that survives, and this is the check that refuses to pretend.
+            def lost_a_leg(path, body, timeout=25):
+                out = fake(path, body, timeout)
+                if path != "SaveCoupon":
+                    out["Value"]["HasRemoveEvents"] = True
+                return out
+
+            coupon._post = lost_a_leg
+            code, detail = coupon.create(picks)
+            self.assertIsNone(code)
+            self.assertIn("bacak kaybetmiş", detail)
             coupon._post = fake
 
             # And if the book stores it as anything else, no code is handed over. A wrong

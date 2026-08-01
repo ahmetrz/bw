@@ -130,7 +130,11 @@ ALLOW_PUSH_MARKETS = False
 
 # --- Daily run --------------------------------------------------------------
 # Windows reported each day. Both are pre-match only.
-DAILY_WINDOWS_HOURS = (24, 48)
+# ONE WINDOW, AND IT IS 24 HOURS. The list used to carry 48 as well, with 24 as a filter
+# on the page. Operator's call, and it is the right one: a selection 40 hours out is not
+# today's bet. Its price will move, its lineup is not known, and it reappears on tomorrow's
+# card anyway — so the only thing the second window added was a longer list to read.
+DAILY_WINDOWS_HOURS = (24,)
 
 # Sports whose head-to-head events routinely span MORE THAN ONE DAY, excluded because the
 # daily slip is meant to settle the same day. The feed does not publish the match format,

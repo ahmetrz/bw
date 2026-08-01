@@ -33,6 +33,17 @@ THREE DETAILS FAIL SILENTLY IF WRONG, AND THE THIRD REACHED THE OPERATOR.
     outcome. Backing Cuiaba +1.5 at 1.197 and sending -1.5 produced a slip the book
     priced at 9.00 — the opposite handicap, silently, at a price nobody would take.
 
+  * A SLIP THAT LOSES A LEG STOPS BEING SINGLES. This is the one that made the feature
+    look broken for days after the bet type was fixed. Verifying at creation is not a
+    guarantee that survives: the book does not FILTER a slip when a fixture starts, it
+    REBUILDS it, and the rebuild takes the default bet type. Measured — five live legs
+    saved as Vid=2 read back Vid=2 / Coef=0; the same five plus one started fixture read
+    back Vid=1 / Coef=1.93 with HasRemoveEvents true. So a code minted at 06:43 and opened
+    at midday has lost the legs that kicked off in between and arrives as an accumulator,
+    correctly labelled "20 tekli bahis" by a page that checked it hours earlier. A coupon
+    therefore has to be rebuilt from fixtures that have NOT started (tools/refresh_coupon.py),
+    and codes expire anyway — every code from three days ago now answers "Incorrect code".
+
   * THE BET TYPE IS `Vid`, AND NOT SENDING IT MEANS ACCUMULATOR. This one shipped. The
     first slip the operator actually loaded was a twenty-leg combo at 85.19 — the product
     of all twenty prices — where one loss pays nothing on the other nineteen. The list it
@@ -203,6 +214,16 @@ def create(picks, verify=True):
     if value.get("Vid") != VID_SINGLES or float(value.get("Coef") or 0) != 0.0:
         return None, (f"kupon tekli olarak kaydedilmedi (Vid={value.get('Vid')}, "
                       f"Coef={value.get('Coef')}) — kod verilmiyor")
+
+    # AND NOTHING MAY HAVE BEEN DROPPED, because dropping is what undoes the line above.
+    # Measured: five live legs saved as Vid=2 read back Vid=2 / Coef=0; the same five plus
+    # ONE started fixture read back Vid=1 / Coef=1.93 with HasRemoveEvents true. The book
+    # does not filter the slip, it REBUILDS it, and the rebuild takes the default bet type.
+    # So a slip that already lost a leg at creation is an accumulator whatever we asked
+    # for, and this is the check that says so instead of shipping the label "tekli".
+    if value.get("HasRemoveEvents"):
+        return None, ("kupon bacak kaybetmiş — kitap kaybeden kuponu KOMBİNE olarak "
+                      "yeniden kuruyor, kod verilmiyor")
 
     # Every leg the book kept must be the leg we asked for, at the price we asked for.
     # This is the check that makes a one-tap slip safe to hand over: the handicap sign
