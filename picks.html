@@ -106,30 +106,7 @@
 <div class="sub">2026-08-01 10:41 UTC · 102 seçim · min oran 1.10 ·
   model güven eşiği %75 · maç başına tek seçim · iadeli bahisler kapalı</div>
 
-<div class="scorecard coupon">
-  <div class="stat"><b id="cc">52FZX</b><span>kupon kodu · 20 tekli bahis</span></div>
-  <div class="stat"><button type="button" id="ccbtn">Kodu kopyala</button>
-    <span>Betwinner &rsaquo; Kuponu yükle &rsaquo; kodu yapıştır</span></div>
-  <div class="stat"><b>TEKLİ</b><span>kombine değil — her seçim ayrı bahis</span></div>
-</div>
-<script>
-(function(){
-  var b=document.getElementById('ccbtn'), c=document.getElementById('cc');
-  if(!b||!c) return;
-  b.addEventListener('click',function(){
-    var t=c.textContent.trim();
-    var done=function(){ b.textContent='Kopyalandı ✓';
-      setTimeout(function(){ b.textContent='Kodu kopyala'; },1800); };
-    if(navigator.clipboard&&navigator.clipboard.writeText){
-      navigator.clipboard.writeText(t).then(done,function(){});
-    } else {
-      var i=document.createElement('input'); i.value=t; document.body.appendChild(i);
-      i.select(); try{document.execCommand('copy');done();}catch(e){}
-      document.body.removeChild(i);
-    }
-  });
-})();
-</script>
+
 <div class="scorecard staking">
   <div class="stat"><b>20 × %0.5 kasa</b><span>oynanacak seçim × birim</span></div>
   <div class="stat"><b>%10</b><span>bugün ortaya konan kasa</span></div>
