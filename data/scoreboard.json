@@ -1,12 +1,12 @@
 {
-  "updated": "2026-08-02T04:04:15.347163+00:00",
+  "updated": "2026-08-02T07:06:42.115112+00:00",
   "overall": {
-    "graded": 351,
-    "win": 282,
+    "graded": 357,
+    "win": 286,
     "half": 0,
     "push": 0,
-    "loss": 69,
-    "hit_rate": 0.8034188034188035,
+    "loss": 71,
+    "hit_rate": 0.8011204481792717,
     "staked": 219.0,
     "returned": 223.841,
     "roi_pct": 2.21
@@ -68,27 +68,27 @@
       "roi_pct": -4.85
     },
     "2026-07-31": {
-      "graded": 71,
-      "win": 55,
+      "graded": 74,
+      "win": 57,
       "half": 0,
       "push": 0,
-      "loss": 16,
-      "hit_rate": 0.7746478873239436,
+      "loss": 17,
+      "hit_rate": 0.7702702702702703,
       "staked": 20.0,
       "returned": 18.379,
       "roi_pct": -8.1
     },
     "2026-08-01": {
-      "graded": 60,
-      "win": 45,
+      "graded": 63,
+      "win": 47,
       "half": 0,
       "push": 0,
-      "loss": 15,
-      "hit_rate": 0.75,
+      "loss": 16,
+      "hit_rate": 0.746031746031746,
       "staked": 15.0,
       "returned": 13.931,
       "roi_pct": -7.13
     }
   },
-  "pending": 144
+  "pending": 138
 }
