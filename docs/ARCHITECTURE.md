@@ -33,9 +33,12 @@ re-describe them — it describes what this session added and exactly where it a
 ## The combine platform, added this session
 
 ```
-tools/daily_combine.py           entrypoint: reuses daily_report.load_models() + the SAME
-                                  already-fetched card, restricts to football+tennis,
-                                  calls pick.for_fixtures() with the SAME models
+tools/daily_combine.py           entrypoint: its own fetch, own 07:00 Istanbul cron
+                                  (combine.yml, docs/DECISIONS/0006), but reuses
+                                  daily_report.load_models() for the model layer — same
+                                  Elo/generic/ClubElo loading code as the daily-picks
+                                  path, restricts to football+tennis, calls
+                                  pick.for_fixtures() with those SAME models
         │
         ├─ engine/confidence.py  wraps rating.score() (UNCHANGED) into the full
         │                        ConfidencePrediction contract: EV, implied prob, factors
@@ -92,7 +95,7 @@ this repo as a permanent test since it is O(2^n)).
 
 | File | Written by | Cadence | Notes |
 |---|---|---|---|
-| `combine.json` | `tools/daily_combine.py` | daily (inside `daily.yml`) | rebuilt fresh each run |
+| `combine.json` | `tools/daily_combine.py` | daily (`combine.yml`, own 07:00 Istanbul cron + own fetch — `docs/DECISIONS/0006`) | rebuilt fresh each run |
 | `combine_report.pdf` | `tools/make_pdf_report.py` | daily | from `combine.json` |
 | `data/combine_log.jsonl` | `tools/daily_combine.py` (append) / `tools/grade_combine.py` (settlement field only) | daily append, hourly settle | selection fields never rewritten once logged |
 | `data/proposed_changes.jsonl` | `engine/governance.propose()` | ad hoc, analyst-run | never auto-applied; status changes only via `governance.review()` |

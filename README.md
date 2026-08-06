@@ -27,7 +27,7 @@ external LLM) can veto any selection. Full reasoning in `docs/PRODUCT_VISION.md`
 ```
 scan.py                    Product 1 entrypoint: parse -> filter -> score -> rank -> top-N
 tools/daily_report.py      Product 1 daily run: fetch -> pick -> score -> picks.html -> Telegram
-tools/daily_combine.py     Product 2 daily run: same card -> combine -> combine.json
+tools/daily_combine.py     Product 2 daily run: own fetch, own 07:00 Istanbul cron -> combine.json
 tools/grade_combine.py     settles data/combine_log.jsonl once results are known
 tools/make_pdf_report.py   combine.json -> combine_report.pdf (needs `pip install -r requirements.txt`)
 tools/make_platform_pages.py  the 14 new web screens, from combine.json + governance data
@@ -39,7 +39,9 @@ docs/                      see docs/ARCHITECTURE.md for the full documentation i
 fixtures/                  real pulls = regression anchors (Product 1); reused by Product 2's tests
 tests/test_regression.py       Product 1's test suite — do not add Product 2 tests here
 tests/test_combine_platform.py Product 2's test suite — kept separate on purpose (docs/DECISIONS/0001)
-.github/workflows/         daily.yml/results.yml now run BOTH products (same fetch, no double-download);
+.github/workflows/         daily.yml is UNCHANGED (Product 1 only); combine.yml is new
+                            (Product 2, own 07:00 Istanbul cron, own fetch — docs/DECISIONS/0006);
+                            results.yml now settles + rebuilds pages for both products hourly;
                             tests.yml is new (push/PR gate — did not exist before this session)
 ```
 
@@ -64,15 +66,17 @@ python tools/make_pdf_report.py --input combine.json --out combine_report.pdf
 `--no-coupon` on `daily_combine.py` is important when testing locally: without it, a
 non-empty combine calls Betwinner's live slip-minting API (`engine/coupon.py`).
 
-## What's provisional / needs an operator decision
+## What's provisional / resolved this session
 
-- **Composite weights** (`config.WEIGHTS`, Product 1) — provisional, tune against real data.
-- **Cadence** — Product 2 currently fires on Product 1's existing, operator-approved
-  schedule (~09:43 Istanbul), not the platform brief's requested 07:00 Istanbul. See
-  `docs/GITHUB_ACTIONS.md` — changing a schedule needs the same approval gate CLAUDE.md's
-  HITL 5 already established, so this session did not change it unilaterally.
-- **The filed tennis calibration proposal** (`data/proposed_changes.jsonl`,
-  `pmc-2026-08-06-tennis-split`) — awaiting review, see `docs/TENNIS_MODELS.md`.
+- **Composite weights** (`config.WEIGHTS`, Product 1) — still provisional, tune against real data.
+- **Cadence** — resolved: Product 2 now runs on its own schedule (`combine.yml`, 07:00
+  Istanbul as the brief specifies), separate from Product 1's unchanged, still
+  operator-approved cadence. See `docs/GITHUB_ACTIONS.md` and `docs/DECISIONS/0006`.
+- **The tennis calibration split** (`data/proposed_changes.jsonl`,
+  `pmc-2026-08-06-tennis-split`) — reviewed, approved, and implemented this session; tennis
+  now produces picks. One disclosed side effect: basketball's calibration gap crossed the
+  admission threshold as a result (0.028→0.030) and basketball is temporarily refused —
+  see `docs/TENNIS_MODELS.md` and `docs/ROADMAP.md`.
 
 Pure Python standard library for everything except PDF generation (`reportlab`, pinned in
 `requirements.txt`).

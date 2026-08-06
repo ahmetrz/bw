@@ -1,0 +1,163 @@
+name: combine
+
+# Gunluk futbol+tenis KOMBINE platformu: docs/PRODUCT_VISION.md, docs/ARCHITECTURE.md.
+# Ayri bir urun (docs/DECISIONS/0001) ve — bu oturumdan itibaren — ayri bir zamanlama ve
+# ayri bir cekim (docs/DECISIONS/0006). Onceki halinde daily.yml'nin ayni isinde
+# calisiyordu (ikinci bir Betwinner cekimini onlemek icin); operator acikca platform
+# brief'inin "Turkiye saatiyle 07:00" gereksinimini onceki, paylasilan zamanlamadan daha
+# oncelikli tutmayi tercih etti, o yuzden bu is artik kendi cekimini yapiyor.
+#
+# HEDEF 07:00 ISTANBUL = 04:00 UTC (Turkiye 2016'dan beri sabit UTC+3, DST yok). Birincil
+# tetikleyici 04:43 UTC (07:43 Istanbul) — daily.yml/watch-live.yml'de zaten dogrulanmis
+# aynı gerekce ile ":00" degil ":43": GitHub'in zamanlanmis isleri "en iyi gayret" ile
+# calisiyor ve saat basina yakin dakikalar en kalabalik dilimler (daily.yml'nin kendi
+# gecmisinde tam "06:10" bir gun hic ateslenmedi). Iki yedek, --only-if-new ile.
+#
+# GEREKEN SECRET'LAR: yok. Bu is henuz Telegram'a yazmiyor (docs/ROADMAP.md) — kombine
+# kodu ve PDF sadece repoya commit ediliyor, web panelinden okunuyor.
+
+on:
+  schedule:
+    - cron: "43 4 * * *"
+    - cron: "43 5 * * *"
+    - cron: "43 6 * * *"
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: "Analiz penceresi (saat)"
+        required: false
+        default: "24"
+      dry_run:
+        description: "true = kupon kodu istenmesin (Betwinner API'sine yazmaz)"
+        required: false
+        default: "false"
+      use_committed_card:
+        description: "true = yeni cekim yapma, repodaki karti kullan"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: combine
+  cancel-in-progress: false
+
+jobs:
+  combine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PDF dependency
+        run: pip install --quiet -r requirements.txt
+
+      # Kendi 24 saatlik penceresini kendi cekiyor — daily.yml'nin kartiyla PAYLASMIYOR
+      # (docs/DECISIONS/0006). Futbol+tenis disindaki sporlar da cekilir (fetch_window.py
+      # zaten butun karti ceker), combine.py zaten kendi icinde config.COMBINE_SPORTS'a
+      # daraltiyor — burada sport filtresi uygulamaya gerek yok.
+      - name: Fetch 24h window
+        if: inputs.use_committed_card != 'true'
+        env:
+          H: ${{ inputs.hours || '24' }}
+        run: |
+          set -o pipefail
+          mkdir -p data
+          python3 tools/fetch_window.py \
+            --hours "${H}" \
+            --partner 159 \
+            --workers 8 \
+            --budget-min 30 \
+            --out data/betwinner_combine.json.gz
+          ls -la data/
+
+      - name: Use committed card
+        if: inputs.use_committed_card == 'true'
+        run: cp data/card_today.json.gz data/betwinner_combine.json.gz
+
+      - name: Build the football+tennis combine
+        env:
+          SCHED: ${{ github.event.schedule }}
+          H: ${{ inputs.hours || '24' }}
+        run: |
+          set -o pipefail
+          CFLAG=""
+          case "${SCHED}" in
+            "43 5 * * *"|"43 6 * * *") CFLAG="--only-if-new" ;;
+          esac
+          NOCOUPON=""
+          if [ "${{ inputs.dry_run || 'false' }}" = "true" ]; then NOCOUPON="--no-coupon"; fi
+          # BASARISIZLIK BU ADIMDA DURMAMALI — asagidaki notlandirma/saglik/sayfa
+          # adimlari, bu kosuda kombine uretilemese bile calismali (bolum 13/21'in "bir
+          # kaynagin basarisiz olmasi butun pipeline'i cokertmesin" kurali).
+          python3 tools/daily_combine.py \
+            --input data/betwinner_combine.json.gz \
+            --hours "${H}" \
+            --out combine.json \
+            --log data/combine_log.jsonl \
+            ${CFLAG} ${NOCOUPON} \
+            || echo "kombine bu kosuda uretilemedi"
+
+      - name: Render the combine PDF report
+        run: python3 tools/make_pdf_report.py --input combine.json --out combine_report.pdf
+             || echo "PDF uretilemedi — sayfa yine de yayinlanir"
+
+      # Gunluk dungudekiler: dunku/bugunku kombinelerin sonuclanip sonuclanmadigini
+      # kontrol eder (results.yml zaten saat basi yapiyor — bu bir yedek), kaynak saglik
+      # durumunu tazeler (ayri, sik calisan pahali bir is olmasin diye buraya entegre
+      # edildi — bolum 21.4), ve 14 ekrani yeniden uretir.
+      - name: Settle graded combines
+        run: python3 tools/grade_combine.py || echo "kombine notlandirma atlandi"
+
+      - name: Check data source health
+        run: python3 tools/check_source_health.py || echo "kaynak saglik kontrolu atlandi"
+
+      - name: Build the combine-platform pages
+        run: python3 tools/make_platform_pages.py || echo "platform sayfalari uretilemedi"
+
+      - name: Commit
+        if: always()
+        run: |
+          set -e
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Ham cekim repoya girmiyor (daily.yml'yle ayni kural) — sadece bu platformun
+          # kendi ciktilari: combine.json/PDF, data/combine_log.jsonl, 14 ekran, kaynak
+          # saglik raporu, olasi yeni oneriler. data/models/history/ zaten "data/models"
+          # altinda (daily.yml'nin commit'iyle gider, burada degil).
+          PLATFORM_PAGES="combine.html referee.html dataquality.html scanned.html \
+            rejected.html combine_history.html combine_results.html lab.html \
+            calibration.html model_versions.html proposed_changes.html \
+            source_health.html runs.html settings.html"
+          git add combine.json combine_report.pdf data/combine_log.jsonl \
+            data/proposed_changes.jsonl data/source_health.json $PLATFORM_PAGES || true
+          git commit -m "combine: $(date -u +%Y-%m-%d) kombine" || echo "degisiklik yok"
+
+          # Gunluk is, saat basi sonuc dongusu ve canli izleyici de ayni dala yaziyor;
+          # rebase ile carpismayi onle (daily.yml/results.yml ile ayni desen).
+          MINE="combine.json combine_report.pdf data/combine_log.jsonl \
+                data/source_health.json $PLATFORM_PAGES"
+          rm -rf /tmp/bwcombine && mkdir -p /tmp/bwcombine
+          for f in $MINE; do
+            [ -f "$f" ] && install -D "$f" "/tmp/bwcombine/$f"
+          done
+          for i in 1 2 3 4; do
+            if git pull --rebase origin main && git push; then
+              echo "push tamam"
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            git fetch origin main && git reset --hard origin/main
+            for f in $MINE; do
+              [ -f "/tmp/bwcombine/$f" ] && install -D "/tmp/bwcombine/$f" "$f"
+            done
+            git add $MINE || true
+            if git diff --cached --quiet; then
+              echo "uzak durumda zaten var"
+              exit 0
+            fi
+            git commit -m "combine: $(date -u +%Y-%m-%d) kombine (yeniden islendi)"
+            sleep $((i * 5))
+          done
+          echo "push basarisiz — bir sonraki calistirma yakalar (kombine gunlugu yeniden turetilebilir degil, ama commit_slice deseninde oldugu gibi /tmp kopyasi bu is bitince kaybolur)"

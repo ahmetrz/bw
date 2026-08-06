@@ -35,16 +35,21 @@ operator, not a scheduled job).
 `market_pause`, `league_pause`, `source_reliability_change`, `new_feature`,
 `module_disable`, `calibration_method_change`.
 
-## The first real proposal this session filed
+## The first real proposal this session filed — reviewed the same session
 
 `pmc-2026-08-06-tennis-split` — a genuine finding, not a demonstration example. Full
 evidence and reasoning in `docs/TENNIS_MODELS.md`; short version: tennis's calibration test
-window is 11 days by construction of a row-count-proportional split colliding with a recent
-density spike from a new data source, and 0 of 7,745 test rows have both sides measurable
-from training. The proposed fix (a date-proportional split) is filed, `status="proposed"`,
-untouched by any automated process, visible on the "Önerilen Model Değişiklikleri" screen
-and in the PDF-equivalent governance section — waiting for the operator, exactly as
-designed.
+window was 11 days by construction of a row-count-proportional split colliding with a
+recent density spike from a new data source, and 0 of 7,745 test rows had both sides
+measurable from training. Filed with `status="proposed"`, visible on the "Önerilen Model
+Değişiklikleri" screen, untouched by any automated process — then reviewed and approved by
+the operator (`engine/governance.review(..., "approved", "operator", note=...)`,
+`status="approved"`) in the same session, at which point a human — not this codebase's
+automation — made the actual code change (`tools/build_generic_model.py`'s
+`_holdout_cut()`). This is the loop working exactly as designed end to end: proposed,
+reviewed, a human decision recorded with reasoning, then implemented and measured (full
+before/after numbers, including a disclosed side effect on basketball's calibration, in
+`docs/TENNIS_MODELS.md`) — not proposed and left to rot, and not silently auto-applied.
 
 ## Model version history
 

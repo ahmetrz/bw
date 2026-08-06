@@ -800,8 +800,20 @@ class TestRegression(unittest.TestCase):
                 ho["test"], 100,
                 f"sport {sid} was admitted on {ho['test']} unseen matches")
             # The check must be capable of failing: an identical train and test set would
-            # report a perfect 0.000 and mean nothing.
-            self.assertGreater(ho["train"], ho["test"])
+            # report a perfect 0.000 and mean nothing. The direct fact that guarantees
+            # that cannot happen is TRAIN ending before TEST begins (no chronological
+            # overlap) — checked directly here rather than via train-row-count >
+            # test-row-count, which was only ever a proxy for it and stopped holding once
+            # tools/build_generic_model.py switched to a date-proportional split
+            # (pmc-2026-08-06-tennis-split): a sport whose recent collection is far
+            # denser than its archive (table tennis, via the live watcher) can have MORE
+            # rows in a 20%-of-TIME test window than in the 80%-of-time train one, while
+            # remaining a perfectly genuine, non-overlapping holdout.
+            self.assertTrue(ho.get("train_to") and ho.get("from"),
+                            f"sport {sid} calibration_holdout is missing date range fields")
+            self.assertLessEqual(ho["train_to"], ho["from"],
+                                 f"sport {sid} train data ({ho['train_to']}) overlaps "
+                                 f"test data ({ho['from']}) — not a real holdout")
             for c in model["calibration"]:
                 self.assertLess(abs(c["predicted"] - c["observed"]), 0.03,
                                 f"sport {sid} admitted with +{c['line']} off by "

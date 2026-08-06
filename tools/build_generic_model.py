@@ -135,6 +135,39 @@ def _appearances_by_pool(seen, latest):
     return out
 
 
+def _holdout_cut(rows):
+    """Where to split TRAIN from TEST — the most recent ~20% of the DATE RANGE, not the
+    most recent 20% of ROWS. `rows` must already be sorted by date.
+
+    Approved structural change, `pmc-2026-08-06-tennis-split`
+    (data/proposed_changes.jsonl, reviewed and approved by the operator): row-count-
+    proportional splitting silently assumes roughly uniform row density over time, which
+    held for football/basketball/baseball/table-tennis but broke for tennis specifically
+    — TML's archive contributes ~2,700 rows/year over 11 years while tennisexplorer + the
+    live watcher contributed thousands in the final weeks alone, so the "last 20% of
+    rows" was the last 11 DAYS, dominated by a population (Challenger/ITF qualifiers) the
+    training window barely covered. A date-proportional cut keeps the same chronological-
+    only guarantee (hard rule 8 / fit_ratings' point-in-time discipline is untouched —
+    this only decides WHERE to slice, never reorders anything) while staying robust to a
+    density spike in any one sport. Full evidence: docs/TENNIS_MODELS.md.
+
+    Falls back to the row-count method when the whole history spans under a day (dates
+    cannot be usefully proportioned) or is unparseable — never raises.
+    """
+    from datetime import date, timedelta
+    try:
+        d0 = date.fromisoformat(rows[0]["date"][:10])
+        d1 = date.fromisoformat(rows[-1]["date"][:10])
+    except (ValueError, IndexError):
+        return max(1, int(len(rows) * 0.8))
+    span_days = (d1 - d0).days
+    if span_days < 1:
+        return max(1, int(len(rows) * 0.8))
+    cutoff = (d1 - timedelta(days=round(span_days * 0.2))).isoformat()
+    cut = next((i for i, r in enumerate(rows) if r["date"][:10] >= cutoff), len(rows))
+    return max(1, min(cut, len(rows) - 1))
+
+
 def build(sport_id, out_dir=mg.MODELS):
     # Archive whatever is CURRENTLY on disk before it is overwritten below — an immutable
     # trail of every day's model, not just today's (docs/DECISIONS/0004). Best-effort: a
@@ -150,10 +183,7 @@ def build(sport_id, out_dir=mg.MODELS):
     rating, gaps = mg.fit_ratings(rows, record=True)
     lines = LADDER_LINES[scale_of(rows)]
 
-    # Hold out the most recent fifth for the check, fit the check's distributions on the
-    # rest. The shipped model still uses everything — throwing away a year of history to
-    # keep a test tidy would make the product worse to make the report prettier.
-    cut = max(1, int(len(rows) * 0.8))
+    cut = _holdout_cut(rows)
     train, test = rows[:cut], rows[cut:]
     train_gaps, test_gaps = gaps[:cut], gaps[cut:]
     if len(test) >= 100:
@@ -188,6 +218,22 @@ def build(sport_id, out_dir=mg.MODELS):
         "bands": bands,
         "calibration": cal,
         "calibration_holdout": {"train": len(train), "test": len(test),
+                                # TRAIN's own date range, so "no chronological overlap
+                                # with test" is a DIRECT, checkable fact rather than an
+                                # inferred one — see tests/test_regression.py's
+                                # test_a_model_is_admitted_only_by_held_out_calibration,
+                                # which used to assert train_rows > test_rows as a proxy
+                                # for this and broke the day a date-proportional split
+                                # (docs/DECISIONS, pmc-2026-08-06-tennis-split) made that
+                                # ratio no longer universally true (a sport whose recent
+                                # collection is much denser than its archive, e.g. table
+                                # tennis via the live watcher, can have MORE rows in its
+                                # 20%-of-time test window than its 80%-of-time train one,
+                                # while remaining a perfectly genuine, non-overlapping
+                                # holdout — train_to <= from is the property that was
+                                # actually being protected).
+                                "train_from": train[0]["date"] if train else None,
+                                "train_to": train[-1]["date"] if train else None,
                                 "from": test[0]["date"] if test else None,
                                 "to": test[-1]["date"] if test else None},
         "appearances": _appearances_by_pool(_appearances(rows), latest),

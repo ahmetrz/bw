@@ -5,40 +5,39 @@ blocked check, a deliberate scope cut recorded in an ADR — not a wishlist item
 for completeness. Where a fuller writeup already exists, this points to it rather than
 repeating it.
 
-## Awaiting an operator decision (engineering is done; a human call is the blocker)
+## Resolved this session, after being filed here as pending
 
-### 1. Tennis calibration split — `pmc-2026-08-06-tennis-split`
+### 1. Tennis calibration split — `pmc-2026-08-06-tennis-split` — DONE
 
-Filed in `data/proposed_changes.jsonl`, `status: "proposed"`, rendered on the "Önerilen
-Model Değişiklikleri" screen. Full evidence in `docs/TENNIS_MODELS.md`; short version:
-`tools/build_generic_model.py`'s calibration split is 80/20 **by row count**, which for
-tennis allocates the entire 7,745-row test window to the last **11 days** of a
-2015–2026 archive — a population dominated by a recent tennisexplorer/live-watcher
-density spike, almost entirely Challenger/ITF/qualifying players the training slice never
-saw. Result: 0 of 7,745 test rows have both sides clearing `MIN_APPEARANCES`, the
-calibration table comes back empty, and tennis is refused — correctly, per hard rule 8,
-not as a bug to route around.
+Was filed as a proposal awaiting review; **approved by the operator and implemented**
+the same session (`engine/governance.review()`, `status: "approved"`, full evidence in
+the review note). `tools/build_generic_model.py` now splits train/test by **date range**
+(`_holdout_cut()`) rather than row count. Measured effect of rebuilding all sports:
+football 0.012→0.010, table tennis 0.015→0.006, badminton 0.024→0.013 (all improved),
+**tennis 0/7,745-empty → usable at 0.023** (the actual target). One measured side effect,
+disclosed rather than hidden: **basketball's gap moved from 0.028 to 0.030**, crossing the
+0.03 admission bar it had been just inside of — a small, boundary-adjacent shift, and the
+calibration gate handled it exactly as designed (basketball is refused rather than kept in
+on a technicality). `tests/test_regression.py`'s
+`test_a_model_is_admitted_only_by_held_out_calibration` was updated in the same change: it
+used to assert `train_rows > test_rows` as a proxy for "genuine non-overlapping holdout,"
+which stopped holding once splitting became date- rather than row-proportional (table
+tennis's live-watcher-fed recent density is high enough that its 20%-of-time test window
+now holds more ROWS than its 80%-of-time train window, while still being a perfectly valid
+holdout) — replaced with a direct check that train's last date precedes test's first date,
+which is both more correct and what the original assertion was actually trying to protect.
 
-The proposed fix — switch to a date-proportional split — is plausible and specifically
-scoped, but `build()` is shared by every sport currently in production (football,
-basketball, baseball, table tennis all calibrate through the same function), so changing
-it needs a human to weigh "fixes tennis" against "re-validates four other sports'
-calibration gaps that already pass." That's exactly what `engine/governance.py`'s
-proposal queue exists to gate (`docs/DECISIONS/0004`). Next step: operator reviews the
-proposal (`engine/governance.review()`), and if approved, someone re-runs
-`build_generic_model.py --all` and confirms all five sports' gaps still clear their
-bars before this is merged.
+### 2. The 07:00 Istanbul cadence question — DONE
 
-### 2. The 07:00 Istanbul cadence question
-
-The platform brief specifies a 07:00 Europe/Istanbul run; `daily.yml`'s existing,
-operator-approved cron (`43 6,7,8 * * *` UTC ≈ 09:43/10:43/11:43 Istanbul) is roughly
-2.5–4.5 hours later, and this session did not change it — reusing the existing job
-inherited the existing trigger time, and moving an already-approved schedule needs the
-same approval gate that set it (CLAUDE.md HITL gate 5), not an edit made in passing.
-Full detail in `docs/GITHUB_ACTIONS.md`. Next step: operator decides between an earlier
-cron, a second scheduled firing at 07:00 specifically, or accepting the current time —
-not an engineering decision to make unilaterally.
+Was: `daily.yml`'s existing, operator-approved cron fires the combine platform at
+~09:43–11:43 Istanbul, not the brief's specified 07:00. Resolved by explicit operator
+instruction this session to prioritise the brief's stated time over the previously-
+approved shared-job cadence. `tools/daily_combine.py` and its supporting steps were moved
+out of `daily.yml` into a new, standalone `.github/workflows/combine.yml` with its own
+07:00 Istanbul (~04:43 UTC, offset for the same GitHub-scheduler-congestion reason the
+existing workflows already use `:43`) cron and its own fetch — the pre-existing
+daily-picks list's cadence and fetch are completely untouched. See
+`docs/GITHUB_ACTIONS.md` and `docs/DECISIONS/0006-separate-cadence-separate-fetch.md`.
 
 ## Blocked on a real gap, not just unwired
 

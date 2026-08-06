@@ -1,15 +1,60 @@
 # TENNIS_MODELS.md
 
-## Status today: `RESEARCH_ONLY` / `BLOCKED_BY_EXTERNAL_ACCESS` for live picks
+## Status: `IMPLEMENTED_AND_VERIFIED` — tennis now produces picks
 
-Tennis (Betwinner `sport_id = 4`) produces **zero picks in the live pipeline right now**,
-before and after this session's changes. This is stated plainly because `CLAUDE.md`'s own
-prose ("the generic gate now admits ALL FIVE sports... tennis 0.012") is **stale** relative
-to the actual repo state as of 2026-08-06 — `data/models/4.json` carries
-`"calibration": []`, and `engine/model_generic.usable()` refuses any model with no
-calibration table outright. This document records the real, measured reason, what this
-session fixed, what it deliberately did not, and the concrete next step — because "tennis
-is refused" without a reason is indistinguishable from a model nobody has looked at.
+Tennis (Betwinner `sport_id = 4`) was refused by `engine/model_generic.usable()` for most
+of this session (`data/models/4.json` carried `"calibration": []`) — `CLAUDE.md`'s own
+prose ("the generic gate now admits ALL FIVE sports... tennis 0.012") was **stale** against
+the actual repo state as of 2026-08-06. This document originally recorded that as a
+measured, unresolved gap and filed a specific fix as a governance proposal rather than
+forcing it through. **The operator reviewed and approved that proposal the same session**;
+it is now implemented, measured, and tennis clears calibration at **0.023** (`data/models/
+4.json`, 38,749 results). The rest of this document is kept in full — the diagnostic
+reasoning is exactly why the fix works and exactly what it cost — with the resolution
+recorded first.
+
+## Resolution: `pmc-2026-08-06-tennis-split`, approved and implemented
+
+`tools/build_generic_model.py`'s calibration split changed from row-count-proportional to
+**date-proportional** (`_holdout_cut()`, new function) — see "What was deliberately NOT
+attempted" below for why this needed approval before touching it, and `docs/MODEL_GOVERNANCE.md`
+for the governance record. Rebuilding all sports with the new split, measured directly:
+
+| Sport | Before (row-count split) | After (date-proportional split) |
+|---|---|---|
+| Football (1) | usable, gap 0.012 | usable, gap **0.010** (improved) |
+| Basketball (3) | usable, gap 0.028 | **refused, gap 0.030** (regressed — see below) |
+| Tennis (4) | **refused — empty calibration table** | **usable, gap 0.023** (fixed) |
+| Baseball (5) | usable, gap 0.014 | usable, gap 0.014 (unchanged) |
+| Table tennis (10) | usable, gap 0.015 | usable, gap **0.006** (improved) |
+| Badminton (16) | usable, gap 0.024 | usable, gap **0.013** (improved) |
+
+**Disclosed trade-off, not hidden:** basketball's gap moved from 0.028 to 0.030, crossing
+the 0.03 admission bar it had been just inside of, and basketball is now refused. This is a
+small, boundary-adjacent shift (0.002), and the calibration gate handled it exactly as
+designed — a sport that no longer clears its own held-out check is excluded, not kept in on
+a technicality (hard rule 8). It may resolve on its own as more basketball results
+accumulate under the new split; it was not forced past the bar to avoid the regression,
+because that would be precisely the gate-bypass hard rule 8 forbids. Tracked as a live
+consequence in `docs/ROADMAP.md`, not swept into the "improved" column above.
+
+A second real consequence, caught by the existing regression suite rather than assumed
+away: `tests/test_regression.py::test_a_model_is_admitted_only_by_held_out_calibration`
+used to assert `train_rows > test_rows` as its proxy for "this is a genuine, non-degenerate
+holdout." That stopped holding for table tennis specifically — its live-watcher-fed recent
+density is so much higher than its archive's that the last-20%-of-TIME test window now
+contains *more* rows than the 80%-of-time train window, while remaining a perfectly valid,
+non-overlapping split. The test was corrected to check the actual property that matters
+(train's last date precedes test's first date) rather than the row-count proxy that used to
+imply it — see `tools/build_generic_model.py`'s `calibration_holdout.train_to`/`from`
+fields, added in the same change.
+
+`engine/pick.py` needed no further wiring: tennis flows through the same
+`generic.get(sport)` path every non-hand-written sport already uses, gated purely by
+`model_generic.usable()` — the moment the calibration table is non-empty and clears 0.03,
+the daily-picks pipeline and the combine platform both pick it up automatically.
+
+## Two real bugs fixed earlier the same session (verified, tests pass, safe for any sport)
 
 ## Two real bugs fixed this session (verified, tests pass, safe for any sport)
 
@@ -63,18 +108,19 @@ indistinguishable from a real one once it is inside a rating"), not a bug to rou
 Loosening `MIN_APPEARANCES` or the calibration threshold to force tennis through would be
 exactly the kind of gate-bypass hard rule 8 forbids, and this session does not do it.
 
-## What was deliberately NOT attempted
+## What was deliberately NOT attempted without review first
 
-- **Changing the 80/20-by-row-count split to a date-proportional one**, which would very
-  plausibly fix this (a time-based test window would include a healthier mix of the
-  well-covered tour-level population instead of being swamped by a recent density spike).
-  Not attempted because `tools/build_generic_model.py`'s `build()` is **shared by every
-  sport** (football, basketball, baseball, table tennis all calibrate through the same
-  function), and changing it without separately re-validating each of their calibration
-  gaps is exactly the kind of unreviewed structural change the platform's new governance
-  layer (`docs/MODEL_GOVERNANCE.md`) exists to gate. Filed instead as a **ProposedModelChange**
-  (`data/proposed_changes.jsonl`, id `pmc-2026-08-06-tennis-split`) for explicit operator
-  review — see that file and the "Önerilen Model Değişiklikleri" screen.
+- **Changing the 80/20-by-row-count split to a date-proportional one directly**, without
+  going through review, even though the fix was already identified and plausible at
+  diagnosis time. `tools/build_generic_model.py`'s `build()` is **shared by every sport**
+  (football, basketball, baseball, table tennis all calibrate through the same function),
+  so a change here needed a human to weigh "fixes tennis" against "may re-validate (or
+  regress) four other sports' calibration gaps that already pass" BEFORE it shipped — which
+  is exactly what happened: filed as a **ProposedModelChange**
+  (`data/proposed_changes.jsonl`, id `pmc-2026-08-06-tennis-split`, `status: "approved"`),
+  reviewed by the operator, and only then implemented and measured (see "Resolution"
+  above, including the basketball trade-off that review process was specifically there to
+  surface rather than ship silently).
 - **Adding tennis-data.co.uk as a second tour-level source.** Reachable in general, but this
   sandbox's egress could not complete a TLS handshake to it (`tennis-data.co.uk`, distinct
   from the TML/GitHub path which works fine) — recorded as `BLOCKED` in
@@ -101,16 +147,17 @@ this session — a silently wrong surface guess is exactly the class of error ha
 exists to prevent, and it would be very hard to detect from the outside (unlike an outright
 refusal). This is recorded as backlog in `docs/ROADMAP.md`, not attempted half-done.
 
-## What this means for the rest of the platform this session
+## What this means for the rest of the platform
 
 The confidence scoring, data-quality scoring, referee board, and combine optimizer built
 this session (`docs/CONFIDENCE_SCORING.md`, `docs/REFEREE_BOARD.md`,
 `docs/COUPON_OPTIMIZATION.md`) are all **sport-agnostic** — they consume whatever
-`engine/pick.py` produces and do not know or care whether a given day's picks include
-tennis. They are verified against synthetic tennis-shaped fixtures (same style as the
-existing test suite's synthetic football `probs` dicts) so that the day tennis does clear
-`model_generic.usable()` — either from more tennisexplorer history accumulating naturally,
-or from the proposed split-methodology change being reviewed and approved — it flows
-through the whole platform with no further wiring. Nothing in this session's new code
-special-cases "assume tennis works"; it special-cases "handle a sport producing zero
-picks today," which is the honest current state.
+`engine/pick.py` produces and never special-cased "assume tennis works" or "assume tennis
+is dark." They were built and verified against synthetic tennis-shaped fixtures precisely
+so that the day tennis cleared `model_generic.usable()` (now: this session, via the
+approved split) it would flow through the whole platform with zero further wiring — which
+is exactly what happened. The same genericity means a sport dropping OUT of `usable()`
+(basketball, today, from the same change) is handled by the identical code path: no
+special-casing needed either way, because "a sport currently produces zero picks" was
+always a normal, expected state for this pipeline to be in, not an edge case bolted on
+afterward.
