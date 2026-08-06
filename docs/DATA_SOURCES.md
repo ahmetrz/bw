@@ -122,10 +122,15 @@ starts empty on a fresh clone; it is populated by the health-check step describe
   next step for a richer factor set (cards, corners, referee) and is left `RECOMMENDED`
   rather than wired in, so as not to grow the football surface area in the same session a
   new sport (tennis) is being added — see `docs/DECISIONS/0002-football-scope-this-session.md`.
-- **Tennis**: `tennis-data.co.uk` is the one new PRODUCTION-grade addition this session
-  (`engine/tennis_data_co_uk.py`), chosen over TML-Database/Sackmann as the PRIMARY new
-  source specifically because it publishes **Surface**, which neither of those two carry,
-  and Surface is `research/tennis.json`'s own top finding ("Surface Elo is the primary
-  predictor; clay/grass specialists diverge 100-200 points from overall"). TML-Database
-  stays wired for the ace/df/serve-point fields tennis-data.co.uk does not carry. See
-  `docs/TENNIS_MODELS.md`.
+- **Tennis**: no new SOURCE was added this session — `tennis-data.co.uk` (the candidate for
+  **Surface**, `research/tennis.json`'s own top finding: "Surface Elo is the primary
+  predictor; clay/grass specialists diverge 100-200 points from overall") turned out to be
+  **unreachable from this sandbox** (TLS handshake failure, catalogued as `BLOCKED` above)
+  and, on its own merits, would not have solved the actual blocker anyway — it is main-tour
+  only, the same population TML already covers, not the Challenger/ITF tail that turned out
+  to be the real gap (`docs/TENNIS_MODELS.md`). What DID ship: TML-Database's own CSV
+  already carries a `surface` column that the existing adapter (`tools/collect_results.py`'s
+  `tennis()`) was reading but discarding — a one-line fix, not a new source, and it is what
+  actually populated `surface` on 29,774 stored rows this session. `tennis-data.co.uk` stays
+  catalogued as `RECOMMENDED` (retest from a plain GitHub Actions runner, no proxy) rather
+  than claimed as done. See `docs/TENNIS_MODELS.md` and `docs/ROADMAP.md`.
