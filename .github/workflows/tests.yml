@@ -1,0 +1,79 @@
+name: tests
+
+# Push/PR gate. Did not exist before this session — the daily/results/watch-live
+# workflows run the pipeline, nothing ran the test suite on a change before it merged.
+#
+# Kept CHEAP and DEPENDENCY-LIGHT on purpose, matching the project's own choice to take
+# no pip dependencies for the core pipeline (README.md): compile-check every file (catches
+# a syntax error before it reaches a scheduled job — this exact class of bug, an f-string
+# with a backslash in it, shipped once during this session and was only caught by running
+# the tool directly), run the full unittest suite (covers unit + integration + schema-
+# shaped assertions together, since that is how this codebase's own tests are written),
+# a minimal secret-pattern grep (defense in depth — GitHub's own secret scanning already
+# covers public repos, this is a second, narrower check), and a PDF smoke test gated
+# behind installing the one optional dependency (reportlab) this project has.
+#
+# No frontend build step: there is no separate frontend to build. Every screen is
+# generated Python -> self-contained HTML, exercised directly by the unittest suite
+# (tests/test_combine_platform.py's TestPlatformPages, tests/test_regression.py's page
+# tests) — that IS this project's frontend test.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile-check every Python file
+        run: |
+          set -e
+          find . -name "*.py" -not -path "./.git/*" -print0 \
+            | xargs -0 -n1 python3 -m py_compile
+          echo "all files compile"
+
+      - name: Minimal secret-pattern scan
+        run: |
+          set -e
+          # Telegram bot tokens have a fixed, recognisable shape: digits, a colon, 35
+          # base64url-ish characters. A real one committed here would be a live incident,
+          # not a style nit, so this fails the build rather than warning.
+          if git grep -InE '[0-9]{6,10}:[A-Za-z0-9_-]{35}' -- . ':!*.md' ':!tests/*'; then
+            echo "::error::possible Telegram bot token committed — see matches above"
+            exit 1
+          fi
+          echo "no obvious secret patterns found"
+
+      - name: Run the test suite (both files, via discovery)
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Install PDF dependency and re-run PDF-dependent tests
+        run: |
+          pip install --quiet -r requirements.txt
+          python3 -m unittest tests.test_combine_platform.TestPdfReport -v
+
+      - name: GitHub Actions workflow syntax (dry-run parse)
+        run: |
+          python3 -c "
+          import sys, yaml, glob
+          bad = False
+          for f in glob.glob('.github/workflows/*.yml'):
+              try:
+                  yaml.safe_load(open(f))
+              except yaml.YAMLError as e:
+                  print(f'{f}: {e}'); bad = True
+          sys.exit(1 if bad else 0)
+          "

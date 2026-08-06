@@ -76,6 +76,12 @@ def clean(row):
     # questions asked in its own unit.
     if row.get("unit"):
         out["unit"] = str(row["unit"])
+    # SURFACE: a rating-relevant attribute for sports where it matters (tennis: clay/
+    # grass/hard specialists diverge 100-200 Elo points from their overall rating per
+    # research/tennis.json). Optional and sport-specific, same treatment as "pool" — an
+    # adapter that has it says so, and nothing downstream may assume it exists.
+    if row.get("surface"):
+        out["surface"] = str(row["surface"])
     for k in ("league", "source", "season", "neutral", "extra_periods"):
         if row.get(k) is not None:
             out[k] = row[k]

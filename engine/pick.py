@@ -41,6 +41,16 @@ from engine import ladder, model_football
 # hand-written one stays until the store catches up.
 MODELLED_SPORTS = {10}
 
+# Sports with no home-court/home-field advantage at all — every fixture is effectively at
+# a neutral site (tour tennis: whichever player is nominally "home" is just whoever sorts
+# first by id, not a host). Passed to model_generic.lookup() so its HOME_ELO term is not
+# added at prediction time for a sport whose training data was fitted without it either
+# (every stored tennis row carries neutral=True; see engine/model_generic.fit_ratings).
+# Without this a neutral sport's ratings are fitted with home advantage mostly switched
+# off but every LOOKUP still added it back in — a train/predict mismatch, not a modelling
+# choice, and one that quietly favours whichever side happens to sort first.
+NEUTRAL_SPORTS = {4}   # tennis
+
 # Directions to consider, in the order they are tried. Sides first: a side view is what
 # the ladder can soften most, since double chance and the handicap family both exist.
 DIRECTIONS = ("home", "away", "over", "under")
@@ -185,8 +195,8 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
         if not model:
             return None, 0.0, None
         probs, score = model_generic.lookup(
-            model, home, away,
-            home_id=sample.get("p1_id"), away_id=sample.get("p2_id"))
+            model, home, away, home_id=sample.get("p1_id"), away_id=sample.get("p2_id"),
+            neutral=sport in NEUTRAL_SPORTS)
         if probs and score >= 0.86:
             return probs, score, "generic"
         return None, 0.0, None

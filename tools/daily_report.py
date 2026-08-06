@@ -513,6 +513,59 @@ def log_predictions(results, path, host=None):
     return added
 
 
+def load_models(rows):
+    """Load every model this pipeline can use, plus the simulated-league detector.
+
+    Factored out of main() so tools/daily_combine.py (the football+tennis combine
+    platform) can share EXACTLY this loading logic instead of re-deriving it — two
+    independent copies of "how do we load the football Elo model" would be the same
+    duplication engine/model_generic.py exists to avoid at the model layer, one level up
+    at the pipeline layer. Pure extraction: main() below calls this and prints nothing
+    it did not already print, in the same order.
+
+    Returns (elo_model, tt, generic, index, fake).
+    """
+    elo_model = model_elo.load()
+    if elo_model:
+        print(f"Elo model: {len(elo_model['divisions'])} divisions, "
+              f"{elo_model['matches']} matches fitted")
+    else:
+        print("Elo model absent — run tools/build_football_model.py", file=sys.stderr)
+    tt = None
+    tt_model = model_tt.load()
+    if tt_model:
+        try:
+            tt = (tt_model, model_tt.build_player_index(setka.ratings()))
+            print(f"Table tennis model: {tt_model['samples']} samples, "
+                  f"logloss {tt_model['logloss']} vs {tt_model['baseline_logloss']} baseline; "
+                  f"{len(tt[1].get('exact', {}))} rated players")
+        except Exception as e:
+            print(f"Setka ratings unavailable: {e}", file=sys.stderr)
+    else:
+        print("Table tennis model absent — run tools/build_tt_model.py", file=sys.stderr)
+
+    generic = {}
+    for sid in sorted(results_store.summary()):
+        model = model_generic.load(sid)
+        ok, why = model_generic.usable(model)
+        label = tr.sport(sid, str(sid))
+        print(f"generic model {label} ({sid}): {'ADMITTED' if ok else 'refused'} — {why}")
+        if ok:
+            generic[sid] = model
+
+    try:
+        index = model_football.build_index()
+        print(f"ClubElo fixtures indexed: {len(index)}")
+    except Exception as e:
+        print(f"ClubElo unavailable: {e}", file=sys.stderr)
+        index = {}
+
+    fake = simulated.leagues(rows)
+    for (sid, league), why in sorted(fake.items(), key=lambda kv: str(kv[0])):
+        print(f"simulated: {tr.sport(sid, str(sid))} / {league} — {why}")
+    return elo_model, tt, generic, index, fake
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True)
@@ -547,52 +600,11 @@ def main():
     rows = bwfeed.normalize(data)
     print(f"normalized rows: {len(rows)} from {len(data)} feed entries")
 
-    # Our own model first — it is fitted from history and works out of season.
-    elo_model = model_elo.load()
-    if elo_model:
-        print(f"Elo model: {len(elo_model['divisions'])} divisions, "
-              f"{elo_model['matches']} matches fitted")
-    else:
-        print("Elo model absent — run tools/build_football_model.py", file=sys.stderr)
-    # Table tennis: the calibrated Setka model plus the live rating index.
-    tt = None
-    tt_model = model_tt.load()
-    if tt_model:
-        try:
-            tt = (tt_model, model_tt.build_player_index(setka.ratings()))
-            print(f"Table tennis model: {tt_model['samples']} samples, "
-                  f"logloss {tt_model['logloss']} vs {tt_model['baseline_logloss']} baseline; "
-                  f"{len(tt[1].get('exact', {}))} rated players")
-        except Exception as e:
-            print(f"Setka ratings unavailable: {e}", file=sys.stderr)
-    else:
-        print("Table tennis model absent — run tools/build_tt_model.py", file=sys.stderr)
-
-    # Every generic model that PASSES its own held-out calibration. One line, and it is
-    # the same line however many sports there eventually are.
-    generic = {}
-    for sid in sorted(results_store.summary()):
-        model = model_generic.load(sid)
-        ok, why = model_generic.usable(model)
-        label = tr.sport(sid, str(sid))
-        print(f"generic model {label} ({sid}): {'ADMITTED' if ok else 'refused'} — {why}")
-        if ok:
-            generic[sid] = model
-
-    try:
-        index = model_football.build_index()
-        print(f"ClubElo fixtures indexed: {len(index)}")
-    except Exception as e:
-        print(f"ClubElo unavailable: {e}", file=sys.stderr)
-        index = {}
-
+    elo_model, tt, generic, index, fake = load_models(rows)
     # Competitions whose schedule is physically impossible — a participant starting a
     # second fixture before the first could have ended. See engine/simulated.py. Written
     # out so the live watcher refuses to store their "results" too: the daily run sees the
     # whole 48-hour card, which is where the pattern is visible at all.
-    fake = simulated.leagues(rows)
-    for (sid, league), why in sorted(fake.items(), key=lambda kv: str(kv[0])):
-        print(f"simulated: {tr.sport(sid, str(sid))} / {league} — {why}")
     simulated.save(fake, args.simulated_out)
 
     windows = [int(w) for w in args.windows.split(",") if w.strip()]

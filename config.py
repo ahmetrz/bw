@@ -160,3 +160,45 @@ REFERRAL_URL = "https://bwref-l4ftkntp.com/13KD"
 # --- Output -----------------------------------------------------------------
 TOP_N = 50
 REPORT_PATH = "report.json"
+
+# --- Combine platform (football + tennis daily combine — a SEPARATE product) ----------
+# Everything below governs tools/daily_combine.py, engine/combine.py, engine/referee.py
+# and engine/confidence.py — the single-daily-combine product described in the platform
+# brief. It is layered ON TOP of the scan/daily-picks pipeline above and does not change
+# any of it: MIN_MODEL_SURVIVAL (0.75) and MIN_ODDS (1.10) above still gate the existing
+# top-N scan and the existing daily picks list exactly as they did before. See
+# docs/DECISIONS/0003-two-thresholds-not-one.md for why these are deliberately separate
+# numbers for separate products rather than one reconciled threshold.
+COMBINE_SPORTS = {1, 4}          # football, tennis — the brief's explicit scope (section 3)
+
+# The brief's own minimum, applied to engine/confidence.py's confidence_score (the SAME
+# 0-100 number rating.py already computes — never a second, looser score invented to make
+# 80 easier to reach).
+MIN_COMBINE_CONFIDENCE = 80.0
+
+# A combine's legs are treated as independent for the combined-probability estimate
+# (matching how engine/parlay.py already estimates the book-implied combined probability
+# under the same assumption) — a simplification, not a claim of true independence; real
+# correlation is instead FLAGGED by engine/referee.correlation_judge and penalised in the
+# optimizer's objective, rather than modelled exactly, because modelling it exactly would
+# need a joint outcome model this platform does not have.
+#
+# The floor below is what stops leg-count or total-odds growth from hollowing out the
+# combine's own real chance of winning (the brief's explicit "toplam oranın yükselmesi
+# için kuponun gerçek başarı ihtimalini anlamsız seviyeye düşürme"): ten legs at the 80
+# floor's own probability neighbourhood (~0.83-0.85 typical) multiply out to roughly
+# 0.83^10 ≈ 0.155, so 0.15 is set as the point below which adding one more leg is refused
+# regardless of how attractive that leg looks alone.
+MIN_COMBINE_COMBINED_PROBABILITY = 0.15
+
+# Beam search width for engine/combine.optimize() — see that module for why beam search
+# rather than a simple greedy fill or brute-force subset search (2^50 candidates on a full
+# card). A wider beam costs more computation for a marginally more thorough search; 8 was
+# enough on every fixture-based test to match brute force on candidate pools up to 20.
+COMBINE_BEAM_WIDTH = 8
+
+# Correlation concentration cap used by engine/referee.correlation_judge — see that
+# function. Not reused from MAX_PER_FIXTURE above because that cap is per FIXTURE (one
+# match cannot supply more than N scan rows); this one is per LEAGUE across a whole
+# combine of one-pick-per-match legs, a different axis of concentration entirely.
+COMBINE_MAX_LEAGUE_SHARE = 0.40

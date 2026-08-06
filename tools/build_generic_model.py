@@ -20,7 +20,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from engine import model_generic as mg, results_store, tr  # noqa: E402
+from engine import governance, model_generic as mg, results_store, tr  # noqa: E402
 
 # The plus-lines a safety ladder actually walks, per unit of scoring. A football ladder
 # lives at +0.5 to +2.5; a basketball one at +6.5 to +20.5. Calibrating a football model
@@ -136,6 +136,13 @@ def _appearances_by_pool(seen, latest):
 
 
 def build(sport_id, out_dir=mg.MODELS):
+    # Archive whatever is CURRENTLY on disk before it is overwritten below — an immutable
+    # trail of every day's model, not just today's (docs/DECISIONS/0004). Best-effort: a
+    # sport being built for the first time has nothing to archive yet, which is fine.
+    try:
+        governance.archive_model_version(sport_id)
+    except OSError:
+        pass
     rows = results_store.load(sport_id)
     if not rows:
         return None, "no results stored"

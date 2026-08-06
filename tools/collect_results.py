@@ -286,6 +286,16 @@ def tennis(start=2015, end=2026):
                 "league": rec.get("tourney_name"), "season": year,
                 "neutral": True,          # no home court on tour
                 "unit": "sets", "source": "tml",
+                # TML mirrors Sackmann's column layout and has carried `surface` in every
+                # year checked (2024 spot-checked directly: "Hard","Clay","Grass"). Stored
+                # but NOT yet used to partition rating pools (see docs/TENNIS_MODELS.md) —
+                # tennisexplorer, the other tennis source, cannot supply it, so partitioning
+                # ratings by surface today would split a player's history between a
+                # surface-labelled TML pool and an unlabelled tennisexplorer pool with no
+                # way to reconcile the two. Recorded now so it is there the day that's fixed
+                # instead of requiring the archive to be re-walked for a column that was
+                # always in it.
+                "surface": rec.get("surface") or None,
             }
         time.sleep(0.3)
 

@@ -87,13 +87,28 @@ jobs:
         run: python3 tools/refresh_coupon.py --report daily_report.json --page picks.html
              || echo "kupon tazelenemedi — liste etkilenmedi"
 
+      # KOMBINE PLATFORMUNUN KENDI SONUC DONGUSU, AYNI SAATLIK GEREKCEYLE: bir bahis
+      # bittigi anda kombindeki o bacagin sonucu bellidir. Butun bacaklar sonuclanmadan
+      # kombine "beklemede" kalir (tools/grade_combine.py); yeni bir kombine URETMEZ.
+      - name: Settle graded combines
+        run: python3 tools/grade_combine.py || echo "kombine notlandirma atlandi"
+
+      - name: Rebuild the combine-platform pages
+        run: python3 tools/make_platform_pages.py || echo "platform sayfalari uretilemedi"
+
       - name: Commit
         if: always()
         run: |
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add results.html stats.html picks.html data/predictions.jsonl data/scoreboard.json data/results_sent.json || true
+          PLATFORM_PAGES="combine.html referee.html dataquality.html scanned.html \
+            rejected.html combine_history.html combine_results.html lab.html \
+            calibration.html model_versions.html proposed_changes.html \
+            source_health.html runs.html settings.html"
+          git add results.html stats.html picks.html data/predictions.jsonl \
+            data/scoreboard.json data/results_sent.json data/combine_log.jsonl \
+            $PLATFORM_PAGES || true
           if git diff --cached --quiet; then
             echo "yeni sonuc yok"
             exit 0
@@ -110,10 +125,15 @@ jobs:
             sleep $((i * 5))
             # Notlandirma tamamen depodan yeniden turetilebiliyor, tahminler gibi
             # kaybolmuyor: uzak durumu alip yeniden calistirmak dogru cevabi verir.
+            # Kombine notlandirmasi da ayni sekilde: data/combine_log.jsonl'daki secim
+            # alanlari degil, yalnizca settlement alani yeniden turetiliyor.
             python3 tools/grade_predictions.py >/dev/null 2>&1 || true
             python3 tools/make_stats_page.py --out stats.html >/dev/null 2>&1 || true
+            python3 tools/grade_combine.py >/dev/null 2>&1 || true
+            python3 tools/make_platform_pages.py >/dev/null 2>&1 || true
             git add results.html stats.html picks.html data/predictions.jsonl \
-              data/scoreboard.json data/results_sent.json || true
+              data/scoreboard.json data/results_sent.json data/combine_log.jsonl \
+              $PLATFORM_PAGES || true
             git diff --cached --quiet && exit 0
             git commit -m "results: $(date -u +%Y-%m-%d) sonuclari (yeniden islendi)"
           done

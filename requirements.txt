@@ -1,0 +1,9 @@
+# The scanning/modelling pipeline (engine/, tools/daily_report.py, tools/collect_*.py,
+# tools/build_generic_model.py and everything they import) is deliberately dependency-
+# free — standard library only (see README.md, tests/test_regression.py's own docstring).
+# This file exists ONLY for the one piece that genuinely needs a real library: PDF
+# rendering (section 20 of the platform brief). Nothing else in this project imports it.
+#
+#   pip install -r requirements.txt
+#
+reportlab>=4.0,<5.1

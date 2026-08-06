@@ -368,8 +368,16 @@ def appearances(model, pool, team):
     return ((model.get("appearances") or {}).get(pool) or {}).get(team, 0)
 
 
-def lookup(model, home, away, matcher=None, home_id=None, away_id=None):
+def lookup(model, home, away, matcher=None, home_id=None, away_id=None, neutral=False):
     """Probabilities for one fixture, or (None, 0.0) when it cannot be priced honestly.
+
+    `neutral=True` must be passed for sports with no home advantage (tennis: every TML/
+    tennisexplorer row is stored with `neutral: True` and `fit_ratings` skips HOME_ELO
+    when fitting them). Defaults to False so every existing caller is unaffected — the
+    bug this parameter fixes is narrow: without it, a neutral-site sport's ratings are
+    fitted with HOME_ELO mostly absent from the training gaps, but every LOOKUP still
+    added it regardless, a train/predict mismatch that biases the nominally-"home" side
+    (lower id/name) in every neutral-sport prediction.
 
     BOTH teams must resolve inside the SAME pool. A cross-pool comparison is how a model
     ends up rating a Championship side against a Bundesliga side on a scale neither of
@@ -410,7 +418,7 @@ def lookup(model, home, away, matcher=None, home_id=None, away_id=None):
         return None, 0.0
     score, pool, h, a = best
     ratings = model["pools"][pool]
-    eff = ratings[h] - ratings[a] + HOME_ELO
+    eff = ratings[h] - ratings[a] + (0.0 if neutral else HOME_ELO)
     pmf, mu, band = margin_pmf(model, eff, pool)
     return {
         # From the HOME side, always. The old version stored it from the favourite's view
