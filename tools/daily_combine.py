@@ -178,11 +178,24 @@ def main():
     print(f"candidate picks: {len(picks)} (skipped: {skipped})")
     settlement.annotate(picks)
     rating.annotate(picks)          # scores + numbers 1..N, same as the daily-picks path
-    confidence.annotate(picks)      # full ConfidencePrediction per pick, from that score
-
     now = datetime.now(timezone.utc)
-    context = build_context(now)
-    report = combine.build_combine(picks, now, context)
+
+    # A BUG IN ANALYSIS MUST PRODUCE "NO COMBINE TODAY", NOT A CRASHED PIPELINE. Sections
+    # 13/21 of the platform brief: one module failing must not take the whole run down.
+    # engine/referee.py's own judges already fail safe individually (_safe_judge); this is
+    # the outer net for anything upstream of the board (confidence scoring, the optimizer
+    # itself) that a bad pick shape could still trip. Exits non-zero either way so the
+    # GitHub Actions step's own `|| echo` fallback (daily.yml) still sees a failure and
+    # the existing daily-picks steps after it are unaffected.
+    try:
+        confidence.annotate(picks)  # full ConfidencePrediction per pick, from that score
+        context = build_context(now)
+        report = combine.build_combine(picks, now, context)
+    except Exception as e:                                          # noqa: BLE001
+        print(f"kombine oluşturulamadı — analiz katmanında hata: {e!r}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
     print(f"eligible: {report.get('eligible_count', 0)} · "
           f"referee-approved: {report.get('referee_approved_count', 0)} · "
           f"final combine: {report['leg_count']} legs")

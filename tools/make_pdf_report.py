@@ -78,14 +78,23 @@ def _fmt_num(x, digits=2):
     return "—" if x is None else f"{x:.{digits}f}"
 
 
-def _p(text, style):
+def _esc(text):
     import html
-    return Paragraph(html.escape(str(text)) if not isinstance(text, Paragraph) else text,
-                     style)
+    return html.escape(str(text))
+
+
+def _p(text, style):
+    return Paragraph(_esc(text) if not isinstance(text, Paragraph) else text, style)
 
 
 def _stat_table(pairs, styles):
-    rows = [[Paragraph(f"<b>{v}</b>", styles["Card"]), Paragraph(k, styles["Small"])]
+    # `v`/`k` are almost always internally-computed (counts, formatted numbers) but are
+    # escaped unconditionally rather than trusted by call site — reportlab's Paragraph
+    # interprets its text as markup (<b>, <font>, <a href>, <img src>), and every OTHER
+    # place this module builds a Paragraph from external-feed-derived text (team/league
+    # names, ultimately from Betwinner's own feed) escapes first. One unescaped path is
+    # one path a future caller can wire feed text through without anyone noticing.
+    rows = [[Paragraph(f"<b>{_esc(v)}</b>", styles["Card"]), Paragraph(_esc(k), styles["Small"])]
            for k, v in pairs]
     # Two stats per physical row, side by side.
     grid = []
@@ -147,7 +156,16 @@ def _no_combine_report(c, styles):
 
 
 def _wrapped_table(rows, styles, col_widths):
-    data = [[Paragraph(str(cell), styles["Small"] if r else styles["Card"])
+    # Every cell here can be feed-derived (match names built from Betwinner's own O1/O2 —
+    # engine/bwfeed.py — flow into these tables via combine.json's gate_excluded/vetoed/
+    # borderline lists). MUST be escaped before reaching Paragraph, which interprets its
+    # text as markup — an unescaped `<font size="40">...</font>` or `<a href="...">` in a
+    # crafted team/tournament name would render as attacker-controlled styling/links in a
+    # PDF generated unattended and delivered straight to the operator as an official
+    # document. Same class of bug tests/test_combine_platform.py already guards against
+    # for the HTML pages (test_combine_page_escapes_hostile_team_names); this closes the
+    # equivalent gap in the PDF path.
+    data = [[Paragraph(_esc(cell), styles["Small"] if r else styles["Card"])
             for cell in row] for r, row in enumerate(rows)]
     t = Table(data, colWidths=col_widths, repeatRows=1)
     t.setStyle(TableStyle([

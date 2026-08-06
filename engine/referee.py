@@ -253,12 +253,27 @@ def final_risk_judge(picks, confs, per_leg_verdicts, correlation, context):
     }
 
 
+def _safe_judge(judge, pick, conf, context):
+    """Run one judge, converting an unexpected exception into a VETO rather than letting
+    it crash the whole board (and, upstream, the whole daily run — section 13/21 of the
+    platform brief: one module failing must not take the rest down). VETO, not APPROVE or
+    a silent skip, because a judge that could not actually run is the same epistemic
+    situation as a judge that refuses — the safe failure mode for an analysis error is
+    EXCLUDING the leg, matching this codebase's standing principle that a wrong row is
+    worse than a missing one (CLAUDE.md, watch-live's own refusal philosophy)."""
+    try:
+        return judge(pick, conf, context)
+    except Exception as e:                                        # noqa: BLE001
+        return _v(judge.__name__, VETO, "MODULE_ERROR",
+                 f"hakem modülü çalıştırılamadı ({judge.__name__}): {e!r}")
+
+
 def review_all(picks, confs, context=None):
     """Run the whole board over a candidate list. Returns
     (per_leg_verdicts, correlation_verdict, final_verdict) — the shape
     engine/combine.py consumes to build the actual slip."""
     context = context or {}
-    per_leg = [[j(pick, conf, context) for j in PER_LEG_JUDGES]
+    per_leg = [[_safe_judge(j, pick, conf, context) for j in PER_LEG_JUDGES]
               for pick, conf in zip(picks, confs)]
     correlation = correlation_judge(picks, confs, context)
     final = final_risk_judge(picks, confs, per_leg, correlation, context)

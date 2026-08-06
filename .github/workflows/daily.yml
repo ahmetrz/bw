@@ -138,11 +138,18 @@ jobs:
           case "${SCHED}" in
             "43 7 * * *"|"43 8 * * *") CFLAG="--only-if-new" ;;
           esac
+          # BASARISIZLIK BU ADIMDA DURMAMALI. Bu satirlar ustteki, zaten canli calisan
+          # gunluk secim listesinden SONRA gelir — combine platformundaki bir hata
+          # (ornegin bir hakem modulundeki beklenmeyen bir veri sekli) altta gelen
+          # "Refresh the results store", "Grade yesterday's predictions" ve "Build the
+          # method page" adimlarini engellememeli. Bolum 13/21'in "bir kaynagin
+          # basarisiz olmasi butun pipeline'i cokertmesin" kurali.
           python3 tools/daily_combine.py \
             --input data/betwinner_daily.json.gz \
             --out combine.json \
             --log data/combine_log.jsonl \
-            ${CFLAG}
+            ${CFLAG} \
+            || echo "kombine platformu bu kosuda basarisiz oldu — gunluk secim listesi etkilenmedi"
 
       - name: Render the combine PDF report
         run: python3 tools/make_pdf_report.py --input combine.json --out combine_report.pdf

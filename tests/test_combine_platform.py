@@ -158,6 +158,56 @@ class TestRefereeBoard(unittest.TestCase):
         self.assertEqual(final["eligible_count"], 0)
 
 
+class TestRefereeResilience(unittest.TestCase):
+    def test_a_crashing_judge_vetoes_that_leg_rather_than_crashing_the_board(self):
+        """Sections 13/21 of the platform brief: one module failing must not crash the
+        whole system. A judge that raises is treated as a VETO (fail-safe, not fail-open)
+        rather than propagating and killing the whole daily run."""
+        def broken_judge(pick, conf, context):
+            raise ValueError("simulated bug in a judge module")
+
+        original = list(referee.PER_LEG_JUDGES)
+        referee.PER_LEG_JUDGES = tuple(list(original) + [broken_judge])
+        try:
+            picks = annotated([leg(1, 1, "L", 90, 1.5)])
+            per_leg, correlation, final = referee.review_all(
+                picks, [picks[0]["_confidence"]], {})
+            self.assertFalse(final["decisions"][0]["include"])
+            broken_verdict = next(v for v in per_leg[0] if v["judge"] == "broken_judge")
+            self.assertEqual(broken_verdict["verdict"], referee.VETO)
+            self.assertEqual(broken_verdict["reason_code"], "MODULE_ERROR")
+        finally:
+            referee.PER_LEG_JUDGES = original
+
+    def test_daily_combine_reports_an_error_instead_of_crashing_on_a_bad_pick(self):
+        """tools/daily_combine.py's own outer guard: an exception in the analysis layer
+        must exit cleanly (non-zero, for the workflow's own fallback to see) rather than
+        raise a bare traceback that could be mistaken for something more catastrophic."""
+        from unittest import mock
+        from tools import daily_combine
+
+        with mock.patch("engine.confidence.annotate", side_effect=RuntimeError("boom")):
+            with mock.patch("tools.daily_combine.daily_report") as mock_dr, \
+                 mock.patch("tools.daily_combine.bwfeed") as mock_bw, \
+                 mock.patch("tools.daily_combine.pick") as mock_pick, \
+                 mock.patch("tools.daily_combine.settlement"), \
+                 mock.patch("tools.daily_combine.rating"):
+                mock_dr.load.return_value = {"fake": "data"}
+                mock_bw.is_bwfeed.return_value = True
+                mock_bw.normalize.return_value = []
+                mock_dr.load_models.return_value = (None, None, {}, {}, {})
+                mock_dr.within.return_value = []
+                mock_pick.for_fixtures.return_value = ([], {})
+                import sys as _sys
+                old_argv = _sys.argv
+                _sys.argv = ["daily_combine.py", "--input", "x.json", "--no-coupon"]
+                try:
+                    rc = daily_combine.main()
+                finally:
+                    _sys.argv = old_argv
+                self.assertEqual(rc, 1)
+
+
 class TestCombineOptimizer(unittest.TestCase):
     def _card(self):
         return annotated([
@@ -431,6 +481,37 @@ class TestPdfReport(unittest.TestCase):
             self.assertTrue(os.path.exists(out))
             with open(out, "rb") as f:
                 self.assertEqual(f.read(4), b"%PDF")
+
+    def test_wrapped_table_escapes_hostile_match_names(self):
+        """A real finding from this session's security review: _wrapped_table() (used for
+        the gate_excluded/vetoed/borderline tables) built Paragraph objects from raw,
+        unescaped cell text while _p() escaped correctly — reportlab's Paragraph
+        interprets its text as markup (<font>, <a href>, <img src>), so a crafted
+        team/tournament name from Betwinner's feed could inject attacker-controlled
+        styling or links into a PDF generated unattended and handed to the operator as
+        an official document. Exercises the exact path: a hostile name reaching
+        combine.json's gate_excluded list."""
+        from tools import make_pdf_report
+        make_pdf_report._register_fonts()
+        styles = make_pdf_report._styles()
+        hostile = '<font size="40" color="red">PHISH ME</font>'
+        table = make_pdf_report._wrapped_table(
+            [["Maç", "Neden"], [hostile, "test"]], styles, [80 * 4, 80 * 4])
+        # The Paragraph's own escaped XML text must not contain the raw, unescaped tag —
+        # reportlab stores the (now-inert) markup-escaped text on the Paragraph object.
+        cell_text = table._cellvalues[1][0].text
+        self.assertNotIn('<font size="40"', cell_text)
+        self.assertIn("&lt;font", cell_text)
+
+    def test_stat_table_escapes_its_values_too(self):
+        from tools import make_pdf_report
+        make_pdf_report._register_fonts()
+        styles = make_pdf_report._styles()
+        table = make_pdf_report._stat_table(
+            [("label", '<a href="http://evil.example">click</a>')], styles)
+        cell_text = table._cellvalues[0][0].text
+        self.assertNotIn('<a href="http://evil.example">', cell_text)
+        self.assertIn("&lt;a href", cell_text)
 
     def test_turkish_characters_render_via_the_vendored_font(self):
         """The specific bug class this test exists for: reportlab's built-in Helvetica
