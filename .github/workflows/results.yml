@@ -1,38 +1,30 @@
 name: results
 
-# Gunun secimlerini sonuclandirir ve isaretlenmis sayfayi Telegram'a yollar.
+# Gunun kombinesindeki bacaklari sonuclandirir ve platform sayfalarini tazeler.
 #
-# NEDEN SAAT BASI: bir bahis bittigi anda sonucu bellidir, ertesi gun degil. Gunde uc
-# kez calisirken bir aksam maci sekiz saat "bekliyor" gorunuyordu; oysa canli izleyici
-# maci biter bitmez kaydediyor, flashscore feed'i ~570 futbol macini gun icinde tasiyor
-# ve tennisexplorer ayni gunun setlerini yayinliyor. Notlandirilacak sey saatler once
-# hazir oluyordu, onu okuyan hicbir sey yoktu.
+# NEDEN SAAT BASI: bir bahis bittigi anda sonucu bellidir, ertesi gun degil. Canli izleyici
+# maci biter bitmez kaydediyor, flashscore feed'i ~570 futbol macini gun icinde tasiyor ve
+# tennisexplorer ayni gunun setlerini yayinliyor. Notlandirilacak sey saatler once hazir
+# oluyor; bu is onu okuyor.
 #
-# Telegram YINE de sadece o gune ait sonuclanan sayi ARTTIYSA bildiriyor
-# (tools/daily_results.py, data/results_sent.json), yani saat basi calismak saat basi
-# bildirim demek degil: yeni sonuc yoksa sessizce geciyor. Sayfa ve toplu istatistik her
-# calismada tazeleniyor.
+# Butun bacaklar sonuclanmadan kombine "beklemede" kalir (tools/grade_combine.py); yeni
+# bir kombine URETMEZ, sadece data/combine_log.jsonl'deki settlement alanini doldurur.
 #
-# Depo public, Actions dakikasi sinirsiz; maliyeti olan tek sey kaynaklara giden istek
-# ve o da saatte bir sweep.
+# KUPON KODU DA BURADA SAAT BASI TAZELENIR (tools/refresh_combine.py). Kod gunun
+# TEK seferlik cekiminde basiliyor (combine.yml), ama kitap bir bacak baslar baslamaz
+# kuponu FILTRELEMIYOR, yeniden KURUYOR — sabah dogrulanmis bir kombine, ogleye dogru
+# baslamis bacaklari eksik ya da varsayilan bahis turunde bir kupona donusuyor. Bu adim
+# combine.json'daki gunun bacaklarini aliyor, baslamis olanlari cikariyor ve kalanlar
+# icin kitaptan yeni bir kod istiyor — combine.json'i yeniden yazar, data/combine_log.
+# jsonl'e dokunmaz (secim kaydi kalici, kupon kodu degil).
+#
+# Depo public, Actions dakikasi sinirsiz; maliyeti olan tek sey kaynaklara giden istek ve
+# o da saatte bir sweep.
 
 on:
   schedule:
     - cron: "30 * * * *"
   workflow_dispatch:
-    inputs:
-      date:
-        description: "Gun (YYYY-MM-DD, bos = en son gun)"
-        required: false
-        default: ""
-      force_send:
-        description: "true = yeni sonuc olmasa da gonder"
-        required: false
-        default: "false"
-      dry_run:
-        description: "true = Telegram'a gonderme, sadece yazdir"
-        required: false
-        default: "false"
 
 permissions:
   contents: write
@@ -48,50 +40,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Grade whatever has finished
-        run: python3 tools/grade_predictions.py
-
-      - name: Build the settled page and notify
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          D: ${{ inputs.date || '' }}
-          FORCE: ${{ inputs.force_send || 'false' }}
-          DRY: ${{ inputs.dry_run || 'false' }}
-        run: |
-          set -o pipefail
-          FLAGS=""
-          if [ "${FORCE}" = "true" ]; then FLAGS="${FLAGS} --force-send"; fi
-          if [ "${DRY}"   = "true" ]; then FLAGS="${FLAGS} --no-telegram"; fi
-          if [ -n "${D}" ]; then FLAGS="${FLAGS} --date ${D}"; fi
-          python3 tools/daily_results.py --out results.html ${FLAGS}
-
-      # BIRIKMIS ISTATISTIK. results.html BIR GUNU isaretler; bu sayfa butun gunleri
-      # toplar. Bir gunun isabet orani 20 bahiste yirmi puan oynar, yani tek gunluk sayi
-      # hicbir seye karar verdirmez — kumulatif olan verdirir, ve o simdiye kadar yalnizca
-      # terminalde vardi. Tamami data/predictions.jsonl'den yeniden turetiliyor, hicbir ozet
-      # dosyasi tasinmiyor: silinse bir sonraki kosu aynisini uretir.
-      - name: Rebuild the cumulative statistics
-        run: python3 tools/make_stats_page.py --out stats.html
-
-      # KUPON KODU SAAT BASI TAZELENIR, LISTE GUNDE BIR KEZ URETILIR. Ikisi ayri omurlu
-      # nesneler. Bir fikstur baslar baslamaz kitap kuponu FILTRELEMIYOR, yeniden KURUYOR
-      # ve yeniden kurulan kupon varsayilan bahis turunu aliyor: 06:43'te dogrulanmis 20
-      # tekli bahis, oglen acildiginda 13 bacakli KOMBINE olarak geliyor, ustelik sayfada
-      # hala "20 tekli bahis" yaziyor. Kodlarin omru de birkac gun; uc gun onceki her kod
-      # artik "Incorrect code" donuyor.
-      #
-      # Bu adim listeye dokunmuyor: gunun planini aliyor, baslamis olanlari cikariyor ve
-      # kalanlar icin kitaptan yeni bir kod istiyor.
-      - name: Refresh the bet-slip code from fixtures that have not started
-        run: python3 tools/refresh_coupon.py --report daily_report.json --page picks.html
-             || echo "kupon tazelenemedi — liste etkilenmedi"
-
-      # KOMBINE PLATFORMUNUN KENDI SONUC DONGUSU, AYNI SAATLIK GEREKCEYLE: bir bahis
-      # bittigi anda kombindeki o bacagin sonucu bellidir. Butun bacaklar sonuclanmadan
-      # kombine "beklemede" kalir (tools/grade_combine.py); yeni bir kombine URETMEZ.
       - name: Settle graded combines
         run: python3 tools/grade_combine.py || echo "kombine notlandirma atlandi"
+
+      - name: Refresh the bet-slip code from legs that have not started
+        run: python3 tools/refresh_combine.py --input combine.json
+             || echo "kupon tazelenemedi — kombine etkilenmedi"
 
       - name: Rebuild the combine-platform pages
         run: python3 tools/make_platform_pages.py || echo "platform sayfalari uretilemedi"
@@ -106,9 +60,7 @@ jobs:
             rejected.html combine_history.html combine_results.html lab.html \
             calibration.html model_versions.html proposed_changes.html \
             source_health.html runs.html settings.html"
-          git add results.html stats.html picks.html data/predictions.jsonl \
-            data/scoreboard.json data/results_sent.json data/combine_log.jsonl \
-            $PLATFORM_PAGES || true
+          git add combine.json data/combine_log.jsonl $PLATFORM_PAGES || true
           if git diff --cached --quiet; then
             echo "yeni sonuc yok"
             exit 0
@@ -123,17 +75,14 @@ jobs:
             git rebase --abort 2>/dev/null || true
             git fetch origin main && git reset --hard origin/main
             sleep $((i * 5))
-            # Notlandirma tamamen depodan yeniden turetilebiliyor, tahminler gibi
-            # kaybolmuyor: uzak durumu alip yeniden calistirmak dogru cevabi verir.
-            # Kombine notlandirmasi da ayni sekilde: data/combine_log.jsonl'daki secim
-            # alanlari degil, yalnizca settlement alani yeniden turetiliyor.
-            python3 tools/grade_predictions.py >/dev/null 2>&1 || true
-            python3 tools/make_stats_page.py --out stats.html >/dev/null 2>&1 || true
+            # Notlandirma tamamen depodan yeniden turetilebiliyor: data/combine_log.jsonl'
+            # daki secim alanlari degil, yalnizca settlement alani yeniden turetiliyor.
+            # Kupon tazeleme de ayni sekilde saf: combine.json'daki secimlerden yeniden
+            # hesaplaniyor, hicbir yeni bilgi tasimiyor.
             python3 tools/grade_combine.py >/dev/null 2>&1 || true
+            python3 tools/refresh_combine.py --input combine.json >/dev/null 2>&1 || true
             python3 tools/make_platform_pages.py >/dev/null 2>&1 || true
-            git add results.html stats.html picks.html data/predictions.jsonl \
-              data/scoreboard.json data/results_sent.json data/combine_log.jsonl \
-              $PLATFORM_PAGES || true
+            git add combine.json data/combine_log.jsonl $PLATFORM_PAGES || true
             git diff --cached --quiet && exit 0
             git commit -m "results: $(date -u +%Y-%m-%d) sonuclari (yeniden islendi)"
           done

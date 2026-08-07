@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
-"""Collect finished results from the book's OWN live feed, for every sport it runs.
+"""Collect finished results from the book's OWN live feed, for football and tennis.
 
     python tools/collect_live.py                      # one sweep
     python tools/collect_live.py --minutes 350        # keep sweeping for ~6 hours
-    python tools/collect_live.py --sports 10,6 --dry-run
+    python tools/collect_live.py --sports 4 --dry-run
 
 WHY THIS EXISTS. Every result source before this one was somebody else's: football-data
-for football, EuroLeague for basketball, MLB for baseball, Setka for table tennis. Each
-had to be found, checked against robots.txt by our crawler's name, qualified on its body,
-and each covered exactly one slice. Setka's archive is Setka Cup and nothing else, so 58%
-of the table tennis card — Pro League, TT-Cup, Masters — had no source at all, and
-volleyball, snooker, darts, futsal and handball had none either. Several of the obvious
-candidates are disallowed to us by name and that will not change.
+for football, TML/tennisexplorer for tennis. Each had to be found, checked against
+robots.txt by our crawler's name, qualified on its body, and each covered exactly one
+slice — tennisexplorer alone still leaves the Challenger/ITF/qualifying tail thin.
 
-The book is running all of those matches itself and publishing the score while they are
-played. `LiveFeed/Get1x2_VZip` returns, per live fixture: both names, both STABLE
-participant ids, the competition, the running score in `SC.FS`, the period breakdown in
-`SC.PS`, the current period in `SC.CPS`, and the format in `MIS` K=3. It is the same
-service-api this project already fetches its card from.
+The book is running these matches itself and publishing the score while they are played.
+`LiveFeed/Get1x2_VZip` returns, per live fixture: both names, both STABLE participant ids,
+the competition, the running score in `SC.FS`, the period breakdown in `SC.PS`, the
+current period in `SC.CPS`, and the format in `MIS` K=3. It is the same service-api this
+project already fetches its card from.
 
-So results are no longer looked for. They are WATCHED. One collector, every sport, every
-circuit the book carries — including the ones no free archive covers.
+So results are no longer looked for. They are WATCHED.
+
+SCOPE IS FIXED AT FOOTBALL AND TENNIS (docs/DECISIONS/0007) — SPORTS below once carried a
+finish condition for close to thirty sports the book runs (basketball, table tennis,
+volleyball, snooker, darts, esports and more), watched because the product's scope was
+"every sport the model can reach." It narrowed to the two sports engine/combine.py ever
+prices, so the finish conditions this file no longer needs were removed along with the
+adapters and models that would have consumed them, not left dormant.
 
 TWO WAYS A MATCH GETS WRITTEN DOWN, and the first is far better than the second:
 
@@ -61,84 +64,29 @@ UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 STATE = "data/live_state.json"
 
 # THE WATCH LIST, and it is deliberately a list of finish CONDITIONS rather than of sports.
-# A sport is here only when we can say what a completed match of it looks like; everything
-# else — motorsport, golf, the marble leagues, the card games, the simulated FIFA ladders —
-# is absent because that sentence cannot be written for it honestly.
+# Fixed at football and tennis (docs/DECISIONS/0007) — the only two sports the product
+# still scopes to.
 #
 #   unit    what the score counts, which decides the markets the model may price
 #           (engine/model_generic.HANDICAP_GROUPS keys off exactly this word)
 #   kind    "target"  a race to N sets/frames/maps/legs; the winner must REACH N
 #           "periods" a fixed number of scheduled periods
 #   n       the default for that rule, or None where the sport runs SEVERAL formats on the
-#           same card and the note must be read instead. Tennis (Bo3 and Bo5) and table
-#           tennis (Bo5 and Bo7) are the two that must be read.
+#           same card and the note must be read instead — tennis (Bo3 and Bo5) is exactly
+#           that case.
 #
 # For a PERIOD sport `n` documents the format and nothing more: `looks_finished` refuses
-# that whole class, so those sports are recorded only when the feed states the match is
-# over. The number is kept because it is the sentence that admitted the sport, and the
-# next person to touch the vanish path needs to see it.
+# that whole class, so football is recorded only when the feed states the match is over.
+# The number is kept because it is the sentence that admitted the sport, and the next
+# person to touch the vanish path needs to see it.
 SPORTS = {
     1:   ("goals",  "periods", 2),      # football — two halves
-    2:   ("goals",  "periods", 3),      # ice hockey — three periods
-    3:   ("points", "periods", 4),      # basketball — four quarters
     4:   ("sets",   "target",  None),   # tennis — Bo3 and Bo5 share a card
-    5:   ("runs",   "periods", 9),      # baseball — nine innings
-    6:   ("sets",   "target",  3),      # volleyball, indoor — best of five
-    8:   ("goals",  "periods", 2),      # handball — two halves
-    10:  ("sets",   "target",  None),   # table tennis — Bo5 and Bo7 share a card
-    12:  ("frames", "target",  None),   # billiards — pyramid, a race to frames
-    13:  ("points", "periods", 4),      # american football — four quarters
-    14:  ("goals",  "periods", 2),      # futsal — two halves
-    16:  ("sets",   "target",  2),      # badminton — best of three
-    17:  ("goals",  "periods", 4),      # water polo — four quarters
-    21:  ("sets",   "target",  None),   # darts — legs or sets, always noted
-    27:  ("goals",  "periods", 4),      # field hockey — four quarters
-    29:  ("sets",   "target",  2),      # beach volleyball — best of three
-    30:  ("frames", "target",  None),   # snooker — frame count is always noted
-    40:  ("maps",   "target",  None),   # esports — best of N maps, always noted
-    48:  ("points", "periods", 4),      # lacrosse — four quarters
-    49:  ("points", "periods", 4),      # netball — four quarters
-    60:  ("points", "target",  None),   # fencing — a bout is a race to 15 hits
-    66:  ("runs",   "periods", 2),      # cricket — two innings a side in a limited match
-    83:  ("runs",   "periods", 7),      # softball — seven innings
-    86:  ("maps",   "target",  None),   # counter strike
-    97:  ("maps",   "target",  None),   # dota
-    109: ("maps",   "target",  None),   # rocket league
-    125: ("maps",   "target",  None),   # call of duty
-    150: ("maps",   "target",  None),   # starcraft 2
-    282: ("sets",   "target",  None),   # padel — "5 Sets Match to 11 points", so it is read
-    283: ("sets",   "target",  None),   # pickleball
-    298: ("maps",   "target",  None),   # overwatch
-    180: ("points", "periods", 2),      # kabaddi — two halves
-}
-
-# NOT watched, and each for a reason rather than an omission. Data rather than a comment,
-# because tools/make_method_page.py reports it: "no source yet" and "cannot have a source"
-# are different answers and the operator should not have to guess which one applies.
-UNWATCHABLE = {
-    9:   "kazanan hakem kararı veya nakavtla belirlenir — skor ÇİFTİ yok, dolayısıyla "
-         "fark yok; genel model fark dağılımı kuruyor",
-    189: "kazanan hakem kararı veya nakavtla belirlenir — skor çifti yok",
-    307: "gösteri güreşi — sonucu önceden belirlenmiş",
-    11:  "1 / 0.5 / 0 puanlanır ve günlerce sürer — fark dağılımı yok",
-    18:  "yarış, ikili karşılaşma değil — sert kural 7",
-    37:  "yarış, ikili karşılaşma değil — sert kural 7",
-    41:  "sahada herkes birbirine karşı — ikili karşılaşma değil",
-    44:  "yarış, ikili karşılaşma değil — sert kural 7",
-    57:  "yarış, ikili karşılaşma değil — sert kural 7",
-    68:  "yarış, ikili karşılaşma değil — sert kural 7",
-    92:  "yarış, ikili karşılaşma değil — sert kural 7",
-    102: "yarış, ikili karşılaşma değil — sert kural 7",
-    220: "yarış, ikili karşılaşma değil — sert kural 7",
-    85:  "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
-    144: "simülasyon: bir video oyunu, gerçek bir karşılaşma değil — sert kural 9",
-    103: "simülasyon — sert kural 9",
-    321: "simülasyon — sert kural 9",
 }
 
 # Sports that can legitimately finish level. Everywhere else a tie in the last seen score
 # means we caught the match mid-flight, not that it ended that way.
-CAN_DRAW = {1, 8, 13, 14, 17, 27, 66}
+CAN_DRAW = {1}
 
 # What the feed says when a match is over. Checked case-folded and as a substring, because
 # the wording varies by sport ("Match finished", "Ended").
@@ -193,14 +141,10 @@ def fetch(sport):
 #
 # Storing them together would corrupt the very thing the model reads. 138,835 results of
 # ninety-minute football teach nothing about a ten-minute one, and the model cannot tell
-# from a stored row which it was looking at.
+# from a stored row which it was looking at. Tennis carries no declared period length at
+# all (a set is not a fixed duration), so it has no entry here.
 MIN_PERIOD_MINUTES = {
     1: 30,     # football — real halves are 40 or 45; everything short-sided is well below
-    2: 10,     # ice hockey — 15 or 20
-    3: 8,      # basketball — 10 or 12
-    8: 20,     # handball — 30
-    14: 15,    # futsal — 20
-    17: 5,     # water polo — 8
 }
 
 # "2 halves of 20 minutes" and "2x10" — the two ways a period length is declared.

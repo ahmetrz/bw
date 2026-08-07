@@ -458,9 +458,9 @@ def render_settings():
     import config
     rows = ""
     keys = ["MIN_ODDS", "MIN_MODEL_SURVIVAL", "ALLOW_PUSH_MARKETS", "DAILY_WINDOWS_HOURS",
-           "COMBINE_SPORTS", "MIN_COMBINE_CONFIDENCE", "MIN_COMBINE_COMBINED_PROBABILITY",
-           "COMBINE_BEAM_WIDTH", "COMBINE_MAX_LEAGUE_SHARE", "MAX_OVERROUND",
-           "STALENESS_MINUTES", "MAX_PER_FIXTURE"]
+           "EXCLUDED_SPORTS", "COMBINE_SPORTS", "MIN_COMBINE_CONFIDENCE",
+           "MIN_COMBINE_COMBINED_PROBABILITY", "COMBINE_BEAM_WIDTH",
+           "COMBINE_MAX_LEAGUE_SHARE"]
     for k in keys:
         v = getattr(config, k, None)
         v = sorted(v) if isinstance(v, (set, frozenset)) else v

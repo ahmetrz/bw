@@ -3,7 +3,7 @@
 
     python tools/collect_results.py --list
     python tools/collect_results.py --all
-    python tools/collect_results.py --source euroleague
+    python tools/collect_results.py --source tml
 
 AN ADAPTER'S ENTIRE JOB is to yield {date, home, away, home_score, away_score}. It owns no
 maths, no model, no probability and no calibration — engine/model_generic.py does all of
@@ -15,6 +15,13 @@ Every adapter declares the ROBOTS check that was actually performed, by our craw
 name, with the date. A source recorded as verified has twice become disallowed since this
 project started — FIVB, then cbv.com.br — so the check belongs next to the code that
 fetches, where it will be read, and not only in a research file.
+
+FOOTBALL AND TENNIS ONLY (docs/DECISIONS/0007). Adapters for basketball (EuroLeague),
+baseball (MLB) and table tennis (Setka) existed here and are gone, not merely unused —
+the product's scope narrowed to the two sports engine/combine.py ever prices, and a
+collector for a sport nothing reads is dead weight with a robots.txt check that will
+silently rot. Their old result files under data/results/ were left as a historical record
+rather than deleted; only the active collection code went.
 """
 import argparse
 import csv
@@ -109,99 +116,6 @@ def _fd_date(raw):
     d, m, y = parts
     y = f"20{y}" if len(y) == 2 else y
     return f"{y}-{m.zfill(2)}-{d.zfill(2)}"
-
-
-# ------------------------------------------------------------- basketball (sport 3)
-
-EL_BASE = "https://api-live.euroleague.net/v2/competitions/{c}/seasons/{c}{y}/games"
-
-
-def basketball(start=2007, end=2025):
-    """EuroLeague + EuroCup. Keyless JSON; no robots.txt on api-live.euroleague.net
-    (404), checked 2026-07-26. ESPN is deliberately NOT used: www.espn.com names
-    anthropic-ai with Disallow: /, and its api subdomains only escape that by being
-    separate hostnames."""
-    for comp, name in (("E", "EuroLeague"), ("U", "EuroCup")):
-        for year in range(start, end + 1):
-            raw = fetch(EL_BASE.format(c=comp, y=year))
-            if not raw:
-                continue
-            try:
-                payload = json.loads(raw.decode("utf-8", "replace"))
-            except json.JSONDecodeError:
-                continue
-            for g in (payload.get("data") if isinstance(payload, dict) else payload) or []:
-                if not g.get("played"):
-                    continue
-                loc, road = g.get("local") or {}, g.get("road") or {}
-                lc, rc = loc.get("club") or {}, road.get("club") or {}
-                if lc.get("isVirtual") or rc.get("isVirtual"):
-                    continue
-                yield {
-                    "date": (g.get("date") or "")[:10],
-                    "home": lc.get("name"), "away": rc.get("name"),
-                    "home_score": loc.get("score"), "away_score": road.get("score"),
-                    "home_id": lc.get("code"), "away_id": rc.get("code"),
-                    "league": name, "season": year, "unit": "points", "source": "euroleague",
-                    "neutral": bool(g.get("isNeutralVenue")),
-                }
-            time.sleep(0.3)
-
-
-# ----------------------------------------------------------- table tennis (sport 10)
-
-def table_tennis(paths=("data/tt_history.jsonl", "data/tt_results.jsonl")):
-    """Setka: the harvested BACK CATALOGUE plus whatever the two-hourly collector adds.
-
-    Reading only the collector's file was a real mistake and an instructive one: it holds a
-    rolling window of about 27 matches, so the store had 27 results, the model was refused
-    for having no usable calibration, and the sport looked unmodellable. The 9,035-match
-    history sat in data/tt_history.jsonl the whole time, harvested weeks earlier for the
-    hand-written model. Nothing was broken — the adapter was simply pointed at one of the
-    two files.
-
-    Setka's robots.txt allows everything (Allow: /), re-checked 2026-07-26.
-    """
-    for path in paths:
-        yield from _tt_file(path)
-
-
-def _tt_file(path):
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                r = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            # Setka stores the set tally as a two-element list, e.g. "sets": [1, 3].
-            # It was first read as a list of per-set pairs, which raised on the very first
-            # row — worth stating because it is the whole reason an adapter is this small:
-            # a format mistake here fails loudly and costs nothing, instead of quietly
-            # feeding a model.
-            sets = r.get("sets")
-            s1, s2 = r.get("p1_sets"), r.get("p2_sets")
-            if s1 is None and isinstance(sets, (list, tuple)) and len(sets) == 2:
-                s1, s2 = sets[0], sets[1]
-            yield {
-                "date": (r.get("date") or r.get("start") or "")[:10],
-                "home": r.get("p1_name") or r.get("p1"),
-                "away": r.get("p2_name") or r.get("p2"),
-                "home_id": r.get("p1_id"), "away_id": r.get("p2_id"),
-                "home_score": s1, "away_score": s2,
-                "league": r.get("tournament") or "Setka", "unit": "sets", "source": "setka",
-                # Setka Cup is best-of-five throughout: every one of the 25,725 stored
-                # matches was won 3-x, with three to five sets played. Declaring it puts
-                # this archive on the SAME rating scale as the best-of-five circuits the
-                # live watcher records, and off the best-of-seven ones — where the same
-                # set handicap is a different bet. Left undeclared, the archive sat in an
-                # unnamed pool and the live rows could not reach it.
-                "pool": "bo5",
-            }
 
 
 # ----------------------------------------------------------------- tennis (sport 4)
@@ -300,45 +214,6 @@ def tennis(start=2015, end=2026):
         time.sleep(0.3)
 
 
-# --------------------------------------------------------------- baseball (sport 5)
-
-MLB = ("https://statsapi.mlb.com/api/v1/schedule"
-       "?sportId=1&startDate={start}-01-01&endDate={start}-12-31&gameType=R")
-
-
-def baseball(start=2016, end=2026):
-    """MLB's own statsapi. Keyless, and statsapi.mlb.com serves no robots.txt (404,
-    checked 2026-07-26). Regular season only — spring training and exhibition games are
-    played by rosters that do not describe the team that turns up in the season."""
-    for year in range(start, end + 1):
-        raw = fetch(MLB.format(start=year))
-        if not raw:
-            continue
-        try:
-            payload = json.loads(raw.decode("utf-8", "replace"))
-        except json.JSONDecodeError:
-            continue
-        for day in payload.get("dates") or []:
-            for g in day.get("games") or []:
-                state = ((g.get("status") or {}).get("abstractGameState") or "")
-                if state != "Final":
-                    continue
-                teams = g.get("teams") or {}
-                home, away = teams.get("home") or {}, teams.get("away") or {}
-                if home.get("score") is None or away.get("score") is None:
-                    continue
-                yield {
-                    "date": (g.get("officialDate") or g.get("gameDate") or "")[:10],
-                    "home": (home.get("team") or {}).get("name"),
-                    "away": (away.get("team") or {}).get("name"),
-                    "home_id": (home.get("team") or {}).get("id"),
-                    "away_id": (away.get("team") or {}).get("id"),
-                    "home_score": home.get("score"), "away_score": away.get("score"),
-                    "league": "MLB", "season": year, "unit": "runs", "source": "mlb",
-                }
-        time.sleep(0.4)
-
-
 # ------------------------------------------------------- tennis, current (sport 4)
 
 TE_DAY = "https://www.tennisexplorer.com/results/?type=all&year={y}&month={m}&day={d}"
@@ -414,11 +289,8 @@ def tennis_current(days=7, today=None):
 
 ADAPTERS = {
     "football": (1, football),
-    "euroleague": (3, basketball),
     "tml": (4, tennis),
     "tennisexplorer": (4, tennis_current),
-    "mlb": (5, baseball),
-    "setka": (10, table_tennis),
 }
 
 

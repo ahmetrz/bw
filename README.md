@@ -1,48 +1,43 @@
-# Betwinner Odds Scanner + Football/Tennis Combine Platform
+# Betwinner Football & Tennis Combine Platform
 
-This repo now holds **two products** sharing one engine. Read `CLAUDE.md` first — it is
-the maintained operating brief for the original, live scanner. This README covers both
-products at a glance and how to run each one locally.
+A **single-book, two-sport** decision-support platform for Betwinner. Read `CLAUDE.md`
+first — it is the maintained operating brief. This README is a quick-start map.
 
-## Product 1 — the scanner (live, pre-existing)
+## What it does
 
-A **single-book** scanner. Pulls every open market on Betwinner across the configured
-tournaments, scores each selection by within-book cheapness (margin/limit/range), ranks
-them, returns the top 50 (`scan.py`). Separately, `tools/daily_report.py` runs once a day:
-model gives each match a DIRECTION, a safety ladder converts it to its safest form, one
-selection per match, sent to Telegram as `picks.html`. No reference book, no "value vs.
-sharp" claim — full detail in `CLAUDE.md`.
+Once a day it either produces **one combine** — a small, referee-reviewed,
+multi-objective-optimized accumulator across independent football and tennis matches,
+each scored 0–100 with full auditable reasoning — or it says plainly that no combine
+cleared the bar that day. Ten deterministic judges (no external LLM) can veto any
+selection. No reference book, no "value vs. sharp" claim, no bankroll sizing — full
+detail in `CLAUDE.md` and `docs/PRODUCT_VISION.md`; every design decision is recorded in
+`docs/DECISIONS/`.
 
-## Product 2 — the daily combine platform (added this session)
-
-A **football + tennis only** decision-support layer on top of the same engine. Once a day
-it either produces **one combine** — a small, referee-reviewed, multi-objective-optimized
-accumulator across independent matches, each scored 0–100 with full auditable reasoning —
-or it says plainly that no combine cleared the bar that day. Ten deterministic judges (no
-external LLM) can veto any selection. Full reasoning in `docs/PRODUCT_VISION.md` and
-`docs/ARCHITECTURE.md`; every design decision is recorded in `docs/DECISIONS/`.
+This repo used to also run a second, older product — a multi-sport top-N scanner. It was
+retired on 2026-08-07 so the combine platform could be the sole product; see
+`docs/DECISIONS/0007` for the full reasoning and exactly what was removed.
 
 ## Repo map
 
 ```
-scan.py                    Product 1 entrypoint: parse -> filter -> score -> rank -> top-N
-tools/daily_report.py      Product 1 daily run: fetch -> pick -> score -> picks.html -> Telegram
-tools/daily_combine.py     Product 2 daily run: own fetch, own 07:00 Istanbul cron -> combine.json
+tools/daily_combine.py     daily run: own fetch, 07:00 Istanbul cron -> combine.json
+tools/notify_combine.py    sends combine_report.pdf to Telegram with a short caption
 tools/grade_combine.py     settles data/combine_log.jsonl once results are known
+tools/refresh_combine.py   rebuilds the bet-slip code hourly from legs not yet started
 tools/make_pdf_report.py   combine.json -> combine_report.pdf (needs `pip install -r requirements.txt`)
-tools/make_platform_pages.py  the 14 new web screens, from combine.json + governance data
-tools/webshell.py          shared shell/CSS/escaping for the 14 new screens (NOT used by the old ones)
+tools/make_platform_pages.py  the 14 web screens, from combine.json + governance data
+tools/webshell.py          shared shell/CSS/escaping for the 14 screens
 tools/check_source_health.py  probes catalogued data sources, writes data/source_health.json
 engine/                    shared engine — see docs/ARCHITECTURE.md for the full module map
-config.py                  Product 1 config (unchanged) + a clearly-delineated Product 2 section
+config.py                  gates, thresholds, exclusions, windows — one product's worth
 docs/                      see docs/ARCHITECTURE.md for the full documentation index
-fixtures/                  real pulls = regression anchors (Product 1); reused by Product 2's tests
-tests/test_regression.py       Product 1's test suite — do not add Product 2 tests here
-tests/test_combine_platform.py Product 2's test suite — kept separate on purpose (docs/DECISIONS/0001)
-.github/workflows/         daily.yml is UNCHANGED (Product 1 only); combine.yml is new
-                            (Product 2, own 07:00 Istanbul cron, own fetch — docs/DECISIONS/0006);
-                            results.yml now settles + rebuilds pages for both products hourly;
-                            tests.yml is new (push/PR gate — did not exist before this session)
+fixtures/                  real pulls = regression anchors
+tests/test_regression.py       shared-engine + integration tests
+tests/test_combine_platform.py the platform's own tests (confidence, referee, optimizer, pages, PDF)
+.github/workflows/         combine.yml is the daily run (07:00 Istanbul, own fetch);
+                            results.yml settles + refreshes the coupon + rebuilds pages
+                            hourly; watch-live.yml watches football+tennis live results;
+                            tests.yml is the push/PR gate
 ```
 
 ## Running things locally
@@ -50,15 +45,11 @@ tests/test_combine_platform.py Product 2's test suite — kept separate on purpo
 Full walkthrough: `docs/LOCAL_SETUP.md`. Quick reference:
 
 ```bash
-# Product 1 — no install needed, stdlib only
-python scan.py --input fixtures/sample.json
-python -m unittest discover -s tests -v      # runs BOTH test files
-
-# Product 2 — no install needed for the pipeline itself
 python tools/daily_combine.py --input fixtures/sample.json --no-coupon
-python tools/make_platform_pages.py           # renders the 14 new screens from combine.json
+python tools/make_platform_pages.py           # renders the 14 screens from combine.json
+python -m unittest discover -s tests -v
 
-# Product 2's PDF needs the one dependency this repo takes
+# The PDF needs the one dependency this repo takes
 pip install -r requirements.txt
 python tools/make_pdf_report.py --input combine.json --out combine_report.pdf
 ```
@@ -66,17 +57,16 @@ python tools/make_pdf_report.py --input combine.json --out combine_report.pdf
 `--no-coupon` on `daily_combine.py` is important when testing locally: without it, a
 non-empty combine calls Betwinner's live slip-minting API (`engine/coupon.py`).
 
-## What's provisional / resolved this session
+## What's provisional / resolved
 
-- **Composite weights** (`config.WEIGHTS`, Product 1) — still provisional, tune against real data.
-- **Cadence** — resolved: Product 2 now runs on its own schedule (`combine.yml`, 07:00
-  Istanbul as the brief specifies), separate from Product 1's unchanged, still
-  operator-approved cadence. See `docs/GITHUB_ACTIONS.md` and `docs/DECISIONS/0006`.
-- **The tennis calibration split** (`data/proposed_changes.jsonl`,
-  `pmc-2026-08-06-tennis-split`) — reviewed, approved, and implemented this session; tennis
-  now produces picks. One disclosed side effect: basketball's calibration gap crossed the
-  admission threshold as a result (0.028→0.030) and basketball is temporarily refused —
-  see `docs/TENNIS_MODELS.md` and `docs/ROADMAP.md`.
+- **Cadence** — resolved: the daily run targets 07:00 Istanbul (`combine.yml`,
+  operator-approved). See `docs/GITHUB_ACTIONS.md` and `docs/DECISIONS/0006`.
+- **Sport scope** — resolved: fixed at football and tennis (`docs/DECISIONS/0007`), not
+  "every sport a model can reach."
+- **The tennis calibration split** — resolved: reviewed, approved, and implemented; tennis
+  produces picks at a 0.023 held-out calibration gap. See `docs/TENNIS_MODELS.md`.
+- **Notifications** — resolved: the existing Telegram bot and channel, reused rather than
+  a second setup (`tools/notify_combine.py`).
 
 Pure Python standard library for everything except PDF generation (`reportlab`, pinned in
 `requirements.txt`).

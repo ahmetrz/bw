@@ -1,20 +1,20 @@
 name: combine
 
-# Gunluk futbol+tenis KOMBINE platformu: docs/PRODUCT_VISION.md, docs/ARCHITECTURE.md.
-# Ayri bir urun (docs/DECISIONS/0001) ve — bu oturumdan itibaren — ayri bir zamanlama ve
-# ayri bir cekim (docs/DECISIONS/0006). Onceki halinde daily.yml'nin ayni isinde
-# calisiyordu (ikinci bir Betwinner cekimini onlemek icin); operator acikca platform
-# brief'inin "Turkiye saatiyle 07:00" gereksinimini onceki, paylasilan zamanlamadan daha
-# oncelikli tutmayi tercih etti, o yuzden bu is artik kendi cekimini yapiyor.
+# GUNLUK FUTBOL+TENIS KOMBINE PLATFORMU — TEK URUN (docs/PRODUCT_VISION.md,
+# docs/ARCHITECTURE.md, docs/DECISIONS/0007). Eski cok sporlu tarayici ve gunluk liste
+# urunu (scan.py, tools/daily_report.py, daily.yml) kaldirildi; bu is artik tek gunluk
+# calisma.
 #
 # HEDEF 07:00 ISTANBUL = 04:00 UTC (Turkiye 2016'dan beri sabit UTC+3, DST yok). Birincil
-# tetikleyici 04:43 UTC (07:43 Istanbul) — daily.yml/watch-live.yml'de zaten dogrulanmis
-# aynı gerekce ile ":00" degil ":43": GitHub'in zamanlanmis isleri "en iyi gayret" ile
-# calisiyor ve saat basina yakin dakikalar en kalabalik dilimler (daily.yml'nin kendi
-# gecmisinde tam "06:10" bir gun hic ateslenmedi). Iki yedek, --only-if-new ile.
+# tetikleyici 04:43 UTC (07:43 Istanbul) — ":00" degil ":43", cunku GitHub'in zamanlanmis
+# isleri "en iyi gayret" ile calisiyor ve saat basina yakin dakikalar en kalabalik
+# dilimler (watch-live.yml'de olculdu: "4 * * * *" kurulunca uc saatlik dilimden yalnizca
+# biri ateslendi). Iki yedek, --only-if-new ile: ilk kosu basarili olduysa butun kart
+# zaten data/combine_log.jsonl'de olur, yedekler yeniden yazmaz.
 #
-# GEREKEN SECRET'LAR: yok. Bu is henuz Telegram'a yazmiyor (docs/ROADMAP.md) — kombine
-# kodu ve PDF sadece repoya commit ediliyor, web panelinden okunuyor.
+# GEREKEN SECRET'LAR (yoksa is yine calisir, sadece bildirim atlanir):
+#   TELEGRAM_BOT_TOKEN   mevcut bot — gunluk liste urunuyle AYNI kanal, ikinci bir kurulum
+#   TELEGRAM_CHAT_ID     gerekmedi (docs/DECISIONS/0007)
 
 on:
   schedule:
@@ -50,13 +50,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Kimlik bilgilerini ONCE dogrula. Bozuk bir token'in cekimden SONRA ortaya cikmasi,
+      # gunun kombinesinin gidecegi yeri olmadigini en gec ogrenmek demektir. Token yoksa
+      # sorun degil (0 doner, is devam eder); token VARSA ve calismiyorsa is burada durur.
+      - name: Check Telegram credentials
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 tools/telegram_ping.py --quiet
+
       - name: Install PDF dependency
         run: pip install --quiet -r requirements.txt
 
-      # Kendi 24 saatlik penceresini kendi cekiyor — daily.yml'nin kartiyla PAYLASMIYOR
-      # (docs/DECISIONS/0006). Futbol+tenis disindaki sporlar da cekilir (fetch_window.py
-      # zaten butun karti ceker), combine.py zaten kendi icinde config.COMBINE_SPORTS'a
-      # daraltiyor — burada sport filtresi uygulamaya gerek yok.
+      # Kendi 24 saatlik penceresini kendi cekiyor (docs/DECISIONS/0006). Futbol+tenis
+      # disindaki sporlar da cekilir (fetch_window.py zaten butun karti ceker),
+      # combine.py zaten kendi icinde config.COMBINE_SPORTS'a daraltiyor — burada sport
+      # filtresi uygulamaya gerek yok.
       - name: Fetch 24h window
         if: inputs.use_committed_card != 'true'
         env:
@@ -103,7 +112,25 @@ jobs:
         run: python3 tools/make_pdf_report.py --input combine.json --out combine_report.pdf
              || echo "PDF uretilemedi — sayfa yine de yayinlanir"
 
-      # Gunluk dungudekiler: dunku/bugunku kombinelerin sonuclanip sonuclanmadigini
+      - name: Notify Telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 tools/notify_combine.py --input combine.json --pdf combine_report.pdf
+             || echo "Telegram bildirimi atlandi"
+
+      # SONUC DEPOSUNU VE MODELLERI HER GUN TAZELE — eski gunluk isin --all adimlarinin
+      # yerini alan, futbol+tenisle SINIRLI hali. Bilerek KOMBINEDEN SONRA: bugunun
+      # kombinesi hala DUNKU commit'te duran modelle kuruluyor, tazeleme bir sonraki
+      # kosuya hazirlaniyor. Ayni kosuda kurup ayni kosuda kullanmak, o gunun kismi
+      # verisindeki bir bozuklugun hemen o gun kullanilan modele sizmasi demek olurdu.
+      - name: Refresh the results store and rebuild the football/tennis models
+        run: |
+          python3 tools/collect_results.py --all || echo "toplama kismen basarisiz"
+          python3 tools/build_generic_model.py --sport 1 || echo "futbol modeli kurulamadi"
+          python3 tools/build_generic_model.py --sport 4 || echo "tenis modeli kurulamadi"
+
+      # Gunluk dongudekiler: dunku/bugunku kombinelerin sonuclanip sonuclanmadigini
       # kontrol eder (results.yml zaten saat basi yapiyor — bu bir yedek), kaynak saglik
       # durumunu tazeler (ayri, sik calisan pahali bir is olmasin diye buraya entegre
       # edildi — bolum 21.4), ve 14 ekrani yeniden uretir.
@@ -122,20 +149,25 @@ jobs:
           set -e
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # Ham cekim repoya girmiyor (daily.yml'yle ayni kural) — sadece bu platformun
-          # kendi ciktilari: combine.json/PDF, data/combine_log.jsonl, 14 ekran, kaynak
-          # saglik raporu, olasi yeni oneriler. data/models/history/ zaten "data/models"
-          # altinda (daily.yml'nin commit'iyle gider, burada degil).
+          # Ham cekim repoya girmiyor — sadece bu platformun kendi ciktilari: combine.json/
+          # PDF, data/combine_log.jsonl, 14 ekran, kaynak saglik raporu, olasi yeni
+          # oneriler, VE bu kosunun kendi tazeledigi sonuc deposu + futbol/tenis modelleri
+          # (data/models/history/ "data/models" altinda, ayrica eklenmiyor).
           PLATFORM_PAGES="combine.html referee.html dataquality.html scanned.html \
             rejected.html combine_history.html combine_results.html lab.html \
             calibration.html model_versions.html proposed_changes.html \
             source_health.html runs.html settings.html"
           git add combine.json combine_report.pdf data/combine_log.jsonl \
-            data/proposed_changes.jsonl data/source_health.json $PLATFORM_PAGES || true
+            data/proposed_changes.jsonl data/source_health.json data/results data/models \
+            $PLATFORM_PAGES || true
           git commit -m "combine: $(date -u +%Y-%m-%d) kombine" || echo "degisiklik yok"
 
-          # Gunluk is, saat basi sonuc dongusu ve canli izleyici de ayni dala yaziyor;
-          # rebase ile carpismayi onle (daily.yml/results.yml ile ayni desen).
+          # Saat basi sonuc dongusu ve canli izleyici de ayni dala yaziyor; rebase ile
+          # carpismayi onle (results.yml/watch-live.yml ile ayni desen). data/results ve
+          # data/models MINE'da DEGIL: bu iki dosya grubu her gun WHOLE yeniden yaziliyor
+          # (TROUBLESHOOTING.md), yani satir bazli bir rebase-merge guvenilir degil —
+          # cakisirsak UZAK durumu aliyoruz (izleyicinin ya da bir onceki kosunun) ve bu
+          # kosunun kendi refresh adimi zaten idempotent, bir sonraki kosuda yeniden yazar.
           MINE="combine.json combine_report.pdf data/combine_log.jsonl \
                 data/source_health.json $PLATFORM_PAGES"
           rm -rf /tmp/bwcombine && mkdir -p /tmp/bwcombine

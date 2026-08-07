@@ -241,16 +241,45 @@ _BASKETBALL = {
 }
 
 
+# These were marked `missing` for a Sackmann-derived, surface-aware model that was
+# considered and never built — the licence blocked it (Sackmann's archive is CC BY-NC-SA)
+# and stayed that way even after tennis was actually wired in through a completely
+# different route: engine/model_generic.py, on TML + tennisexplorer + the live watcher
+# (docs/TENNIS_MODELS.md, docs/DECISIONS/0007). Exactly the drift the table tennis
+# section above already had once — a modelled sport reporting zero live signals because
+# the registry described a plan instead of the pipeline that shipped. Corrected here,
+# against what tennis's model actually is today, not the surface-elo idea it replaced.
 _TENNIS = {
     1: [
-        S("elo_by_surface", "surface-specific rating; a clay rating misprices a hard court",
-          "missing", "Sackmann's archive is CC BY-NC-SA — non-commercial only",
-          tr="Zemine özel derece. Toprak kortta ölçülmüş bir derece, sert kortu yanlış "
-             "fiyatlar. Kaynak lisansı ticari olmayan kullanımla sınırlı."),
-        S("serve_hold_rate", "the base rate almost everything in tennis derives from",
-          "missing", "same licence constraint",
-          tr="Servis koruma oranı. Teniste neredeyse her şey bundan türer; aynı lisans "
-             "kısıtı nedeniyle elimizde yok."),
+        S("generic_rating", "counted rating from results alone; higher rating -> higher "
+                            "win probability for that side",
+          "live", "engine/model_generic.py, fitted on TML + tennisexplorer + the live "
+                  "watcher (38,749 matches); held-out calibration gap 0.023",
+          tr="Sayılmış derece. Elo gibi fit edilmiş değil, gerçekleşmiş sonuçlardan "
+             "SAYILARAK kurulur. Yüksek dereceli tarafın kazanma olasılığı yüksektir."),
+        S("bo3_bo5_pool_separation", "a Grand Slam men's draw plays best-of-five and every "
+                                     "other tour match best-of-three; pooled they are two "
+                                     "different games on one scale",
+          "live", "engine/model_generic.py pool key, read from TML's best_of column and "
+                  "from the live score for watcher-collected matches",
+          tr="Bo3/Bo5 ayrımı. Grand Slam erkekler tekleri beş set, geri kalan her şey üç "
+             "set üzerinden oynanır; ayrılmazsa aynı skalada iki farklı oyun karışır."),
+    ],
+    109: [   # set handicap
+        S("rating_gap", "a wide gap raises the chance of a straight-sets win, which is "
+                        "what decides whether +1.5 or +2.5 sets is the safe rung",
+          "live", "buckets the counted set-margin distribution by rating gap; gaps beyond "
+                  "the fitted range are refused rather than extrapolated",
+          tr="Derece farkı. Fark açıldıkça set kaybetmeden kazanma ihtimali artar; güvenli "
+             "basamağın +1.5 mi yoksa +2.5 set mi olduğuna bu karar verir."),
+    ],
+    182: [   # total sets
+        S("set_total_distribution", "the counted two-set/three-set split by rating gap "
+                                    "sets the totals ladder",
+          "live", "the same counted distribution as the handicap, read for the total "
+                  "instead of the margin",
+          tr="Set toplamı dağılımı. Aynı ölçülmüş dağılım, bu kez maçın kaç sette "
+             "bittiğini okumak için kullanılır."),
     ],
 }
 

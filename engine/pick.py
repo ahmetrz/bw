@@ -21,13 +21,14 @@ probability suggests, and that difference is exactly what a safety ladder exists
 import config
 from engine import ladder, model_football
 
-# Sports with a calibrated model. Everything else is counted as unmodelled rather than
-# guessed at, and that count is reported.
-#   10 table tennis — Setka ratings + a measured set-score distribution
-# Everything else goes through engine/model_generic.py, which admits a sport only when its
-# own held-out calibration says the model works. So this set is no longer the list of
-# sports the product covers — it is the list of sports with a HAND-WRITTEN model, and it
-# is meant to shrink.
+# Sports with a calibrated hand-written model. Everything else is counted as unmodelled
+# rather than guessed at, and that count is reported.
+# Everything goes through engine/model_generic.py, which admits a sport only when its own
+# held-out calibration says the model works. So this set is no longer the list of sports
+# the product covers — it is the list of sports with a HAND-WRITTEN model, and it is meant
+# to shrink. It is empty now: table tennis, the last sport that needed one, left the
+# product's scope entirely when it narrowed to football+tennis (see docs/DECISIONS), and
+# football left the set earlier than that —
 #
 # FOOTBALL LEFT IT. The hand-written Elo model is fitted on more history (298,950 results
 # against 138,823) and finds 18 selections the generic one does not, but its accuracy has
@@ -36,10 +37,12 @@ from engine import ladder, model_football
 # qualifies: 0.011 held out on 27,764 unseen fixtures. It offers fewer selections — 52
 # against 57 — and fewer, better-evidenced selections is what this product is.
 #
-# TABLE TENNIS HAS NOT. Its generic store holds 88 players against the 2,007 on Setka's
-# live rating index, so the generic model reaches almost nothing on a real card. The
-# hand-written one stays until the store catches up.
-MODELLED_SPORTS = {10}
+# Kept as a set rather than deleted outright: a future sport (within football+tennis, or
+# a sport the product's scope later widens to again) that needs a bespoke model before its
+# generic calibration catches up has somewhere to register one, gated the same way football
+# and table tennis both were — by calibration (hard rule 8), not by having been written
+# first.
+MODELLED_SPORTS = set()
 
 # Sports with no home-court/home-field advantage at all — every fixture is effectively at
 # a neutral site (tour tennis: whichever player is nominally "home" is just whoever sorts
@@ -60,15 +63,14 @@ def _win_push(row, probs):
     """(win, push) for one selection, or None if the model cannot price it.
 
     Dispatches on the model that produced `probs`, because each sport prices its rungs
-    from a different distribution: football from a scoreline matrix, table tennis from a
-    measured set distribution. The probs dict carries its own source so the two can never
-    be crossed — pricing a set handicap off a goals matrix would be silently meaningless.
+    from a different distribution — today that is always the generic model's, but the
+    dispatch stays rather than being collapsed to one call so a future hand-written model
+    in MODELLED_SPORTS (see above) can register its own rung pricing without this function
+    needing to change again.
     """
-    from engine import model_generic, model_tt
+    from engine import model_generic
 
     source = probs.get("_source")
-    if source == "setka":
-        return model_tt.rung_probs(row, probs)
     if source == "generic":
         return model_generic.rung_probs(row, probs)
     return model_football.rung_probs(row, probs)
@@ -166,30 +168,28 @@ def best(rows, sport_id, probs, min_odds=None, min_survival=None):
     return c[0] if c else None
 
 
-def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
-            generic=None):
+def resolve(sample, index=None, elo_model=None, min_name_score=0.82, generic=None):
     """Probabilities for one fixture from whichever model can reach it.
 
-    Football: our own Elo model is tried FIRST. It is fitted on 298,950 results across 39
-    divisions and can price a fixture in or out of season, whereas ClubElo publishes only
-    near-term fixtures for the leagues it covers. ClubElo stays as the fallback because it
-    reaches competitions our division list omits, including the smaller European ties.
-
-    Table tennis: the calibrated Setka model. Its match-winner probabilities are weak by
-    design — the fit says so — but its set distribution is strong, which is where the
-    ladder does its work.
+    Football: our own Elo model is tried FIRST, when MODELLED_SPORTS includes it. It is
+    fitted on 298,950 results across 39 divisions and can price a fixture in or out of
+    season, whereas ClubElo publishes only near-term fixtures for the leagues it covers.
+    ClubElo stays as the fallback because it reaches competitions our division list omits,
+    including the smaller European ties. Today MODELLED_SPORTS is empty (see above) so
+    football, like every other sport, is priced by the generic path below; this branch
+    stays so re-admitting a hand-written model is a one-line change, not a rewrite.
 
     Returns (probs, name_score, source) or (None, 0.0, None).
     """
-    from engine import model_elo, model_football as mf, model_generic, model_tt
+    from engine import model_elo, model_football as mf, model_generic
 
     home, away = sample.get("p1"), sample.get("p2")
     sport = sample.get("sport_id")
 
-    # The generic path first, for any sport that is not one of the two hand-written ones.
-    # `generic` is a dict of already-loaded, already-admitted models — a sport whose
-    # held-out calibration failed is simply not in it, so there is no way to price from a
-    # model the data does not support.
+    # The generic path first, for any sport that is not hand-written. `generic` is a dict
+    # of already-loaded, already-admitted models — a sport whose held-out calibration
+    # failed is simply not in it, so there is no way to price from a model the data does
+    # not support.
     if sport not in MODELLED_SPORTS:
         model = (generic or {}).get(sport)
         if not model:
@@ -199,35 +199,6 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
             neutral=sport in NEUTRAL_SPORTS)
         if probs and score >= 0.86:
             return probs, score, "generic"
-        return None, 0.0, None
-
-    if sport == 10:
-        # Setka's rating index FIRST, because on a measured card it reaches four times as
-        # many fixtures: 70 of 350 against 18, for 11 selections against 4. The generic
-        # model has the better evidence — a held-out calibration at 0.011, which the
-        # hand-written one does not have at all — so hard rule 8 says it should take over,
-        # and it will. What decides the order today is that Setka publishes live ratings
-        # for its own circuit and the generic store is still filling.
-        #
-        # THE GENERIC MODEL IS THE FALLBACK RATHER THAN THE REPLACEMENT, and it is not
-        # redundant: it now holds Pro League, Masters and TT-Cup players from the live
-        # watcher, which Setka's index does not carry at all. So the two cover different
-        # parts of the same card. Running them in sequence was checked before it was wired
-        # in — where both priced the same fixture they agreed on the direction AND on the
-        # ladder rung every time, so this adds reach without mixing two opinions.
-        # tools/compare_models.py re-runs that check; when the generic side wins on reach
-        # as well, swap the order and delete the hand-written model.
-        if tt:
-            probs, score = model_tt.lookup(tt[0], tt[1], home, away)
-            if probs:
-                return probs, score, "setka"
-        model = (generic or {}).get(sport)
-        if model:
-            probs, score = model_generic.lookup(
-                model, home, away,
-                home_id=sample.get("p1_id"), away_id=sample.get("p2_id"))
-            if probs and score >= 0.86:
-                return probs, score, "generic"
         return None, 0.0, None
 
     if sport == 1:
@@ -243,7 +214,7 @@ def resolve(sample, index=None, elo_model=None, min_name_score=0.82, tt=None,
 
 
 def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=None,
-                 min_name_score=0.82, tt=None, generic=None):
+                 min_name_score=0.82, generic=None):
     """Run the whole selection over a scan's worth of rows, one pick per match.
 
     `rows` should be UNFILTERED normalized rows, not the scored top-N: the ladder needs
@@ -268,7 +239,7 @@ def for_fixtures(rows, index=None, elo_model=None, min_odds=None, min_survival=N
             skipped["by_sport"][sport] = skipped["by_sport"].get(sport, 0) + 1
             continue
         probs, name_score, source = resolve(sample, index, elo_model, min_name_score,
-                                           tt, generic)
+                                           generic)
         if not probs:
             # The biggest bucket on a real card by a long way, and the one the coverage
             # report has to break down by sport: it is not "we did not look", it is "we

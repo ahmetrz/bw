@@ -11,6 +11,7 @@ report, and simply says the notification was skipped — a missing token should 
 a scan that otherwise succeeded.
 """
 import json
+import mimetypes
 import os
 import urllib.error
 import urllib.parse
@@ -88,7 +89,7 @@ def send(text, parse_mode="HTML", disable_preview=True):
 
 
 def send_document(path, caption="", timeout=60, parse_mode=None):
-    """Upload a file (the picks page) as a document. Returns (sent, detail).
+    """Upload a file (an HTML page or the combine PDF) as a document. Returns (sent, detail).
 
     Telegram truncates a caption at 1024 characters and rejects the message outright if
     the cut lands inside an HTML tag, so the caption is clipped on a LINE boundary — the
@@ -105,6 +106,11 @@ def send_document(path, caption="", timeout=60, parse_mode=None):
     with open(path, "rb") as f:
         content = f.read()
     name = os.path.basename(path)
+    # Guessed from the extension rather than hardcoded: this now uploads both the picks
+    # pages (.html) and the combine PDF (.pdf), and a mismatched Content-Type on the
+    # multipart file part is exactly the class of "looks fine, opens wrong" bug hard rule
+    # 10 exists to catch.
+    mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
 
     fields = [("chat_id", chat), ("caption", chunks(caption, 1000)[0] if caption else "")]
     if parse_mode:
@@ -118,7 +124,7 @@ def send_document(path, caption="", timeout=60, parse_mode=None):
         )
     parts.append(
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; "
-        f"filename=\"{name}\"\r\nContent-Type: text/html\r\n\r\n".encode()
+        f"filename=\"{name}\"\r\nContent-Type: {mime}\r\n\r\n".encode()
     )
     parts.append(content)
     parts.append(f"\r\n--{boundary}--\r\n".encode())

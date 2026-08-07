@@ -1,13 +1,9 @@
-"""Regression anchor: re-run fixtures/sample.json and assert the table has not moved.
+"""Regression + integration tests for the football+tennis combine platform's shared
+engine — the pipeline layer beneath tests/test_combine_platform.py's own suite.
 
-Standard library only — the project takes no pip dependencies.
+Standard library only — the project takes no pip dependencies for the core pipeline.
 
     python -m unittest discover -s tests -v
-
-The snapshot lives in fixtures/expected_report.json. Regenerate deliberately, never
-casually, and read the diff before you do:
-
-    python tests/test_regression.py --update
 """
 import collections
 import json
@@ -23,131 +19,24 @@ sys.path.insert(0, ROOT)
 
 import config  # noqa: E402
 from engine import (bwfeed, coupon, grade, ladder, mirror, model_generic,  # noqa: E402
-                    parlay, pick, rating, results_store, score, settlement, signals,
-                    simulated, stake, telegram)
-from tools import collect_live, daily_report, fetch_window  # noqa: E402
-from tools import grade_predictions, heartbeat  # noqa: E402
-from tools import daily_results as tools_daily_results  # noqa: E402
-from tools import make_method_page, make_picks_page  # noqa: E402
-
-sys.path.insert(0, os.path.join(ROOT, "tools"))
-import grade_predictions  # noqa: E402
+                    parlay, pick, rating, results_store, settlement, signals,
+                    simulated, telegram)
+from tools import collect_live, grade_predictions, heartbeat, refresh_combine  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
-SNAPSHOT = os.path.join(ROOT, "fixtures", "expected_report.json")
 
 
 def _sample():
     with open(SAMPLE) as f:
         return json.load(f)
 
-# Every field CLAUDE.md hard rule 1 requires on an emitted selection.
-REQUIRED_FIELDS = {
-    "odds", "implied_prob", "market_overround", "margin_score", "limit_score",
-    "range_score", "total_score", "limit", "staleness_seconds", "market_type",
-    "main_line", "flags",
-}
-
-
-def build_report():
-    """Run the real pipeline and return exactly what report.write_json would emit."""
-    with open(SAMPLE) as f:
-        data = json.load(f)
-    rows = score.filter_and_score(bwfeed.normalize(data))
-    out = []
-    for r in rows[: config.TOP_N]:
-        out.append({
-            "fixture_id": r["fixture_id"],
-            "match": f"{r['p1']} v {r['p2']}",
-            "start": r["start"],
-            "market_type": r["market_type"],
-            "main_line": r["main_line"],
-            "selection": r["selection"],
-            "odds": r["odds"],
-            "implied_prob": round(r["implied"], 4),
-            "market_overround": round(r["overround"], 4),
-            "limit": r["limit"],
-            "staleness_seconds": r["staleness_seconds"],
-            "margin_score": r["margin_score"],
-            "limit_score": r["limit_score"],
-            "range_score": r["range_score"],
-            "total_score": r["total_score"],
-            "flags": r["flags"],
-        })
-    return out
-
 
 class TestRegression(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.actual = build_report()
-        with open(SNAPSHOT) as f:
-            cls.expected = json.load(f)
-
-    def test_row_count_unchanged(self):
-        self.assertEqual(len(self.actual), len(self.expected))
-
-    def test_table_unchanged(self):
-        for i, (a, e) in enumerate(zip(self.actual, self.expected)):
-            self.assertEqual(a, e, f"row {i + 1} changed:\n  got      {a}\n  expected {e}")
-
-    def test_hard_rule_1_every_row_carries_every_field(self):
-        for i, row in enumerate(self.actual):
-            missing = REQUIRED_FIELDS - set(row)
-            self.assertFalse(missing, f"row {i + 1} is missing {sorted(missing)}")
-
-    def test_suppress_alt_lines_when_main_line_exists(self):
-        """SUPPRESS rule 2 — no alternative line may be emitted in a default scan."""
-        self.assertFalse(config.INCLUDE_ALT_LINES, "fixture assumes a main-line-only scan")
-        for i, row in enumerate(self.actual):
-            self.assertNotIn("alt_line", row["flags"], f"row {i + 1} is an alt line")
-
-    def test_no_placeholder_fixtures(self):
-        """Betwinner's feed carries 'Home v Away' template entries; they priced at the
-        lowest hold in the pull and took the entire top 24 before being suppressed."""
-        for row in self.actual:
-            self.assertNotEqual(row["match"], "Home v Away")
-
-    def test_scores_actually_discriminate(self):
-        """Guards the normalization bug: scaling the hold against a row-weighted max
-        squeezed every ordinary market into 0.95-1.00 and printed 1.000 for everything."""
-        scores = {r["total_score"] for r in self.actual}
-        self.assertGreater(len(scores), 5, f"only {len(scores)} distinct scores — flat again")
-
-    def test_more_than_one_market_type(self):
-        """CLAUDE.md's first-run sanity check: a table that is all one market type is a
-        red flag. It was 100% totals under every weighting tried, because one global
-        hold scale ranked every totals market above every 1X2. Scaling within each type
-        is what fixed it, and this is what would catch that regressing."""
-        types = collections.Counter(r["market_type"] for r in self.actual)
-        self.assertGreater(len(types), 1, f"top-N is a single market type: {dict(types)}")
-
-    def test_more_than_one_fixture(self):
-        """The other half of that check — one cheap fixture must not fill the table."""
-        fixtures = collections.Counter(r["fixture_id"] for r in self.actual)
-        self.assertGreater(len(fixtures), 1, "top-N came from a single fixture")
-
-    def test_cap_counts_matches_not_game_ids(self):
-        """A fixture and its halves are three game ids for ONE match. Capping on the
-        game id let a single match take 6 of 50 rows — CSKA Sofia v Spartak Trnava did
-        exactly that — because each id got its own allowance. The cap has to bind on
-        the match, which is what a reader of the table sees."""
-        cap = getattr(config, "MAX_PER_FIXTURE", 0)
-        if not cap:
-            self.skipTest("cap disabled")
-        worst = collections.Counter(r["match"] for r in self.actual).most_common(1)[0]
-        self.assertLessEqual(worst[1], cap, f"match {worst[0]!r} took {worst[1]} rows")
-
-    def test_ranked_descending(self):
-        s = [r["total_score"] for r in self.actual]
-        self.assertEqual(s, sorted(s, reverse=True))
-
     def test_settlement_is_stated_for_football(self):
         """A prediction app must say what a bet means. Football settlement is confirmed
         (90 minutes), so every football row must carry a settlement scope of 'regulation'
         and must NOT be flagged as needing confirmation."""
-        with open(SAMPLE) as f:
-            rows = score.filter_and_score(bwfeed.normalize(json.load(f)))
+        rows = bwfeed.normalize(_sample())
         settlement.annotate(rows)
         football = [r for r in rows if r.get("sport_id") == 1]
         self.assertTrue(football, "sample should contain football rows")
@@ -155,19 +44,6 @@ class TestRegression(unittest.TestCase):
             s = r["settlement"]
             self.assertEqual(s["scope"], "regulation")
             self.assertFalse(s["needs_confirmation"], "football settlement is confirmed")
-
-    def test_double_chance_is_scored_not_discarded(self):
-        """Double chance covers the three-way outcome space TWICE — 1X, 12 and X2 each
-        contain two of the three results — so its implied probabilities sum to about 2.
-        Read as a hold that meant 100%+, and MAX_OVERROUND then dropped every one of
-        them. That silently removed the top rung of the football safety ladder from the
-        scan: the operator's rule is to take 'does not lose' over the outright win, and
-        there was no 'does not lose' left to take."""
-        rows = score.filter_and_score(bwfeed.normalize(_sample()))
-        dc = [r for r in rows if r["market_type"] == "doubleChance"]
-        self.assertTrue(dc, "no double-chance rows survived scoring")
-        worst = max(r["overround"] for r in dc)
-        self.assertLess(worst, 0.25, f"double-chance hold computed as {worst:.1%} — coverage lost")
 
     def test_handicap_markets_have_both_sides(self):
         """A handicap is quoted as home -1.5 against away +1.5, so the two halves of one
@@ -227,47 +103,13 @@ class TestRegression(unittest.TestCase):
                         f"rung {r2} is {o2 / o1 - 1:.0%} dearer than {r1} — wrong side of the line?")
         self.assertGreater(checked, 5, "not enough fixtures carried a full ladder to test")
 
-    def test_excluded_sports_never_reach_the_ranking(self):
-        """RNG markets are the cheapest on the book, so the scorer would rank them first.
-
-        Betwinner's lottery markets measured a 3.09% median hold against football's 8.65%
-        — roughly three times cheaper than real sport. Since margin_score rewards a low
-        hold, a sweep that included them would be headed by lottery tickets, and no data
-        could ever justify one: past draws say nothing about the next, and the book can
-        compute the exact odds as well as we can.
-
-        Synthesises rows rather than requiring a live pull, so the guard holds offline.
-        """
-        excluded = getattr(config, "EXCLUDED_SPORTS", set())
-        self.assertTrue(excluded, "no sports are excluded — the RNG guard is off")
-
-        with open(SAMPLE) as f:
-            rows = bwfeed.normalize(json.load(f))
-        victim = sorted(excluded)[0]
-        # Copy real rows onto an excluded sport and make them the cheapest thing present,
-        # so they would sweep the table if the filter were not applied.
-        planted = []
-        for r in rows[:200]:
-            p = dict(r)
-            p["sport_id"] = victim
-            p["fixture_id"] = -abs(p["fixture_id"])
-            p["match_id"] = p["fixture_id"]
-            p["market_key"] = (p["fixture_id"], p["market_key"][1])
-            p["odds"] = 2.0
-            p["implied"] = 0.5      # two of these per market sum to 1.0 -> a 0% hold
-            planted.append(p)
-
-        scored = score.filter_and_score(rows + planted)
-        leaked = [r for r in scored if r.get("sport_id") in excluded]
-        self.assertFalse(leaked, f"{len(leaked)} rows from an excluded sport reached the ranking")
-
     def test_outrights_are_suppressed(self):
         """An entry with no second participant is not a head-to-head, and must not parse.
 
         The feed uses an empty O2 for tournament winners, election questions, novelty
         bundles that appear even inside football, and multi-runner races. All of them
-        break the machinery downstream: the parlay's one-selection-per-match rule has
-        nothing to bind on, and the safety ladder has no two-outcome market to walk down.
+        break the machinery downstream: the one-selection-per-match rule has nothing to
+        bind on, and the safety ladder has no two-outcome market to walk down.
 
         They are also the long-dated bets, and crucially the start timestamp does not say
         so — the 2026 Senate markets are stamped 5 to 16 days out because that is when the
@@ -562,7 +404,9 @@ class TestRegression(unittest.TestCase):
         with open(SAMPLE) as f:
             data = json.load(f)
         self.assertTrue(bwfeed.is_bwfeed(data))
-        self.assertIn(config.BOOK, bwfeed.books_in(data))
+        # "betwinner" is not a config knob — engine/bwfeed.py's own normalize() defaults
+        # to it, and this whole repo exists for one book.
+        self.assertIn("betwinner", bwfeed.books_in(data))
 
     def test_score_never_reads_the_price(self):
         """The 0-100 score must be computable without the odds, and blind to them.
@@ -623,160 +467,6 @@ class TestRegression(unittest.TestCase):
         self.assertEqual(rating.band(75.4), "sınırda")
         self.assertEqual(rating.score({"model_survival": 0.93, "name_match": 1.0,
                                        "division_matches": 9000})["band"], "çok güçlü")
-
-    def test_numbering_is_best_first_and_shared_across_windows(self):
-        """#1 is the day's best selection, and a bet keeps ONE number in both windows.
-
-        Numbering each window separately would put two different bets at #7 on the same
-        page, which is worse than no number at all.
-        """
-        def leg(mid, surv, line):
-            return {"match_id": mid, "market_key": ("k", line), "outcome_id": 1,
-                    "model_survival": surv, "name_match": 1.0, "division_matches": 9000}
-
-        short = [leg(2, 0.80, "17|2.5"), leg(1, 0.95, "17|5.5")]
-        full = [leg(3, 0.88, "8|"), leg(1, 0.95, "17|5.5"), leg(2, 0.80, "17|2.5")]
-        results = daily_report.number([
-            {"hours": 24, "picks": short}, {"hours": 48, "picks": full},
-        ])
-        by_hours = {r["hours"]: r["picks"] for r in results}
-
-        self.assertEqual([p["id"] for p in by_hours[48]], [1, 2, 3])
-        self.assertEqual([p["match_id"] for p in by_hours[48]], [1, 3, 2])
-        # The 24h window inherits the numbers rather than renumbering from 1.
-        self.assertEqual({p["match_id"]: p["id"] for p in by_hours[24]}, {1: 1, 2: 3})
-        for p in by_hours[24]:
-            self.assertEqual(p["score"], next(q["score"] for q in by_hours[48]
-                                              if q["match_id"] == p["match_id"]))
-
-    def test_picks_page_renders_every_selection_with_its_link(self):
-        """The page IS the deliverable now, so a dropped row is a dropped bet.
-
-        Also asserts the id/score/window data attributes the filters run on: a filter
-        reading an attribute that is not there fails silently by showing everything.
-        """
-        report = {
-            "generated": "2026-07-26T06:10:00+00:00", "link_host": "betwinner2.com",
-            "min_odds": 1.10, "min_model_survival": 0.75,
-            "windows": [
-                {"hours": 24, "matches": 3, "skipped": {"no_model": 1},
-                 "picks": [{"id": 1, "score": 88.0, "band": "güçlü", "model_pct": 88.0,
-                            "evidence_pct": 100.0, "model_survival": 0.88, "p1": "Napoli", "p2": "Carrarese",
-                            "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
-                            "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
-                            "odds": 1.10, "settlement": {"scope": "regulation"},
-                            "url": "https://betwinner2.com/en/line/1/1/2"}]},
-                {"hours": 48, "matches": 5, "skipped": {"no_model": 2},
-                 "picks": [{"id": 1, "score": 88.0, "band": "güçlü", "model_pct": 88.0,
-                            "evidence_pct": 100.0, "model_survival": 0.88, "p1": "Napoli", "p2": "Carrarese",
-                            "league": "Club Friendlies", "start": "2026-07-26T16:00:00+00:00",
-                            "sport_id": 1, "selection_tr": "Toplam gol 5.5 altı",
-                            "odds": 1.10, "settlement": {"scope": "regulation"},
-                            "url": "https://betwinner2.com/en/line/1/1/2"},
-                           {"id": 2, "score": 76.0, "band": "sınırda", "model_pct": 76.0,
-                            "evidence_pct": 100.0, "model_survival": 0.76, "p1": "Anna Lapa", "p2": "V. Shevchuk",
-                            "league": "Setka Cup", "start": "2026-07-27T09:00:00+00:00",
-                            "sport_id": 10, "selection_tr": "Anna Lapa +2.5 set handikap",
-                            "odds": 1.24, "settlement": {"scope": "match",
-                                                         "needs_confirmation": True},
-                            "url": "https://betwinner2.com/en/line/10/3/4"}]},
-            ],
-        }
-        out = os.path.join(ROOT, "fixtures", "_tmp_picks.html")
-        try:
-            n = make_picks_page.build(report, out)
-            with open(out, encoding="utf-8") as f:
-                page = f.read()
-        finally:
-            if os.path.exists(out):
-                os.remove(out)
-
-        self.assertEqual(n, 2)
-        self.assertEqual(page.count('<tr data-sport='), 2)
-        # The 24h pick is tagged with the window it first appears in, so "24 saat" is a
-        # real filter rather than a duplicate of the full list.
-        self.assertIn('data-window="24"', page)
-        self.assertIn('data-window="48"', page)
-        for needle in ('data-id="1"', 'data-score="88.0"', 'data-odds="1.24"', 'güçlü',
-                       "Napoli - Carrarese", "Masa Tenisi", "Futbol",
-                       "https://betwinner2.com/en/line/10/3/4"):
-            self.assertIn(needle, page)
-        # The count the model could NOT reach is on the page, not quietly left off it.
-        self.assertIn("modelsiz 2", page)
-        # Self-contained: it is opened from a Telegram attachment, often offline.
-        for external in ("http://", "src=", "<link"):
-            self.assertNotIn(external, page.replace("https://betwinner2.com", ""))
-
-    def test_picks_page_escapes_hostile_text(self):
-        """Team names come from the feed. One containing a quote or a tag must not be
-        able to break out of an attribute — the page is opened on the operator's phone."""
-        report = {"windows": [{"hours": 48, "matches": 1, "picks": [{
-            "id": 1, "score": 50.0, "band": "sınırda", "model_pct": 50.0, "evidence_pct": 1.0,
-            "p1": '<script>alert("x")</script>', "p2": 'O"Brien & Sons',
-            "league": "<b>x</b>", "start": "2026-07-26T16:00:00+00:00", "sport_id": 1,
-            "selection_tr": "5.5 altı", "odds": 1.5, "settlement": {},
-            "url": 'https://x.test/"onerror="alert(1)'}]}]}
-        out = os.path.join(ROOT, "fixtures", "_tmp_escape.html")
-        try:
-            make_picks_page.build(report, out)
-            with open(out, encoding="utf-8") as f:
-                page = f.read()
-        finally:
-            if os.path.exists(out):
-                os.remove(out)
-        self.assertNotIn("<script>alert", page)
-        self.assertNotIn('"onerror="', page)
-        self.assertIn("&lt;script&gt;", page)
-
-    def test_settled_page_marks_every_outcome_and_totals_them(self):
-        """The evening page is the morning page with results on it.
-
-        The badge map is keyed on engine/grade.py's own lowercase constants. An uppercase
-        key here matched nothing and rendered a fully settled day as all-pending — the
-        page looked right and said the opposite of the truth, which is the worst kind of
-        reporting bug.
-        """
-        for key in ("win", "loss", "push", "half"):
-            self.assertIn(key, make_picks_page.RESULTS_TR,
-                          f"grade.py emits {key!r} and the page cannot render it")
-        self.assertEqual(
-            sorted(make_picks_page.RESULTS_TR),
-            sorted([grade.WIN, grade.LOSS, grade.PUSH, grade.HALF]))
-
-        log = []
-        for i, res in enumerate([grade.WIN] * 3 + [grade.LOSS, grade.PUSH, None], 1):
-            log.append({
-                "date": "2026-07-26", "id": i, "score": 90.0 - i, "band": "güçlü",
-                "model_pct": 90.0 - i, "evidence_pct": 100.0, "model_survival": 0.9,
-                "p1": f"Ev {i}", "p2": f"Dep {i}", "league": "Test Ligi", "sport_id": 1,
-                "start": "2026-07-26T16:00:00+00:00", "odds": 1.5,
-                "selection_tr": "Toplam gol 5.5 altı", "url": "https://x.test/1",
-                "result": res, "final_score": [2, 1] if res else None,
-            })
-        report = tools_daily_results.as_report("2026-07-26", log)
-        out = os.path.join(ROOT, "fixtures", "_tmp_results.html")
-        try:
-            make_picks_page.build(report, out)
-            with open(out, encoding="utf-8") as f:
-                page = f.read()
-        finally:
-            if os.path.exists(out):
-                os.remove(out)
-
-        # Count the BADGES, not the word: the footer explains what a pending selection
-        # is not counted as, and that sentence names the outcomes too.
-        badge = lambda css, txt: page.count(f'class="badge {css}">{txt}')
-        self.assertEqual(badge("win", "KAZANDI"), 3)
-        self.assertEqual(badge("loss", "KAYBETTİ"), 1)
-        self.assertEqual(badge("push", "İADE"), 1)
-        # The one with no result must be shown as pending, never as a silent blank.
-        self.assertIn("BEKLİYOR", page)
-        self.assertIn('data-result="pending"', page)
-        # Hit rate counts decided legs only: 3 wins of 4 decided, the push set aside.
-        s = report["summary"]
-        self.assertEqual((s["win"], s["loss"], s["push"], s["graded"]), (3, 1, 1, 5))
-        self.assertAlmostEqual(s["hit_rate"], 0.75)
-        self.assertIn("%75.0", page)
 
     def test_a_model_is_admitted_only_by_held_out_calibration(self):
         """The gate that replaces judgement about whether a sport is "ready".
@@ -1010,94 +700,53 @@ class TestRegression(unittest.TestCase):
         self.assertIsNotNone(model_generic.lookup(model, "A", "B")[0])
 
     def test_every_modelled_sport_has_a_live_signal(self):
-        """A sport that produces selections must have something marked live behind it.
+        """Every sport actually in the product's scope must have something marked live
+        behind it.
 
         The registry said table tennis had ZERO live signals for weeks after its model was
         fitted and wired, and nothing noticed until a generated page put the two side by
-        side. A modelled sport with no live signal is either a stale registry or a model
-        running on nothing, and both need to be seen.
+        side. A sport with no live signal is either a stale registry or a model running on
+        nothing, and both need to be seen. Checked over config.COMBINE_SPORTS rather than
+        pick.MODELLED_SPORTS: the latter is the (now empty) list of HAND-WRITTEN models —
+        see engine/pick.py — and both football and tennis run on the generic model, not on
+        one of those.
         """
-        for sid in pick.MODELLED_SPORTS:
+        for sid in config.COMBINE_SPORTS:
             cov = signals.coverage(sid)[sid]
             self.assertGreater(
                 cov["live"], 0,
-                f"sport {sid} is modelled but engine/signals.py lists no live signal")
-
-    def test_method_page_reports_coverage_without_flattering_it(self):
-        """The generated method page must state the gap, not imply it away.
-
-        1,261 researched mappings against 2 modelled sports is the honest headline, and a
-        long table is very good at implying the opposite.
-        """
-        out = os.path.join(ROOT, "fixtures", "_tmp_method.html")
-        try:
-            groups, mappings = make_method_page.build(out)
-            with open(out, encoding="utf-8") as f:
-                page = f.read()
-        finally:
-            if os.path.exists(out):
-                os.remove(out)
-
-        self.assertGreater(groups, 10)
-        self.assertGreater(mappings, 500)
-        self.assertIn(str(len(pick.MODELLED_SPORTS)), page)
-        for needle in ("Modelli", "Merdiven hazır, model yok", "Kapsam dışı",
-                       "puan = 100", "MIN_ODDS"):
-            self.assertIn(needle, page)
-        # Self-contained, like every page this project attaches to a Telegram message.
-        self.assertNotIn("<script src", page)
-        self.assertNotIn("<link", page)
-
-    def test_telegram_caption_never_splits_a_tag(self):
-        """Telegram caps a caption at 1024 characters and rejects the whole upload if the
-        cut lands inside an HTML tag. Clipping on a line boundary is what prevents a
-        working report from failing to send over a formatting detail."""
-        notice = "\n".join(f"<b>satır {i}</b> uzun bir açıklama metni" for i in range(60))
-        clipped = telegram.chunks(notice, 1000)[0]
-        self.assertLessEqual(len(clipped), 1000)
-        self.assertEqual(clipped.count("<b>"), clipped.count("</b>"))
-
-        # AND THE REAL NOTICE HAS TO FIT INSIDE THAT CLIP. Clipping is safe, not free: it
-        # drops whole trailing lines, and the last thing in this caption is the bet-slip
-        # code — the one line the operator actually acts on. Adding a paragraph anywhere
-        # above it silently deletes it, with nothing failing to say so.
-        picks = [{"id": i, "score": 90 - i, "band": "yüksek", "odds": 1.2,
-                  "p1": "A", "p2": "B"} for i in range(1, 40)]
-        results = [{"hours": 48, "picks": picks, "matches": 900, "skipped": {}},
-                   {"hours": 24, "picks": picks[:20], "matches": 500, "skipped": {}}]
-        real = daily_report.build_notice(
-            results, "picks.html", host="betwinner2.example", host_source="ayna",
-            source_note="kaynak: card_today.json.gz", coupon_code="F44SR",
-            coupon_detail="39 bacak, fiyatlar doğrulandı",
-            staking=stake.plan(picks))
-        self.assertIn("F44SR", telegram.chunks(real, 1000)[0])
+                f"sport {sid} is in scope but engine/signals.py lists no live signal")
 
     def test_the_watcher_reads_the_format_instead_of_assuming_it(self):
         """The live watcher decides a match is over from the book's own format note.
 
-        This matters most exactly where the collector is most useful. Table tennis runs
-        best-of-five and best-of-seven on the SAME day — Setka Cup against Masters — so
-        3-1 is a finished match on one circuit and a 3-1 lead on the other. Assuming
-        either would write down a wrong result at the precise moment the watcher is
-        earning its keep."""
-        def game(note, sport=10):
+        Tennis is the sport this matters most for: it runs best-of-three and best-of-five
+        on the SAME tour, on the SAME day, with no format note published at all, so 2-0 is
+        a finished match in one and a lead in the other. Assuming either would write down a
+        wrong result at the precise moment the watcher is earning its keep — see
+        test_tennis_is_collectable_even_though_it_states_no_format for that path in full;
+        this test is the underlying note parser."""
+        def game(note, sport=4):
             return {"MIS": [{"K": 1, "V": "Group A"}, {"K": 3, "V": note}]}
 
-        self.assertEqual(collect_live.format_of(game("5 Games Match"), 10), ("target", 3))
-        self.assertEqual(collect_live.format_of(game("7 Games Match"), 10), ("target", 4))
+        # Football genuinely publishes short-sided period notation on the card ("Short
+        # Football 3x3" at 2x5, "Subsoccer" at 2x5, "MLS+" at 2x10) — real notes, not
+        # invented ones.
+        self.assertEqual(collect_live.format_of(game("4x10", 1), 1), ("periods", 4))
+        self.assertEqual(collect_live.format_of(game("3x5", 1), 1), ("periods", 3))
+        # Tennis never actually publishes these forms today (it declares nothing at all —
+        # see below), but the parser itself is sport-agnostic string matching and has to
+        # be right regardless of which "target"-kind sport eventually sends it one.
+        self.assertEqual(collect_live.format_of(game("5 Games Match"), 4), ("target", 3))
+        self.assertEqual(collect_live.format_of(game("7 Games Match"), 4), ("target", 4))
         # The explicit form wins over the headline count when the note carries both.
         self.assertEqual(
-            collect_live.format_of(game("7 Frames Match (4 Frames up to win)", 30), 30),
+            collect_live.format_of(game("7 Sets Match (4 Sets up to win)"), 4),
             ("target", 4))
-        self.assertEqual(collect_live.format_of(game("Best of 3 maps"), 40), ("target", 2))
-        # Duration notation is a PERIOD count, not a race: 4x10 is four quarters.
-        self.assertEqual(collect_live.format_of(game("4x10"), 3), ("periods", 4))
-        self.assertEqual(collect_live.format_of(game("3x5"), 2), ("periods", 3))
-        # No note: a sport with a single format may fall back to it, one with several
-        # may NOT, and the ones with several are exactly tennis and table tennis.
-        self.assertEqual(collect_live.format_of({}, 6), ("target", 3))
+        self.assertEqual(collect_live.format_of(game("Best of 3 maps"), 4), ("target", 2))
+        # No note: a sport with a single format falls back to it (football always has
+        # one), one that runs several may NOT (tennis, Bo3 and Bo5 on the same card).
         self.assertEqual(collect_live.format_of({}, 1), ("periods", 2))
-        self.assertEqual(collect_live.format_of({}, 10), ("target", None))
         self.assertEqual(collect_live.format_of({}, 4), ("target", None))
 
     def test_the_watcher_refuses_a_match_it_cannot_prove_is_over(self):
@@ -1108,7 +757,7 @@ class TestRegression(unittest.TestCase):
         real one afterwards. So each branch that cannot answer refuses, and the cost of
         refusing is one result rather than a corrupted history."""
         def rec(**kw):
-            base = {"sport": 10, "kind": "target", "n": 4, "s1": 4, "s2": 2, "period": 0}
+            base = {"sport": 4, "kind": "target", "n": 4, "s1": 4, "s2": 2, "period": 0}
             base.update(kw)
             return base
 
@@ -1130,6 +779,8 @@ class TestRegression(unittest.TestCase):
                 "cps": "2nd half", "ts": 3000, "sls": "50 minutes"}
         self.assertFalse(collect_live.looks_finished(foot))
         self.assertFalse(collect_live.looks_finished({**foot, "period": 9}))
+        # A period sport with no CLOCK_FINISH entry (nobody has watched its clock to the
+        # end — see collect_live.CLOCK_FINISH) stays refused however complete it looks.
         self.assertFalse(collect_live.looks_finished(
             {"sport": 3, "kind": "periods", "n": 4, "s1": 91, "s2": 88, "period": 4}))
         # And the feed saying so needs no inference at all.
@@ -1137,157 +788,20 @@ class TestRegression(unittest.TestCase):
         self.assertFalse(collect_live.is_finished_now({"cps": "2nd half"}))
         # Once the feed HAS said so, a race's target is not guessed but read off the
         # result: a race ends when somebody reaches it, so the winner's tally is it. That
-        # recovers the fixtures whose format note the book omits — a real 0-4 at the CTT
-        # World Championship was thrown away for want of a "7 Games Match" line.
+        # recovers the fixtures whose format note the book omits — tennis declares one on
+        # only a small minority of live fixtures.
         got = collect_live.settle_target(
-            {"sport": 10, "kind": "target", "n": None, "s1": 0, "s2": 4})
+            {"sport": 4, "kind": "target", "n": None, "s1": 0, "s2": 4})
         self.assertEqual(got["n"], 4)
         self.assertTrue(collect_live.placeable(got))
         self.assertEqual(collect_live.to_result({**got, "p1": "A", "p2": "B",
                                                  "start": 1_753_500_000}, 0)["pool"], "bo7")
         # A stated format is never overwritten by the score.
         self.assertEqual(collect_live.settle_target(
-            {"sport": 10, "kind": "target", "n": 3, "s1": 3, "s2": 1})["n"], 3)
+            {"sport": 4, "kind": "target", "n": 3, "s1": 3, "s2": 1})["n"], 3)
         # And a period sport has no target to settle.
         self.assertIsNone(collect_live.settle_target(
             {"sport": 1, "kind": "periods", "n": None, "s1": 2, "s2": 1}).get("n"))
-
-    def test_the_slip_code_is_rebuilt_from_fixtures_that_have_not_started(self):
-        """The list is a document and the bet slip is a live object; they cannot share a
-        lifetime. A code minted with the 06:43 list has lost every fixture that kicked off
-        before the operator opened it, and the book rebuilds what remains as an
-        ACCUMULATOR — so the page went on saying "20 tekli bahis" about a 13-leg combo.
-        The refresher takes the day's plan, drops what has begun, and asks for a new one.
-
-        It may never add a selection: the list is the operator's, and a code that quietly
-        contained something they had not been shown would be a different product."""
-        from datetime import datetime, timezone
-        from tools import refresh_coupon
-        now = datetime(2026, 8, 1, 12, 0, tzinfo=timezone.utc)
-        report = {"windows": [{"hours": 24, "picks": [
-            {"id": 1, "game_id": 11, "outcome_id": 7, "odds": 1.2,
-             "market_key": [0, "2|1.5"], "start": "2026-08-01T18:00:00+00:00"},
-            # started three hours ago — gone
-            {"id": 2, "game_id": 12, "outcome_id": 7, "odds": 1.3,
-             "market_key": [0, "2|1.5"], "start": "2026-08-01T09:00:00+00:00"},
-            # kicks off inside the margin — treated as gone, because the book suspends a
-            # market before the whistle and one late leg refuses the whole slip
-            {"id": 3, "game_id": 13, "outcome_id": 7, "odds": 1.4,
-             "market_key": [0, "2|1.5"], "start": "2026-08-01T12:05:00+00:00"},
-            # below the daily cap: never in the code, whatever the clock says
-            {"id": 4, "game_id": 14, "outcome_id": 7, "odds": 1.5, "in_plan": False,
-             "market_key": [0, "2|1.5"], "start": "2026-08-01T20:00:00+00:00"},
-            # no betslip id: cannot be expressed as an event at all
-            {"id": 5, "outcome_id": 7, "odds": 1.6,
-             "market_key": [0, "2|1.5"], "start": "2026-08-01T20:00:00+00:00"},
-        ]}]}
-        got = refresh_coupon.open_picks(report, now=now)
-        self.assertEqual([p["game_id"] for p in got], [11])
-        # And when the whole day has started there is no code to give. A five-character
-        # code that loads nothing is worse than no code, so the page loses it.
-        late = datetime(2026, 8, 2, 0, 0, tzinfo=timezone.utc)
-        self.assertEqual(refresh_coupon.open_picks(report, now=late), [])
-
-    def test_a_results_site_names_players_differently_from_the_book(self):
-        """"Fritz T." and "Taylor Harry Fritz" are the same person and neither string
-        normalizes to the other, so an exact index misses every row from a source that
-        abbreviates — which is every live-score site there is. Tennis had no other source
-        at all, so without this bridge the sport stays permanently ungraded."""
-        gp = grade_predictions
-        self.assertEqual(gp.abbreviated("Fritz T."), (("fritz",), "t"))
-        self.assertEqual(gp.abbreviated("Van Assche L."), (("van", "assche"), "l"))
-        # A club name never ends in a lone letter, so the index this feeds stays empty for
-        # football without anyone listing which sports are played by people.
-        self.assertIsNone(gp.abbreviated("Manchester United"))
-        self.assertIsNone(gp.abbreviated("Bahia"))
-
-        rows = [("2026-07-27", (("fritz",), "t"), (("bergs",), "z"), 2, 0),
-                ("2026-07-28", (("dellien",), "h"), (("martinez",), "p"), 2, 0)]
-        self.assertEqual(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
-                                          "2026-07-27T14:00:00+00:00"), (2, 0))
-        # Either way round, with the score swapped to match — there is no home player.
-        self.assertEqual(gp.lookup_abbrev(rows, "Zizou Bergs", "Taylor Harry Fritz",
-                                          "2026-07-27T14:00:00+00:00"), (0, 2))
-        # A SPANISH DOUBLE SURNAME is why the surname is matched as a contiguous run
-        # rather than as a suffix: the site prints "Martinez" for "Pedro Martinez
-        # Portero", and a suffix test lost seven real matches on one card.
-        self.assertEqual(gp.lookup_abbrev(rows, "Pedro Martinez Portero", "Hugo Dellien",
-                                          "2026-07-28T12:00:00+00:00"), (0, 2))
-        # The initial still has to agree, or every player sharing a surname matches.
-        self.assertIsNone(gp.lookup_abbrev(rows, "Ricardo Fritz", "Zizou Bergs",
-                                           "2026-07-27T14:00:00+00:00"))
-        # And the date: these circuits replay the same pairing constantly.
-        self.assertIsNone(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
-                                           "2026-07-20T14:00:00+00:00"))
-
-    def test_a_fuzzy_result_match_refuses_the_two_ways_it_could_be_wrong(self):
-        """Grading football from a source that spells clubs its own way — "Carrarese" for
-        "Carrarese Calcio", "Aalesund" for "Aalesunds". It is the last route tried and the
-        only one that JUDGES rather than identifies, so both of its failure modes are
-        fenced: a variant is a different team, and an ambiguous name is no team at all."""
-        gp = grade_predictions
-        day = "2026-07-26T18:00:00+00:00"
-        rows = [("2026-07-26", "Carrarese", "Napoli", 1, 3),
-                ("2026-07-26", "Aalesund", "Viking", 1, 1)]
-        self.assertEqual(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio", day), (3, 1))
-        self.assertEqual(gp.lookup_fuzzy(rows, "Aalesunds", "Viking", day), (1, 1))
-
-        # A VARIANT IS A DIFFERENT TEAM. "Corinthians Paulista (Women)" shares every
-        # meaningful token with "Corinthians", and the model once priced four selections
-        # off the men's side for exactly that reason. A grader repeating it would settle
-        # the bet against another team's result.
-        wom = [("2026-07-26", "Corinthians", "Bahia", 1, 1)]
-        self.assertIsNone(gp.lookup_fuzzy(wom, "Corinthians Paulista (Women)", "Bahia", day))
-        self.assertEqual(gp.lookup_fuzzy(wom, "Corinthians Paulista", "Bahia", day), (1, 1))
-
-        # AMBIGUITY IS REFUSED OUTRIGHT. Two candidates within 0.05 mean the name does not
-        # identify one fixture, and taking the higher by a hair is how a wrong result gets
-        # written down as a right one. On a real card this declined 3 of 38.
-        twins = [("2026-07-26", "Atletico GO", "Bahia", 1, 0),
-                 ("2026-07-26", "Atletico MG", "Bahia", 0, 2)]
-        self.assertIsNone(gp.lookup_fuzzy(twins, "Atletico", "Bahia", day))
-        # And the date still bounds it, as everywhere else in this grader.
-        self.assertIsNone(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio",
-                                          "2026-07-20T18:00:00+00:00"))
-
-    def test_every_selection_is_staked_the_same_and_the_day_has_a_ceiling(self):
-        """Sizing is a RISK rule here, and it must not become an edge claim by accident.
-
-        Kelly and every other proportional rule sizes by edge — how far the price is from
-        the truth — and this product does not claim one. Feeding the model's probability
-        in anyway would convert "the model is 86% sure" into "the model is 86% sure AND
-        the book is wrong", size the bets on that, and never say it out loud. So every
-        stake is the same, and the only lever is how many of them there are."""
-        picks = [{"id": i, "odds": 1.10 + i * 0.05} for i in range(1, 8)]
-        s = stake.plan(picks, unit_pct=1.0, cap=4)
-        self.assertEqual([p["stake"] for p in picks], [1, 1, 1, 1, 0, 0, 0])
-        # Confidence does not size anything, and neither does price. Same stake, always.
-        self.assertEqual({p["stake"] for p in picks if p["in_plan"]}, {1.0})
-        self.assertEqual((s["placed"], s["left_out"]), (4, 3))
-        self.assertEqual(s["risk_pct"], 4.0)
-        # The cap follows the SCORE order, which is the numbering, not the list order.
-        shuffled = [{"id": i, "odds": 1.5} for i in (5, 1, 4, 2, 3)]
-        stake.plan(shuffled, unit_pct=1.0, cap=2)
-        self.assertEqual({p["id"] for p in shuffled if p["in_plan"]}, {1, 2})
-        # Break-even is arithmetic on the book's own prices and asserts nothing: four
-        # legs at 2.00 return the stake at exactly half.
-        self.assertAlmostEqual(stake.break_even_rate([2.0, 2.0, 2.0, 2.0]), 0.5)
-        self.assertIsNone(stake.break_even_rate([]))
-        # And a settled day is measured on what was actually RISKED. A selection under
-        # the cap is still evidence about the model — it was predicted and it settled —
-        # so it counts in the hit rate; it was not funded, so it must not move the money.
-        graded = [{"result": grade.WIN, "odds": 2.0, "stake": 1.0},
-                  {"result": grade.LOSS, "odds": 2.0, "stake": 1.0},
-                  {"result": grade.LOSS, "odds": 2.0, "stake": 0.0}]
-        got = grade.summarize(graded)
-        self.assertEqual(got["staked"], 2.0)
-        self.assertEqual(got["returned"], 2.0)
-        self.assertEqual(got["roi_pct"], 0.0)
-        self.assertAlmostEqual(got["hit_rate"], 1 / 3)
-        # Rows logged before staking existed carry no stake and stay one unit, which is
-        # what they were reported as at the time.
-        old = grade.summarize([{"result": grade.WIN, "odds": 2.0}])
-        self.assertEqual((old["staked"], old["returned"]), (1.0, 2.0))
 
     def test_the_clock_is_what_says_a_period_sport_is_over(self):
         """The score cannot end a football match; the clock can.
@@ -1395,14 +909,6 @@ class TestRegression(unittest.TestCase):
         self.assertEqual(stray["n"], 3)
         self.assertEqual(collect_live.to_result(
             {**stray, "p1": "A", "p2": "B", "start": 1_753_500_000}, 0)["pool"], "bo5")
-        # And it touches nothing else: a table tennis fixture with no readable format is
-        # still refused, because that sport DOES declare one and an absent note means the
-        # payload was not what we thought.
-        tt = collect_live.with_target(
-            {"sport": 10, "kind": "target", "n": None, "s1": 3, "s2": 1,
-             "league": "Setka Cup", "note": "", "period": 0})
-        self.assertIsNone(tt["n"])
-        self.assertFalse(collect_live.looks_finished(tt))
 
     def test_a_goalless_match_under_way_is_remembered(self):
         """`FS` omits zeros, so 0-0 arrives as an empty score. The clock separates a
@@ -1425,10 +931,10 @@ class TestRegression(unittest.TestCase):
 
         Two details do the work. The book's participant ids survive a rename and a
         transliteration where a name does not, and a race to four sets is a different bet
-        from a race to three — pooling them would rate a Masters player on a Setka Cup
-        scale and price a best-of-seven handicap off best-of-five history."""
+        from a race to three — pooling them would rate a player on a best-of-seven scale
+        off best-of-five history."""
         row = collect_live.to_result(
-            {"sport": 10, "league": "Masters. Russia", "p1": "A", "p2": "B",
+            {"sport": 4, "league": "Masters. Some Cup", "p1": "A", "p2": "B",
              "id1": "2778933", "id2": "4097977", "s1": 4, "s2": 2, "start": 1_753_500_000,
              "kind": "target", "n": 4}, 1_753_500_000)
         self.assertEqual(row["home_id"], "2778933")
@@ -1438,69 +944,13 @@ class TestRegression(unittest.TestCase):
         # And the store accepts it as it stands — no adapter-side repair on the way in.
         self.assertIsNotNone(results_store.clean(row))
         five = collect_live.to_result(
-            {"sport": 10, "p1": "A", "p2": "B", "s1": 3, "s2": 1, "start": 1_753_500_000,
-             "kind": "target", "n": 3, "league": "Setka Cup"}, 1_753_500_000)
+            {"sport": 4, "p1": "A", "p2": "B", "s1": 3, "s2": 1, "start": 1_753_500_000,
+             "kind": "target", "n": 3, "league": "ATP. Some Open"}, 1_753_500_000)
         self.assertEqual(five["pool"], "bo5")
         # A period sport has no such split, so it stays on one scale.
         self.assertNotIn("pool", collect_live.to_result(
             {"sport": 1, "p1": "A", "p2": "B", "s1": 1, "s2": 0, "start": 1_753_500_000,
              "kind": "periods", "n": 2, "league": "E0"}, 1_753_500_000))
-        # Except where the FORMAT is the scale. A Test innings runs to three hundred and a
-        # T20 innings to a hundred and eighty; pooled, the model would price a T20 run
-        # handicap off scores no T20 can reach. So cricket is placed by its format note,
-        # and a fixture without one is refused rather than dropped into the wrong pool.
-        crick = {"sport": 66, "p1": "A", "p2": "B", "s1": 180, "s2": 175,
-                 "start": 1_753_500_000, "kind": "periods", "n": 2, "note": "T20"}
-        self.assertEqual(collect_live.to_result(crick, 0)["pool"], "T20")
-        self.assertEqual(
-            collect_live.to_result({**crick, "note": "Test Match"}, 0)["pool"], "Test Match")
-        self.assertTrue(collect_live.placeable(crick))
-        self.assertFalse(collect_live.placeable({**crick, "note": ""}))
-
-    def test_a_second_model_may_fill_a_gap_but_never_overrule_a_refusal(self):
-        """A fallback model answers where the first CANNOT reach, never where it declined.
-
-        Table tennis runs two models: Setka's rating index reaches four times as many
-        fixtures on a real card (70 of 350 against 18), and the generic one now holds Pro
-        League, Masters and TT-Cup players from the live watcher that Setka's index does
-        not carry at all — 3 fixtures on the measured card. Running them in sequence adds
-        that reach.
-
-        What it must NOT do is ask the second model when the first said no. The confidence
-        floor exists to throw away what a model is not sure of; consulting another model
-        until one clears the floor would select for whichever happens to be overconfident,
-        and would do it invisibly. So the fallback is at the RESOLVE step — can this model
-        price this fixture at all — and never at the pick step."""
-        called = []
-
-        def tt_lookup(_m, _i, home, _away):
-            called.append(("setka", home))
-            # Setka knows this player and has an opinion.
-            return ({"_source": "setka"}, 1.0) if home == "known" else (None, 0.0)
-
-        def generic_lookup(_m, home, _away, home_id=None, away_id=None):
-            called.append(("generic", home))
-            return {"_source": "generic"}, 1.0
-
-        # resolve() imports these inside the function, so patch the modules themselves.
-        from engine import model_tt
-        with mock.patch.object(model_tt, "lookup", tt_lookup), \
-             mock.patch.object(model_generic, "lookup", generic_lookup):
-            # Setka can price it: the generic model is never consulted, whatever the
-            # ladder later decides about the rungs.
-            probs, _score, source = pick.resolve(
-                {"p1": "known", "p2": "x", "sport_id": 10},
-                tt=("model", "index"), generic={10: "gen"})
-            self.assertEqual(source, "setka")
-            self.assertNotIn("generic", [c[0] for c in called])
-
-            called.clear()
-            # Setka cannot reach this player at all — that is a gap, not a refusal.
-            probs, _score, source = pick.resolve(
-                {"p1": "unknown", "p2": "x", "sport_id": 10},
-                tt=("model", "index"), generic={10: "gen"})
-            self.assertEqual(source, "generic")
-            self.assertEqual([c[0] for c in called], ["setka", "generic"])
 
     def test_a_generated_competition_is_caught_without_touching_setka_cup(self):
         """A league is called generated on PHYSICAL IMPOSSIBILITY, nothing weaker.
@@ -1510,18 +960,21 @@ class TestRegression(unittest.TestCase):
         Setka Cup fixtures across 33 — the book templates prices for any thin market.
         A completed micro round-robin: RHL and UPVL both showed one, and so does Setka
         Cup, because that is genuinely how the circuit runs. Either rule would have
-        deleted the sport behind 25,738 stored results and a 0.011 calibration.
+        deleted a real sport behind a real calibration.
 
         What separates them is whether a body could keep the schedule. Berkut Volgograd
         starts at 02:50 and again at 04:20; an ice hockey game is not over in ninety
-        minutes. A Setka Cup player's matches sit thirty minutes apart and a best-of-five
-        is done in eighteen."""
+        minutes. A round-robin's matches sit thirty minutes apart and a race format is
+        done in well under that."""
         hour = 3600
 
         def fx(pairs, sport):
             return [(a, b, t) for a, b, t in pairs], sport
 
-        # RHL: a three-team cycle inside ninety minutes, in ice hockey.
+        # A three-team cycle inside ninety minutes, in a period sport (ice hockey, no
+        # longer in the product's own scope but still a real sport `impossible_schedule`
+        # must judge correctly for whatever the fetcher hands it — schedule physics do
+        # not depend on which sports this product happens to model).
         rhl, sport = fx([("berkut", "phoenix", 0),
                          ("phoenix", "elektronik", 40 * 60),
                          ("elektronik", "berkut", 90 * 60)], 2)
@@ -1529,13 +982,9 @@ class TestRegression(unittest.TestCase):
         self.assertTrue(bad)
         self.assertIn("üretilmiş", why)
 
-        # The SAME schedule in table tennis is ordinary — the sport is the whole point.
-        self.assertFalse(simulated.impossible_schedule(rhl, 10)[0])
-
-        # Setka Cup's real shape: four players, a full round-robin, half-hour spacing.
-        setka_like = [("a", "b", 0), ("c", "d", 30 * 60), ("a", "c", 60 * 60),
-                      ("b", "d", 90 * 60), ("a", "d", 120 * 60), ("b", "c", 150 * 60)]
-        self.assertFalse(simulated.impossible_schedule(setka_like, 10)[0])
+        # The SAME schedule in a race-format sport (a target of sets, not periods) is
+        # ordinary — a race can finish in minutes, so tight spacing is not evidence.
+        self.assertFalse(simulated.impossible_schedule(rhl, 4)[0])
 
         # A real group stage in a slow sport, spread over days, is fine too.
         spread = [("x", "y", 0), ("y", "z", 26 * hour), ("z", "x", 50 * hour)]
@@ -1547,7 +996,6 @@ class TestRegression(unittest.TestCase):
 
         # And the flagged set survives a round trip to disk, which is how the live
         # watcher learns about it — it never sees a whole card itself.
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "sim.json")
             simulated.save({(2, "RHL"): "why"}, path)
@@ -1570,15 +1018,9 @@ class TestRegression(unittest.TestCase):
             self.assertFalse(collect_live.real_format(1, note), note)
         for note in ("2x40", "2 halves of 40 minutes", "", None):
             self.assertTrue(collect_live.real_format(1, note), repr(note))
-        # Each sport judged against its own game: twenty-minute hockey periods are real,
-        # five-minute ones are not; ten-minute basketball quarters are real, four are not.
-        self.assertTrue(collect_live.real_format(2, "3x20"))
-        self.assertFalse(collect_live.real_format(2, "3x5"))
-        self.assertTrue(collect_live.real_format(3, "4x10"))
-        self.assertFalse(collect_live.real_format(3, "4x4"))
-        # A sport with no declared minimum is unaffected — table tennis notes a race, not
-        # a clock, and must not be caught by a rule about period lengths.
-        self.assertTrue(collect_live.real_format(10, "7 Games Match"))
+        # A sport with no declared minimum is unaffected — tennis notes a race, not a
+        # clock, and must not be caught by a rule about period lengths.
+        self.assertTrue(collect_live.real_format(4, "7 Games Match"))
 
         # And the guard is wired into the refusal, on both recording paths.
         short = {"sport": 1, "kind": "periods", "n": 2, "s1": 3, "s2": 2,
@@ -1589,13 +1031,13 @@ class TestRegression(unittest.TestCase):
     def test_a_missing_day_is_reported_and_a_quiet_one_is_not(self):
         """A workflow that does not run produces no failure to notice.
 
-        On 2026-07-27 the daily schedule never fired — not late, not at all — and nothing
-        said so. A missing list looks exactly like a card where nothing cleared the
-        confidence floor, and those are opposite situations: one is a real and expected
-        outcome, the other means nobody got their list. So the check asks whether today's
-        OUTPUT exists, from outside, on a different schedule, because a job that never
-        started cannot report anything about itself."""
-        yesterday = {"2026-07-26": 99}
+        On 2026-07-27 the (then daily-list) schedule never fired — not late, not at all —
+        and nothing said so. A missing run looks exactly like a card where nothing cleared
+        the confidence floor, and those are opposite situations: one is a real and expected
+        outcome, the other means nobody got their combine. So the check asks whether
+        today's OUTPUT exists, from outside, on a different schedule, because a job that
+        never started cannot report anything about itself."""
+        yesterday = {"2026-07-26": 1}
         # Before the day is due, silence is not evidence of anything.
         ok, _ = heartbeat.verdict(yesterday, "2026-07-27", 7, 9)
         self.assertTrue(ok)
@@ -1604,11 +1046,44 @@ class TestRegression(unittest.TestCase):
         ok, msg = heartbeat.verdict(yesterday, "2026-07-27", 10, 9)
         self.assertFalse(ok)
         self.assertIn("2026-07-27", msg)
-        self.assertIn("hiç tahmin kaydı yok", msg)
+        self.assertIn("hiç çalışma kaydı yok", msg)
         self.assertIn("2026-07-26", msg)          # yesterday, for comparison
-        # A day that did produce a list is not an alarm.
-        ok, _ = heartbeat.verdict({**yesterday, "2026-07-27": 29}, "2026-07-27", 10, 9)
+        # A day that did produce a run is not an alarm.
+        ok, _ = heartbeat.verdict({**yesterday, "2026-07-27": 1}, "2026-07-27", 10, 9)
         self.assertTrue(ok)
+
+    def test_the_slip_code_is_rebuilt_from_legs_that_have_not_started(self):
+        """The combine is a document and the bet slip is a live object; they cannot share
+        a lifetime. A code minted with the morning combine has lost every leg that kicked
+        off before the operator opened it, and the book rebuilds what remains as an
+        ACCUMULATOR — so combine.json went on citing a code for legs no longer on it.
+        The refresher takes the day's combine, drops what has begun, and asks for a new
+        one.
+
+        It may never add a leg: the combine is the referee board's, and a code that
+        quietly contained something they had not approved would be a different product."""
+        from datetime import datetime as _dt, timezone as _tz
+        now = _dt(2026, 8, 1, 12, 0, tzinfo=_tz.utc)
+        combine = {"legs": [
+            {"_game_id": 11, "_outcome_id": 7, "odds": 1.2,
+             "_market_key": [0, "2|1.5"], "start": "2026-08-01T18:00:00+00:00"},
+            # started three hours ago — gone
+            {"_game_id": 12, "_outcome_id": 7, "odds": 1.3,
+             "_market_key": [0, "2|1.5"], "start": "2026-08-01T09:00:00+00:00"},
+            # kicks off inside the margin — treated as gone, because the book suspends a
+            # market before the whistle and one late leg refuses the whole slip
+            {"_game_id": 13, "_outcome_id": 7, "odds": 1.4,
+             "_market_key": [0, "2|1.5"], "start": "2026-08-01T12:05:00+00:00"},
+            # no betslip id: cannot be expressed as an event at all
+            {"_outcome_id": 7, "odds": 1.6,
+             "_market_key": [0, "2|1.5"], "start": "2026-08-01T20:00:00+00:00"},
+        ]}
+        got = refresh_combine.open_legs(combine, now=now)
+        self.assertEqual([leg["game_id"] for leg in got], [11])
+        # And when the whole day has started there is no code to give. A five-character
+        # code that loads nothing is worse than no code, so the combine loses it.
+        late = _dt(2026, 8, 2, 0, 0, tzinfo=_tz.utc)
+        self.assertEqual(refresh_combine.open_legs(combine, now=late), [])
 
     def test_a_coupon_leg_carries_the_line_the_backed_side_sees(self):
         """The bet-slip event must express the line from the BACKED side's point of view.
@@ -1660,8 +1135,10 @@ class TestRegression(unittest.TestCase):
         else is stored as 1. So Vid=2 was a SYSTEM bet with no valid combination, and the
         slips shipped as "20 tekli bahis" were systems.
 
-        What the code CAN promise is the legs and their prices. The bet type is the
-        operator's one control on the slip screen, and the page says which one."""
+        This product's OWN slip is meant to load as a combine (that is the whole point),
+        so what matters here is only that the code and its trim/drop accounting are
+        correct — not a warning about the bet type, which the old singles-list product
+        needed and this one does not."""
         picks = [{"game_id": i, "outcome_id": 10, "odds": 1.2,
                   "market_key": (0, "17|4.5")} for i in range(1, 61)]
         sent = {}
@@ -1725,11 +1202,6 @@ class TestRegression(unittest.TestCase):
             self.assertIn("kendi partner", detail)
         finally:
             coupon._post = real
-
-        # And the page must not claim the bet type it cannot set. It warns instead.
-        page = make_picks_page.COUPON
-        self.assertIn("KOMBİNE", page)
-        self.assertIn("TEKLİ", page)
 
     def test_the_slip_obeys_the_rules_about_what_may_be_combined(self):
         """The slip loads as an accumulator, so what may not be combined is not cosmetic —
@@ -1796,13 +1268,13 @@ class TestRegression(unittest.TestCase):
         points in table tennis and frames-worth-of-points in snooker. A model fitted on
         sets cannot answer any of those, so offering group 17 to a set-scored sport builds
         a ladder whose every rung is then refused — which from the outside is
-        indistinguishable from the model having no opinion. Volleyball's model is days
-        away; without this it would have arrived, been correct, and produced nothing.
+        indistinguishable from the model having no opinion.
 
         Reading the group right and the OUTCOME wrong fails exactly the same way: the
-        over/under ids are 9/10 only inside group 17. Every one of these sports returned
-        zero total rungs on a card that was quoting all four markets until that was
-        fixed."""
+        over/under ids are 9/10 only inside group 17. This is engine/ladder.py's own
+        sport-to-group table and is independent of which sports the live watcher currently
+        tracks (tools/collect_live.py) — the ladder has to classify a market correctly for
+        any sport the card carries, not only the ones this product models today."""
         def total_row(group, oid, line):
             return {"market_key": (1, f"{group}|{line}"), "outcome_id": oid,
                     "odds": 1.5, "p1": "A", "p2": "B"}
@@ -1838,107 +1310,43 @@ class TestRegression(unittest.TestCase):
         for group in ladder.LADDER_GROUPS:
             self.assertIn(group, settleable, group)
 
-    def test_the_wait_for_a_sport_is_measured_not_asserted(self):
-        """"When do the other sports show up" is answered from the collection ledger.
-
-        It cannot be answered from the results store, and the first version tried: the
-        store keeps each fixture's own DATE, not the moment we learned of it, so a watcher
-        that had run for three hours looked exactly like one that had run for a day. It
-        told the operator volleyball was 28 days away when the measured rate put it at
-        four. The ledger records what was collected and when, so the rate is per hour of
-        actual watching."""
-        with tempfile.TemporaryDirectory() as tmp:
-            path = os.path.join(tmp, "watch_log.jsonl")
-            with open(path, "w") as f:
-                for at, n in (("2026-07-26T22:35:00Z", 7), ("2026-07-26T23:57:00Z", 3)):
-                    f.write(json.dumps({"at": at, "sport": 6, "added": n}) + "\n")
-            ledger = [daily_report._read_ledger(path)]
-            got = daily_report._eta(6, 14, _ledger=ledger)
-        # 10 results over two runs 82 minutes apart. Two entries are two runs but only ONE
-        # gap between them, so the watching time is the span scaled by n/(n-1) — crediting
-        # both runs to one run's worth of hours would overstate the rate by half.
-        self.assertIn("günde ~", got)
-        self.assertIn("gün", got)
-        rate = int(re.search(r"günde ~(\d+)", got).group(1))
-        self.assertTrue(80 <= rate <= 95, got)
-
-        # Too little to say anything with: say nothing rather than extrapolate from one.
-        self.assertNotIn("günde ~", daily_report._eta(6, 14, _ledger=[[
-            {"at": "2026-07-26T22:35:00Z", "sport": 6, "added": 7}]]))
-        # A ledger that is not there at all is not an error.
-        self.assertEqual(daily_report._read_ledger("/nonexistent/watch_log.jsonl"), [])
-
-    def test_a_hit_rate_on_a_handful_of_legs_says_so(self):
-        """A percentage over three legs looks exactly like one over three hundred.
-
-        This project has twice been steered by a number that meant nothing: 87.1%
-        computed from matches that had not kicked off, and 100% computed from a single
-        leg. Both were arithmetically correct and both were printed in bold. The fix for
-        the first two was to stop producing them; the fix for the general case is to say
-        how much they rest on, on the PAGE and not only in the Telegram caption, because
-        the page is where the number is actually read."""
-        base = {"id": 1, "score": 90.0, "band": "güçlü", "p1": "A", "p2": "B",
-                "sport_id": 1, "start": "2026-07-26T12:00:00+00:00", "odds": 1.5,
-                "selection_tr": "x", "market_line": "17|2.5", "outcome_id": 10,
-                "model_survival": 0.9, "league": "L", "window": 24}
-        def page(picks, summary):
-            with tempfile.TemporaryDirectory() as tmp:
-                out = os.path.join(tmp, "results.html")
-                make_picks_page.build({"day": "2026-07-26", "picks": picks,
-                                       "summary": summary}, out)
-                with open(out) as f:
-                    return f.read()
-
-        thin = page([dict(base, result="win"), dict(base, id=2, result="loss")],
-                    {"win": 1, "half": 0, "push": 0, "loss": 1, "hit_rate": 0.5,
-                     "staked": 2, "returned": 1.5})
-        self.assertIn("sonuçlanan seçime dayanıyor", thin)
-        self.assertIn(str(make_picks_page.MIN_MEANINGFUL), thin)
-
-        # Once there is enough behind it, the caveat goes away rather than nagging.
-        many = page([dict(base, id=i, result="win") for i in range(40)],
-                    {"win": 40, "half": 0, "push": 0, "loss": 0, "hit_rate": 1.0,
-                     "staked": 40, "returned": 60.0})
-        self.assertNotIn("sonuçlanan seçime dayanıyor", many)
-
     def test_a_result_recorded_the_other_way_round_is_swapped_not_dropped(self):
         """Which participant is "home" belongs to the SOURCE, not to the match.
 
-        In table tennis and tennis there is no home side at all, so the book's O1/O2 and
-        Setka's p1/p2 are ordered independently. Keying results one way silently lost
-        matches that were sitting in the store — on the first real card, a Setka row read
-        "Lukas Rulc 3-1 Ondrej Mezera" while the prediction was on Mezera.
+        In tennis there is no home side at all, so the book's O1/O2 and a results source's
+        own ordering are independent. Keying results one way silently loses matches that
+        are sitting in the store.
 
         Losing them is the safe failure. Forgetting to swap the scores is the unsafe one:
         it settles the bet against the wrong player and reports it as a graded result."""
         with tempfile.TemporaryDirectory() as tmp:
             store = os.path.join(tmp, "results")
             os.makedirs(store)
-            with open(os.path.join(store, "10.jsonl"), "w") as f:
-                f.write(json.dumps({"date": "2026-07-26", "home": "Lukas Rulc",
-                                    "away": "Ondrej Mezera", "home_score": 3,
-                                    "away_score": 1, "source": "setka"}) + "\n")
+            with open(os.path.join(store, "4.jsonl"), "w") as f:
+                f.write(json.dumps({"date": "2026-07-26", "home": "Novak Player",
+                                    "away": "Marko Rival", "home_score": 3,
+                                    "away_score": 1, "source": "tennisexplorer"}) + "\n")
             with mock.patch.object(results_store, "STORE", store):
-                _by_id, by_name = grade_predictions.store_results(10)
+                _by_id, by_name = grade_predictions.store_results(4)
 
         start = "2026-07-26T14:15:00+00:00"
         # Asked in the store's own order: the scores come back as stored.
         self.assertEqual(
-            grade_predictions.lookup_result(by_name, "Lukas Rulc", "Ondrej Mezera",
+            grade_predictions.lookup_result(by_name, "Novak Player", "Marko Rival",
                                             start, elapsed_hours=10), (3, 1))
         # Asked the other way round: found, and SWAPPED.
         self.assertEqual(
-            grade_predictions.lookup_result(by_name, "Ondrej Mezera", "Lukas Rulc",
+            grade_predictions.lookup_result(by_name, "Marko Rival", "Novak Player",
                                             start, elapsed_hours=10), (1, 3))
-        # Which is what makes the settlement right: Mezera lost by two sets, so +2.5
+        # Which is what makes the settlement right: Rival lost by two sets, so +2.5
         # covers it and +1.5 does not.
-        got = grade_predictions.lookup_result(by_name, "Ondrej Mezera", "Lukas Rulc",
+        got = grade_predictions.lookup_result(by_name, "Marko Rival", "Novak Player",
                                               start, elapsed_hours=10)
         self.assertEqual(
-            grade.settle({"market_key": (0, "7099|2.5"), "outcome_id": 5749}, *got),
+            grade.settle({"market_key": (0, "109|2.5"), "outcome_id": 732}, *got),
             grade.WIN)
         self.assertEqual(
-            grade.settle({"market_key": (0, "7099|1.5"), "outcome_id": 5749}, *got),
+            grade.settle({"market_key": (0, "109|1.5"), "outcome_id": 732}, *got),
             grade.LOSS)
 
     def test_a_running_match_is_never_graded(self):
@@ -1956,10 +1364,10 @@ class TestRegression(unittest.TestCase):
             5, start, "2026-07-26T21:20:00+00:00"))
         self.assertTrue(grade_predictions.finished_enough(
             5, start, "2026-07-26T23:30:00+00:00"))
-        # A table tennis match is over in half an hour and must not wait on a football
+        # A tennis match can be over in well under an hour and must not wait on a football
         # clock, or a whole sport grades a day late.
         self.assertTrue(grade_predictions.finished_enough(
-            10, start, "2026-07-26T20:45:00+00:00"))
+            4, start, "2026-07-26T21:15:00+00:00"))
         # Unreadable timestamps refuse rather than default to "probably finished".
         self.assertFalse(grade_predictions.finished_enough(1, None, "2026-07-26T23:00:00"))
 
@@ -1974,6 +1382,68 @@ class TestRegression(unittest.TestCase):
             grade_predictions._nearest(yesterday, start, 1, elapsed_hours=1.2))
         self.assertEqual(
             grade_predictions._nearest(yesterday, start, 1, elapsed_hours=20.0), (9, 2))
+
+    def test_a_results_site_names_players_differently_from_the_book(self):
+        """"Fritz T." and "Taylor Harry Fritz" are the same person and neither string
+        normalizes to the other, so an exact index misses every row from a source that
+        abbreviates — which is every live-score site there is. Tennis had no other source
+        at all, so without this bridge the sport stays permanently ungraded."""
+        gp = grade_predictions
+        self.assertEqual(gp.abbreviated("Fritz T."), (("fritz",), "t"))
+        self.assertEqual(gp.abbreviated("Van Assche L."), (("van", "assche"), "l"))
+        # A club name never ends in a lone letter, so the index this feeds stays empty for
+        # football without anyone listing which sports are played by people.
+        self.assertIsNone(gp.abbreviated("Manchester United"))
+        self.assertIsNone(gp.abbreviated("Bahia"))
+
+        rows = [("2026-07-27", (("fritz",), "t"), (("bergs",), "z"), 2, 0),
+                ("2026-07-28", (("dellien",), "h"), (("martinez",), "p"), 2, 0)]
+        self.assertEqual(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
+                                          "2026-07-27T14:00:00+00:00"), (2, 0))
+        # Either way round, with the score swapped to match — there is no home player.
+        self.assertEqual(gp.lookup_abbrev(rows, "Zizou Bergs", "Taylor Harry Fritz",
+                                          "2026-07-27T14:00:00+00:00"), (0, 2))
+        # A SPANISH DOUBLE SURNAME is why the surname is matched as a contiguous run
+        # rather than as a suffix: the site prints "Martinez" for "Pedro Martinez
+        # Portero", and a suffix test lost seven real matches on one card.
+        self.assertEqual(gp.lookup_abbrev(rows, "Pedro Martinez Portero", "Hugo Dellien",
+                                          "2026-07-28T12:00:00+00:00"), (0, 2))
+        # The initial still has to agree, or every player sharing a surname matches.
+        self.assertIsNone(gp.lookup_abbrev(rows, "Ricardo Fritz", "Zizou Bergs",
+                                           "2026-07-27T14:00:00+00:00"))
+        # And the date: these circuits replay the same pairing constantly.
+        self.assertIsNone(gp.lookup_abbrev(rows, "Taylor Harry Fritz", "Zizou Bergs",
+                                           "2026-07-20T14:00:00+00:00"))
+
+    def test_a_fuzzy_result_match_refuses_the_two_ways_it_could_be_wrong(self):
+        """Grading football from a source that spells clubs its own way — "Carrarese" for
+        "Carrarese Calcio", "Aalesund" for "Aalesunds". It is the last route tried and the
+        only one that JUDGES rather than identifies, so both of its failure modes are
+        fenced: a variant is a different team, and an ambiguous name is no team at all."""
+        gp = grade_predictions
+        day = "2026-07-26T18:00:00+00:00"
+        rows = [("2026-07-26", "Carrarese", "Napoli", 1, 3),
+                ("2026-07-26", "Aalesund", "Viking", 1, 1)]
+        self.assertEqual(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio", day), (3, 1))
+        self.assertEqual(gp.lookup_fuzzy(rows, "Aalesunds", "Viking", day), (1, 1))
+
+        # A VARIANT IS A DIFFERENT TEAM. "Corinthians Paulista (Women)" shares every
+        # meaningful token with "Corinthians", and the model once priced four selections
+        # off the men's side for exactly that reason. A grader repeating it would settle
+        # the bet against another team's result.
+        wom = [("2026-07-26", "Corinthians", "Bahia", 1, 1)]
+        self.assertIsNone(gp.lookup_fuzzy(wom, "Corinthians Paulista (Women)", "Bahia", day))
+        self.assertEqual(gp.lookup_fuzzy(wom, "Corinthians Paulista", "Bahia", day), (1, 1))
+
+        # AMBIGUITY IS REFUSED OUTRIGHT. Two candidates within 0.05 mean the name does not
+        # identify one fixture, and taking the higher by a hair is how a wrong result gets
+        # written down as a right one. On a real card this declined 3 of 38.
+        twins = [("2026-07-26", "Atletico GO", "Bahia", 1, 0),
+                 ("2026-07-26", "Atletico MG", "Bahia", 0, 2)]
+        self.assertIsNone(gp.lookup_fuzzy(twins, "Atletico", "Bahia", day))
+        # And the date still bounds it, as everywhere else in this grader.
+        self.assertIsNone(gp.lookup_fuzzy(rows, "Napoli", "Carrarese Calcio",
+                                          "2026-07-20T18:00:00+00:00"))
 
     def test_the_books_own_id_beats_a_name_match(self):
         """Where the card and the store share the book's participant id, use it.
@@ -2018,50 +1488,14 @@ class TestRegression(unittest.TestCase):
         rows = bwfeed.normalize(_sample())
         self.assertTrue(any(r.get("p1_id") and r.get("p2_id") for r in rows))
 
-    def test_a_sport_skipped_before_fetching_is_still_reported(self):
-        """Cutting the fetch must not cut the coverage report.
-
-        The fetcher now drops excluded sports and non-head-to-head entries while reading
-        the fixture list, instead of after pulling a thousand markets for each of them —
-        on a live card that was 750 lottery draws and 311 races and outrights. But those
-        sports then never reach the normalized rows, and the coverage report is built from
-        those rows, so they would silently vanish from the one place that says what is on
-        the card and why it was left out. "Only football and table tennis" was true for
-        weeks precisely because nothing said so where it would be read."""
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            card = os.path.join(tmp, "card.json.gz")
-            # Through the fetcher's own helper, so writer and reader cannot drift into
-            # two filenames and quietly report a trimmed card as a complete one.
-            with open(fetch_window.skipped_path(card), "w") as f:
-                json.dump({"excluded_sport": {"82": 731, "314": 14},
-                           "not_head_to_head": {"44": 151}}, f)
-            got = daily_report.skipped_at_fetch(card)
-            self.assertEqual(got[82]["matches"], 731)
-            self.assertEqual(got[44]["reason"], "not_head_to_head")
-
-            rows = [{"sport_id": 1, "fixture_id": 7, "match_id": 7}]
-            results = [{"hours": 48, "picks": [], "matches": 1}]
-            cov = daily_report.coverage(rows, results, {}, card_path=card)
-            by_sport = {c["sport_id"]: c for c in cov}
-            self.assertIn(82, by_sport)
-            self.assertEqual(by_sport[82]["matches"], 731)
-            self.assertEqual(by_sport[82]["state"], "excluded")
-            self.assertIn(44, by_sport)
-            self.assertEqual(by_sport[44]["state"], "excluded")
-            # Biggest first, so the report opens on what actually fills the card.
-            self.assertEqual([c["matches"] for c in cov],
-                             sorted((c["matches"] for c in cov), reverse=True))
-        # A missing sidecar is not an error: an older card simply reports what it has.
-        self.assertEqual(daily_report.skipped_at_fetch("/nonexistent/card.json.gz"), {})
-
     def test_the_watch_list_is_a_list_of_finish_conditions(self):
         """A sport is watched only when we can say what finishing it looks like.
 
         The temptation is to sweep everything the book runs and sort it out later. But
         `data/results/` feeds ratings directly, and there is no honest finish rule for a
         marble race, a card game or a simulated FIFA ladder — nor is there anything worth
-        modelling in one. The watch list IS the statement of what we can settle."""
+        modelling in one. The watch list IS the statement of what we can settle, and today
+        it is fixed at football and tennis (docs/DECISIONS/0007)."""
         for sport, (unit, kind, n) in collect_live.SPORTS.items():
             self.assertIn(kind, ("target", "periods"), sport)
             self.assertIn(unit, ("goals", "points", "runs", "sets", "frames", "maps"),
@@ -2076,10 +1510,4 @@ class TestRegression(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    if "--update" in sys.argv:
-        rows = build_report()
-        with open(SNAPSHOT, "w") as f:
-            json.dump(rows, f, indent=2)
-        print(f"Wrote {len(rows)} rows to {SNAPSHOT}")
-    else:
-        unittest.main()
+    unittest.main()

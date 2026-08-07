@@ -1,65 +1,14 @@
-"""Single-book parlay construction, described only in Betwinner's own numbers.
+"""Deep-link construction, shared by anything that needs a Betwinner fixture URL.
 
-CLAUDE.md hard rule 4: a parlay inside one book cannot carry positive expectation, and
-this module must never present it as if it could. `summarize` returns the three figures
-that rule requires — combined decimal odds, combined book-implied probability, and the
-book expected-return multiple — so callers can display them together with the payout-cap
-caveat.
-
-The arithmetic, stated plainly: each leg multiplies the book's margin in again. At the
-7.14% median hold measured on real Betwinner data, one leg returns 0.9334 of stake in
-expectation and fifty legs return 0.9334^50 = 0.032. That is a 96.8% expected loss, and
-no choice of legs changes it — only the number of legs does.
+Historical note (docs/DECISIONS/0007): this module used to also build and summarize a
+single-book parlay in the book's own implied numbers (CLAUDE.md hard rule 4), for the
+now-retired scan path's opt-in `--parlay` output. That machinery — and the `overround`
+field it read, which nothing in the surviving pipeline computes — was removed with it.
+`betwinner_url` is unrelated to that and stays: every product this repo has ever had needs
+a link to the fixture it is describing.
 """
 import config
-
-
-def build(rows, legs=50, min_odds=1.10, max_odds=None):
-    """Pick at most one selection per fixture, best score first.
-
-    One-per-fixture is not a preference, it is a correctness requirement: two selections
-    from the same match are not independent, and books reject most such combinations on
-    the slip anyway.
-    """
-    picked, seen = [], set()
-    for r in rows:
-        if len(picked) >= legs:
-            break
-        # Group on the real-world match, not the game id: a fixture and its halves are
-        # three game ids for one match, and taking all three would break the rule and
-        # stack three correlated legs.
-        key = r.get("match_id", r["fixture_id"])
-        if key in seen:
-            continue
-        if r["odds"] < min_odds:
-            continue
-        if max_odds is not None and r["odds"] > max_odds:
-            continue
-        seen.add(key)
-        picked.append(r)
-    return picked
-
-
-def summarize(legs):
-    """The figures CLAUDE.md hard rule 4 requires. None of them is a value claim."""
-    if not legs:
-        return None
-    combined_odds = 1.0
-    combined_fair = 1.0
-    exp_return = 1.0
-    for r in legs:
-        combined_odds *= r["odds"]
-        # The book's own fair probability for this selection, after removing its margin.
-        combined_fair *= r["implied"] / (1.0 + r["overround"])
-        exp_return *= 1.0 / (1.0 + r["overround"])
-    return {
-        "legs": len(legs),
-        "combined_odds": combined_odds,
-        "combined_book_implied_prob": combined_fair,
-        "book_expected_return_multiple": exp_return,
-        "expected_loss_pct": 100.0 * (1.0 - exp_return),
-        "one_in": (1.0 / combined_fair) if combined_fair > 0 else float("inf"),
-    }
+from engine import mirror
 
 
 def betwinner_url(row, host=None):
@@ -70,28 +19,7 @@ def betwinner_url(row, host=None):
     quietly stop opening. The numeric path is used because the book redirects it to its
     own slugged form, so the link resolves without us guessing a competition slug.
     """
-    from engine import mirror
-
     sid, cid, fid = row.get("sport_id"), row.get("champ_id"), row.get("fixture_id")
     if not host:
-        import config
         host, _ = mirror.current(getattr(config, "REFERRAL_URL", None))
     return mirror.event_url(host, sid, cid, fid)
-
-
-def format_summary(s):
-    """Plain-text block. Says what the numbers are, and what they are not."""
-    if not s:
-        return "No legs to combine."
-    return "\n".join([
-        "=" * 68,
-        f"  PARLAY of {s['legs']} legs  (Betwinner's own numbers — NOT value)",
-        f"  combined decimal odds         : {s['combined_odds']:,.2f}",
-        f"  combined book-implied prob    : {s['combined_book_implied_prob']:.3e}"
-        f"   (~1 in {s['one_in']:,.0f})",
-        f"  book expected-return multiple : {s['book_expected_return_multiple']:.4f}",
-        f"  expected loss                 : {s['expected_loss_pct']:.2f}% of stake",
-        "  A single book cannot yield positive expectation on its own line.",
-        "  Also subject to Betwinner's per-slip payout cap and max-legs limit.",
-        "=" * 68,
-    ])

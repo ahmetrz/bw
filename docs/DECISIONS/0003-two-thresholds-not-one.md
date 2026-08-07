@@ -1,7 +1,15 @@
 # ADR 0003 — Two confidence thresholds, not one reconciled number
 
 **Date:** 2026-08-06
-**Status:** Accepted
+**Status:** Accepted. Note (2026-08-07, `docs/DECISIONS/0007`): the scan/daily-picks
+product this ADR contrasts the combine against no longer exists — it was retired, not
+merely deprioritized. The DECISION below is unaffected and still describes the code
+exactly: `MIN_MODEL_SURVIVAL` still gates every candidate `engine/pick.py` produces
+(now the combine platform's only consumer), and `MIN_COMBINE_CONFIDENCE` (80.0) is still
+a separate, additional filter applied only inside `engine/combine.py`, on top of that
+floor. Only the CONTEXT — "two products, two bars" — is now historical; there is one
+product, and it still has two thresholds for two different questions (does this candidate
+survive at all, and is it confident enough to sit in a combine).
 
 ## Context
 

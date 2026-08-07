@@ -1,7 +1,14 @@
 # ADR 0006 — The combine platform gets its own workflow, own cadence, own fetch
 
 **Date:** 2026-08-06
-**Status:** Accepted (supersedes the cadence portion of ADR 0001)
+**Status:** Accepted (supersedes the cadence portion of ADR 0001). Note (2026-08-07,
+`docs/DECISIONS/0007`): the cadence decision below is unchanged and still exactly what
+`combine.yml` runs. Two things it describes as open/unbuilt are not, any more —
+`daily.yml` was deleted rather than reverting to its pre-session shape (the product it
+served was retired, not merely left alone), and `combine.yml` DOES now send a Telegram
+notification (`tools/notify_combine.py`, added when the operator asked for the existing
+channel to be reused). Read the "Cadence chosen" section as current; read "Product 1" /
+"daily-picks list" references in Context/Consequences as historical.
 
 ## Context
 

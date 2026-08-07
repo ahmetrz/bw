@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-## Two products, one engine
+## One product, one engine
 
 ```
                     ┌─────────────────────────────────────────────┐
@@ -8,37 +8,53 @@
                     └───────────────────────┬───────────────────────┘
                                              │
                                     engine/bwfeed.py
-                              (normalize -> book-agnostic rows)
+                              (normalize -> book-agnostic rows,
+                               restricted to football+tennis)
                                              │
-                    ┌────────────────────────┴────────────────────────┐
-                    │                                                    │
-            engine/score.py                                    engine/pick.py
-       (within-book composite score,                    (model direction -> ladder ->
-        SUPPRESS rules, diversity cap)                    1.10 gate -> confidence floor)
-                    │                                                    │
-                    ▼                                                    ▼
-         ┌──────────────────────┐                        engine/rating.py (0-100 score)
-         │   SCAN PATH           │                                       │
-         │   scan.py, report.json│              ┌────────────────────────┴─────────────────────┐
-         │   top-N singles       │              │                                                  │
-         └──────────────────────┘      DAILY PICKS PATH                              COMBINE PLATFORM PATH
-                                     tools/daily_report.py                          tools/daily_combine.py
-                                     picks.html, Telegram                        (this session — see below)
+                                    engine/pick.py
+                          (model direction -> ladder -> 1.10 gate
+                                -> confidence floor)
+                                             │
+                                             ▼
+                                engine/rating.py (0-100 score)
+                                             │
+                    ┌────────────────────────┴─────────────────────┐
+                    │                                                 │
+            engine/dataquality.py                            engine/confidence.py
+       (reason-coded 0-100 data                        (full ConfidencePrediction:
+        quality score)                                  EV, implied prob, factors,
+                    │                                    risks, model version)
+                    └────────────────────────┬─────────────────────┘
+                                             │
+                                    engine/referee.py
+                              (10 judges + 2 board-level judges,
+                                   no external LLM)
+                                             │
+                                    engine/combine.py
+                              (beam search, multi-objective;
+                               empty is a normal outcome)
+                                             │
+                                    engine/coupon.py
+                              (mints + verifies the slip code)
+                                             │
+                    ┌────────────────────────┴─────────────────────┐
+                    │                                                 │
+            combine.json + combine_report.pdf                tools/notify_combine.py
+       (tools/make_pdf_report.py,                              (Telegram: PDF + caption)
+        tools/make_platform_pages.py -> 14 screens)
 ```
 
-The scan path (`scan.py`) and the daily-picks path (`tools/daily_report.py`) are the
-pre-existing, live product described in full in `CLAUDE.md`. This document does not
-re-describe them — it describes what this session added and exactly where it attaches.
+`docs/DECISIONS/0007` records the retirement of this repo's earlier, second product (a
+multi-sport top-N scanner) and the narrowing of scope to football+tennis; this document
+does not describe that retired product.
 
-## The combine platform, added this session
+## Pipeline, entrypoint by entrypoint
 
 ```
 tools/daily_combine.py           entrypoint: its own fetch, own 07:00 Istanbul cron
-                                  (combine.yml, docs/DECISIONS/0006), but reuses
-                                  daily_report.load_models() for the model layer — same
-                                  Elo/generic/ClubElo loading code as the daily-picks
-                                  path, restricts to football+tennis, calls
-                                  pick.for_fixtures() with those SAME models
+                                  (combine.yml, docs/DECISIONS/0006), restricts to
+                                  football+tennis, calls pick.for_fixtures() with the
+                                  loaded models (its own load_models() — see below)
         │
         ├─ engine/confidence.py  wraps rating.score() (UNCHANGED) into the full
         │                        ConfidencePrediction contract: EV, implied prob, factors
@@ -57,29 +73,47 @@ tools/daily_combine.py           entrypoint: its own fetch, own 07:00 Istanbul c
         │       └─ engine/referee.py   10 deterministic judge functions + 2 board-level
         │                              judges (correlation, final risk) — NO external LLM
         │
-        ├─ engine/coupon.py      UNCHANGED — mints the slip code from combine.py's chosen
-        │                        legs exactly as it already does for the daily-picks path
+        ├─ engine/coupon.py      mints the slip code from combine.py's chosen legs,
+        │                        verifies it before handing it over
         │
         ├─ combine.json          written; tools/make_platform_pages.py renders it into
-        │                        14 screens (tools/webshell.py: shared shell/CSS/escaping,
-        │                        deliberately separate from the old pages' own escaping)
+        │                        14 screens (tools/webshell.py: shared shell/CSS/escaping)
         │
         ├─ tools/make_pdf_report.py   combine.json -> combine_report.pdf (reportlab +
         │                             vendored DejaVu font, assets/fonts/ — see below)
         │
+        ├─ tools/notify_combine.py    sends combine_report.pdf to the existing Telegram
+        │                             channel with a short caption built from
+        │                             combine.json — a SEPARATE step from
+        │                             daily_combine.py, which runs before the PDF exists
+        │
         └─ data/combine_log.jsonl     one row per day, append-only selection fields,
                                        settlement filled in later by tools/grade_combine.py
                                        (reuses tools/grade_predictions.py's lookup tables)
+
+tools/refresh_combine.py         hourly (results.yml): rebuilds the bet-slip code from
+                                  legs that have not started yet — a slip is a live
+                                  object, not a document (see CLAUDE.md's coupon section)
 
 engine/governance.py             ProposedModelChange records (data/proposed_changes.jsonl,
                                   never auto-applied) + model-version archiving
                                   (data/models/history/<sport>/, called from
                                   tools/build_generic_model.py before every refit)
 
-engine/track_record.py           reads data/predictions.jsonl: Brier score, log loss,
+engine/track_record.py           reads data/combine_log.jsonl: Brier score, log loss,
                                   per-sport calibration, per-market gradeability — feeds
                                   both engine/referee.py's context and lab.html/calibration.html
 ```
+
+## `tools/daily_combine.py`'s own model-loading (`load()`, `within()`, `load_models()`)
+
+These three functions used to live in a separate module (`tools/daily_report.py`) shared
+between the scanner's own daily picks list and this platform. Once the scanner was
+retired (`docs/DECISIONS/0007`), the only remaining caller was `daily_combine.py` itself,
+so they were folded directly into it rather than left in an otherwise-empty module kept
+alive for three functions. `load_models()` also dropped the table-tennis (Setka) model
+loading it used to do alongside football's — table tennis is out of the product's scope
+entirely now, not merely unused by this one entrypoint.
 
 ## Why a beam search, not brute force or a simple greedy fill
 
@@ -88,14 +122,13 @@ worth of eligible legs is 2^n, a single greedy fill cannot trade a marginal leg 
 combined-probability cost of adding it, and the objective is deliberately non-linear
 (log-scaled odds utility, sqrt-scaled count utility) so integer programming's linear-
 objective sweet spot does not fit either. Verified against brute force on small candidate
-sets during this session (matches exactly, see the session's own testing, not repeated in
-this repo as a permanent test since it is O(2^n)).
+sets (matches exactly), not repeated in this repo as a permanent test since it is O(2^n).
 
 ## Data flow ownership — what writes what, and when
 
 | File | Written by | Cadence | Notes |
 |---|---|---|---|
-| `combine.json` | `tools/daily_combine.py` | daily (`combine.yml`, own 07:00 Istanbul cron + own fetch — `docs/DECISIONS/0006`) | rebuilt fresh each run |
+| `combine.json` | `tools/daily_combine.py` (build), `tools/refresh_combine.py` (coupon fields only) | daily build (`combine.yml`), hourly coupon refresh (`results.yml`) | legs are written once; `coupon_code`/`coupon_detail` are the only fields refreshed |
 | `combine_report.pdf` | `tools/make_pdf_report.py` | daily | from `combine.json` |
 | `data/combine_log.jsonl` | `tools/daily_combine.py` (append) / `tools/grade_combine.py` (settlement field only) | daily append, hourly settle | selection fields never rewritten once logged |
 | `data/proposed_changes.jsonl` | `engine/governance.propose()` | ad hoc, analyst-run | never auto-applied; status changes only via `governance.review()` |
@@ -105,24 +138,22 @@ this repo as a permanent test since it is O(2^n)).
 
 ## What was deliberately NOT built as new abstraction
 
-- **No Pydantic entity classes.** The brief's section 23 entity list (Event, Market,
-  Selection, DataQualityAssessment, …) already exists as precisely-shaped **dicts** flowing
-  through `engine/bwfeed.py` -> `engine/pick.py` -> `engine/rating.py` -> `engine/confidence.py`.
-  Introducing a parallel typed class hierarchy that nothing in the pipeline would actually
-  use would be exactly the "gereksiz mikroservis mimarisi" the brief warns against. This
-  document, `docs/CONFIDENCE_SCORING.md` and the test suite ARE the schema — precise,
-  enforced by tests, just not a separate class file.
+- **No Pydantic entity classes.** The brief's entity list (Event, Market, Selection,
+  DataQualityAssessment, …) already exists as precisely-shaped **dicts** flowing through
+  `engine/bwfeed.py` -> `engine/pick.py` -> `engine/rating.py` -> `engine/confidence.py`.
+  Introducing a parallel typed class hierarchy that nothing in the pipeline would
+  actually use would be exactly the kind of unneeded abstraction layer the brief warns
+  against. This document, `docs/CONFIDENCE_SCORING.md` and the test suite ARE the schema
+  — precise, enforced by tests, just not a separate class file.
 - **No microservices.** Everything is one Python process per pipeline step, invoked
-  sequentially from a GitHub Actions job, exactly like the pre-existing scanner.
+  sequentially from a GitHub Actions job.
 - **No live settings UI.** `settings.html` is read-only; changes are made by editing
   `config.py` like any other code change, with structural changes routed through
   `engine/governance.py`'s proposal record first.
 
-## Where the old and new pages meet
+## The 14 platform pages
 
-They don't share a template. `tools/make_picks_page.py` / `make_stats_page.py` /
-`make_method_page.py` each escape and render independently (already true before this
-session) and are unmodified. `tools/webshell.py` is a **second**, independent shell used
-only by the 14 new screens. Cross-linked by relative `<a href>` in the new pages' nav bar;
-the old pages do not link forward (`docs/DECISIONS/0001` — minimising risk to a live,
-tested page generator was worth more than a two-way nav bar).
+`tools/make_platform_pages.py` renders all 14 from `combine.json` + governance/track-
+record data through one shared shell (`tools/webshell.py`: CSS, escaping, navigation).
+One template, one escaping path, by design — a second, independently-formatted page
+generator would be a second chance to get escaping wrong.

@@ -3,15 +3,13 @@
 
     python tools/daily_combine.py --input data/betwinner_daily.json.gz
 
-A SEPARATE product from tools/daily_report.py's top-N picks list (docs/DECISIONS/0001,
-0003) — reuses the SAME already-fetched card and the SAME model loading
-(tools/daily_report.load_models), so this never re-downloads anything, but applies its
-own 80-point confidence floor, its own ten-judge referee board, and a genuine
+The product (docs/DECISIONS/0001, 0003, 0007) — fetches and normalizes its own card, then
+applies an 80-point confidence floor, a ten-judge referee board, and a genuine
 multi-objective selection (engine/combine.py) instead of a top-N list.
 
-Pipeline: fetch (reused) -> normalize (reused) -> restrict to football+tennis
-  -> pick.for_fixtures() (reused, same models) -> settlement + confidence + data quality
-  -> engine.referee (10 judges) -> engine.combine (beam search) -> coupon.create()
+Pipeline: fetch -> normalize -> restrict to football+tennis -> pick.for_fixtures()
+  -> settlement + confidence + data quality -> engine.referee (10 judges)
+  -> engine.combine (beam search) -> coupon.create() -> Telegram
   -> data/combine_log.jsonl (immutable, one row per day) -> combine.json
 
 Writes combine.json only; tools/make_platform_pages.py renders combine.html (and every
@@ -20,6 +18,7 @@ other new screen) from it in a separate step, the same separation of "produce da
 consistent screens rather than 18 independently-formatted ones.
 """
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -29,9 +28,68 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import config  # noqa: E402
-from engine import (bwfeed, combine, confidence, coupon, mirror, pick,  # noqa: E402
-                    rating, settlement, track_record, tr)
-from tools import daily_report  # noqa: E402
+from engine import (bwfeed, combine, confidence, coupon, mirror, model_elo,  # noqa: E402
+                    model_football, model_generic, pick, rating, results_store,
+                    settlement, simulated, telegram, track_record, tr)
+
+def load(path):
+    opener = gzip.open if path.endswith(".gz") else open
+    with opener(path, "rt") as f:
+        return json.load(f)
+
+
+def within(rows, hours, now=None):
+    """Rows whose fixture starts inside the window. Starts already past are dropped —
+    that is in-play territory and this is a pre-match product."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = now.timestamp() + hours * 3600
+    out = []
+    for r in rows:
+        start = r.get("start")
+        if not start:
+            continue
+        try:
+            ts = datetime.fromisoformat(start).timestamp()
+        except ValueError:
+            continue
+        if now.timestamp() <= ts <= cutoff:
+            out.append(r)
+    return out
+
+
+def load_models(rows):
+    """Load every model this pipeline can use, plus the simulated-league detector.
+
+    Returns (elo_model, generic, index, fake).
+    """
+    elo_model = model_elo.load()
+    if elo_model:
+        print(f"Elo model: {len(elo_model['divisions'])} divisions, "
+              f"{elo_model['matches']} matches fitted")
+    else:
+        print("Elo model absent — run tools/build_football_model.py", file=sys.stderr)
+
+    generic = {}
+    for sid in sorted(results_store.summary()):
+        model = model_generic.load(sid)
+        ok, why = model_generic.usable(model)
+        label = tr.sport(sid, str(sid))
+        print(f"generic model {label} ({sid}): {'ADMITTED' if ok else 'refused'} — {why}")
+        if ok:
+            generic[sid] = model
+
+    try:
+        index = model_football.build_index()
+        print(f"ClubElo fixtures indexed: {len(index)}")
+    except Exception as e:
+        print(f"ClubElo unavailable: {e}", file=sys.stderr)
+        index = {}
+
+    fake = simulated.leagues(rows)
+    for (sid, league), why in sorted(fake.items(), key=lambda kv: str(kv[0])):
+        print(f"simulated: {tr.sport(sid, str(sid))} / {league} — {why}")
+    return elo_model, generic, index, fake
+
 
 CONFIG_FINGERPRINT_KEYS = (
     "MIN_ODDS", "MIN_MODEL_SURVIVAL", "ALLOW_PUSH_MARKETS", "MIN_COMBINE_CONFIDENCE",
@@ -61,8 +119,8 @@ def build_context(now):
 
 def serialize_leg(p, host):
     """The public-facing shape of one leg for combine.json / combine.html — trims the
-    pick dict to what the report actually needs, same discipline engine/report.py
-    already applies to the scan output, rather than dumping every internal field."""
+    pick dict to what the report actually needs, rather than dumping every internal
+    field."""
     from engine import parlay
     return {
         "sport": tr.sport(p.get("sport_id"), str(p.get("sport_id"))),
@@ -83,6 +141,12 @@ def serialize_leg(p, host):
         "confidence": p.get("_confidence"),
         "referee": p.get("_referee"),
         "url": parlay.betwinner_url(p, host),
+        # THE BETSLIP id, not the deep-link id (CLAUDE.md: sending CI where the slip wants
+        # I loaded the wrong game once already). Kept only for tools/refresh_combine.py,
+        # which has to rebuild the day's slip code hourly from fixtures that have not
+        # started — a code minted once at fetch time is stale by the time anyone opens it,
+        # because the book rebuilds the slip the moment one leg kicks off.
+        "_game_id": p.get("game_id"),
         # kept for grading later — never shown as the headline number, only used to
         # reconstruct combine settlement once results are in
         "_market_key": list(p["market_key"]) if p.get("market_key") else None,
@@ -157,16 +221,16 @@ def main():
         print("bugünün kombine kaydı zaten var — yedek koşu hiçbir şeyi yeniden yazmıyor")
         return 0
 
-    data = daily_report.load(args.input)
+    data = load(args.input)
     if not bwfeed.is_bwfeed(data):
         print("Input is not a Betwinner feed pull — refusing to proceed.", file=sys.stderr)
         return 1
     rows = bwfeed.normalize(data)
     print(f"normalized rows: {len(rows)}")
 
-    elo_model, tt, generic, index, fake = daily_report.load_models(rows)
+    elo_model, generic, index, fake = load_models(rows)
 
-    windowed = daily_report.within(rows, args.hours)
+    windowed = within(rows, args.hours)
     windowed = [r for r in windowed if r.get("sport_id") in config.COMBINE_SPORTS]
     if fake:
         windowed = [r for r in windowed
@@ -174,7 +238,7 @@ def main():
     print(f"football+tennis rows in {args.hours:.0f}h window: {len(windowed)}")
 
     picks, skipped = pick.for_fixtures(rows=windowed, index=index, elo_model=elo_model,
-                                       tt=tt, generic=generic)
+                                       generic=generic)
     print(f"candidate picks: {len(picks)} (skipped: {skipped})")
     settlement.annotate(picks)
     rating.annotate(picks)          # scores + numbers 1..N, same as the daily-picks path

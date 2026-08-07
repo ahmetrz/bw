@@ -187,16 +187,18 @@ class TestRefereeResilience(unittest.TestCase):
         from tools import daily_combine
 
         with mock.patch("engine.confidence.annotate", side_effect=RuntimeError("boom")):
-            with mock.patch("tools.daily_combine.daily_report") as mock_dr, \
+            with mock.patch("tools.daily_combine.load") as mock_load, \
+                 mock.patch("tools.daily_combine.load_models") as mock_load_models, \
+                 mock.patch("tools.daily_combine.within") as mock_within, \
                  mock.patch("tools.daily_combine.bwfeed") as mock_bw, \
                  mock.patch("tools.daily_combine.pick") as mock_pick, \
                  mock.patch("tools.daily_combine.settlement"), \
                  mock.patch("tools.daily_combine.rating"):
-                mock_dr.load.return_value = {"fake": "data"}
+                mock_load.return_value = {"fake": "data"}
                 mock_bw.is_bwfeed.return_value = True
                 mock_bw.normalize.return_value = []
-                mock_dr.load_models.return_value = (None, None, {}, {}, {})
-                mock_dr.within.return_value = []
+                mock_load_models.return_value = (None, {}, {}, {})
+                mock_within.return_value = []
                 mock_pick.for_fixtures.return_value = ([], {})
                 import sys as _sys
                 old_argv = _sys.argv

@@ -1,7 +1,11 @@
 # ADR 0001 — Extend the existing scanner; do not replace it
 
 **Date:** 2026-08-06
-**Status:** Accepted
+**Status:** Superseded by ADR 0007 (2026-08-07) — the operator's later, explicit
+instruction was to retire the scanner entirely and run the combine platform as the sole
+product. Kept below unedited as the record of what was decided and why, at the time it
+was decided; it was the right call given what was known then, and reversed once the
+operator's own direction changed, not because it was wrong on its own terms.
 
 ## Context
 

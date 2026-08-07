@@ -1,6 +1,6 @@
 name: tests
 
-# Push/PR gate. Did not exist before this session — the daily/results/watch-live
+# Push/PR gate. Did not exist before this session — the combine/results/watch-live
 # workflows run the pipeline, nothing ran the test suite on a change before it merged.
 #
 # Kept CHEAP and DEPENDENCY-LIGHT on purpose, matching the project's own choice to take

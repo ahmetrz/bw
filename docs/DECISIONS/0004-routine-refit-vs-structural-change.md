@@ -1,7 +1,13 @@
 # ADR 0004 — Routine model refit is automatic; structural change is not
 
 **Date:** 2026-08-06
-**Status:** Accepted
+**Status:** Accepted. Note (2026-08-07, `docs/DECISIONS/0007`): the refresh step this ADR
+describes now lives in `combine.yml` (`daily.yml` was deleted with the scanner it served),
+and runs `--sport 1`/`--sport 4` explicitly rather than `--all` — the results store may
+still hold other, now-out-of-scope sports' historical data, and there is no reason to
+spend a daily refit on a model nothing reads. The DECISION itself (routine recalibration
+automatic and gated only by `model_generic.usable()`; structural change through
+`engine/governance.propose()`, never auto-applied) is unchanged.
 
 ## Context
 

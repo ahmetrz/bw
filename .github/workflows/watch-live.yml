@@ -1,33 +1,32 @@
 name: watch-live
 
-# Canli izleyici: kitabin KENDI canli akisindan biten maclari kaydeder.
+# Canli izleyici: kitabin KENDI canli akisindan biten futbol ve tenis maclarini kaydeder.
 #
-# NEDEN: Her sonuc kaynagi bugune kadar baskasinindi ve her biri tek bir dilimi
-# kapsiyordu — football-data futbolu, EuroLeague basketbolu, Setka ise sadece Setka Cup'i.
-# Masa tenisi kartinin %58'i (Pro League, TT-Cup, Masters) hicbir arsivde yoktu; voleybol,
-# snooker, dart, hentbol ve futsalin ise hic kaynagi yoktu. Aday kaynaklarin bir kismi
-# robots.txt'te bizim ajan adimiza kapali ve bu degismeyecek.
+# NEDEN: football-data.co.uk gunler gecikiyor ve Brazil/China/Norway gibi "extra"
+# dosyalari yillarca eski; TML arsivi alti ay gecikiyor ve tennisexplorer'in kapsamadigi
+# Challenger/ITF/qualifying kuyrugu var. Kitap bu maclarin hepsini kendisi oynatiyor ve
+# skoru oynanirken yayinliyor — bu is akisi LiveFeed'i tarar, her fikstürün son skorunu
+# hatirlar ve mac bittiginde (ya akis "Match finished" dedigi icin ya da fikstür akistan
+# dustugu icin) sonucu data/results/ altina yazar. tools/collect_live.py neyi kaydetmeyi
+# REDDETTIGINI aciklar.
 #
-# Kitap bu maclarin hepsini kendisi oynatiyor ve skoru oynanirken yayinliyor. Bu is akisi
-# LiveFeed'i tarar, her fikstürün son skorunu hatirlar ve mac bittiginde (ya akis "Match
-# finished" dedigi icin ya da fikstür akistan dustugu icin) sonucu data/results/ altina
-# yazar. tools/collect_live.py neyi kaydetmeyi REDDETTIGINI aciklar.
+# KAPSAM SABIT: FUTBOL VE TENIS (docs/DECISIONS/0007). tools/collect_live.py'nin SPORTS
+# listesi bunlarla sinirli — bu is bir zamanlar otuza yakin spor izliyordu (basketbol, masa
+# tenisi, voleybol, snooker, dart, e-spor ve digerleri), urunun kapsami engine/combine.py'nin
+# fiyatladigi iki sporla sinirlanana kadar. O genis kapsamdaki gercek verim asagida hala
+# dogru bir OLCUM METODOLOJISI ornegi olarak duruyor; mutlak sayilar artik gecerli degil —
+# masa tenisi (~490/gun) ve voleybol (~120/gun) gibi en yuksek hacimli sporlar tam da
+# kapsam disinda kalanlar.
 #
 # CADENCE OLCULDU, TAHMIN EDILMEDI. 15 dakika boyunca 51 saniyede bir tarayip biten
 # maclarin akista NE KADAR KALDIGINA baktim: 274 fikstürün 36'si dustu ve biten bir mac
 # akista ~50-150 saniye duruyor. Yani yakalama sansi kabaca (kalma suresi / tarama
 # araligi): dakikada bir tarama neredeyse hepsini, saatte bir taramaysa ~%2'sini yakalar.
-# Kapsam tarama SURESIYLE orantili, tarama SAYISIYLA degil.
+# Kapsam tarama SURESIYLE orantili, tarama SAYISIYLA degil — bu METODOLOJI sinirli
+# kapsamda da gecerliligini koruyor, sadece toplam sayi kuculuyor (o donemki olcumde
+# futbol ~130/gun idi; tenis ayrica olculmedi ama futboldan daha seyrek bir kart tasir).
 #
 # Bu yuzden saat basi 55 dakikalik pencere aciliyor — gunde ~22 saat kesintisiz izleme.
-# Onceki hali gunde 4 x 10 dakikaydi ve tek nedeni deponun private olmasiydi: aylik 2.000
-# dakikalik kota gunde ~40 dakikadan fazlasina izin vermiyordu.
-#
-# GERCEK VERIM, iki tam kosudan olculdu: kosu basina ~43 sonuc, gunde ~1.000. Masa tenisi
-# ~490, futbol ~130, voleybol ~120, e-spor ~60. (Ilk tahminim gunde 3.600'du; en yogun
-# saatin en yogun dakikasindan genellenmisti ve uc kat yanlisti.) Voleybolun 400 sonucluk
-# esigi bu hizla ~4 gun. Gunluk kapsam raporu bu hesabi data/watch_log.jsonl uzerinden
-# spor spor kendisi yapiyor ve kac gun kaldigini yaziyor.
 #
 # Saat basi ayri is, tek uzun is degil: durum her taramada diske, ama repoya ancak is
 # bitince yaziliyor, o yuzden bir cokme en fazla bir saat kaybettiriyor.
