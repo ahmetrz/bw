@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="tr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bugünün Kuponu — Kombine Platformu</title>
+<style>
+:root {
+  --bg: #0b0f14; --panel: #121821; --panel2: #171f2a; --border: #232d3a;
+  --text: #e6edf3; --muted: #8b98a5; --accent: #4fb0ff; --accent2: #7ee0c3;
+  --warn: #f0b429; --bad: #ff6b6b; --good: #58d68d;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f5f7fa; --panel: #ffffff; --panel2: #eef1f5; --border: #dde3ea;
+          --text: #16202b; --muted: #5b6b7a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans);
+       line-height: 1.5; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel);
+         border-bottom: 1px solid var(--border); padding: 10px 14px; }
+header .brand { font-weight: 700; letter-spacing: .02em; }
+nav { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 13px; }
+nav a { color: var(--muted); padding: 3px 0; }
+nav a.active { color: var(--accent); font-weight: 600; }
+nav .sep { color: var(--border); }
+main { max-width: 1100px; margin: 0 auto; padding: 18px 14px 60px; }
+h1 { font-size: 20px; margin: 6px 0 14px; }
+h2 { font-size: 16px; margin: 26px 0 10px; color: var(--accent2); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px 16px; margin-bottom: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px; }
+.stat { background: var(--panel2); border-radius: 8px; padding: 10px 12px; }
+.stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase;
+               letter-spacing: .04em; }
+.stat .value { font-family: var(--mono); font-size: 20px; margin-top: 2px; }
+.tablewrap { width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 13px; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left;
+         white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+.mono { font-family: var(--mono); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+         font-weight: 700; }
+.badge.win, .badge.approve, .badge.ok { background: rgba(88,214,141,.15); color: var(--good); }
+.badge.loss, .badge.veto, .badge.bad { background: rgba(255,107,107,.15); color: var(--bad); }
+.badge.push, .badge.flag, .badge.warn { background: rgba(240,180,41,.15); color: var(--warn); }
+.badge.pending { background: rgba(139,152,165,.15); color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+.pill { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+details { margin: 6px 0; }
+details summary { cursor: pointer; color: var(--accent); }
+footer { max-width: 1100px; margin: 30px auto 0; padding: 14px; color: var(--muted);
+         font-size: 12px; border-top: 1px solid var(--border); }
+</style>
+</head><body>
+<header>
+  <div class="brand">⚽🎾 Futbol &amp; Tenis Kombine Platformu</div>
+  <nav><a href="combine.html" class="active">Bugünün Kuponu</a> <span class="sep">·</span> <a href="referee.html">Hakem Kurulu</a> <span class="sep">·</span> <a href="dataquality.html">Veri Kalitesi</a> <span class="sep">·</span> <a href="scanned.html">Taranan Karşılaşmalar</a> <span class="sep">·</span> <a href="rejected.html">Elenen Seçimler</a> <span class="sep">·</span> <a href="combine_history.html">Geçmiş Kuponlar</a> <span class="sep">·</span> <a href="combine_results.html">Sonuçlar</a> <span class="sep">·</span> <a href="lab.html">Performans Laboratuvarı</a> <span class="sep">·</span> <a href="calibration.html">Güven Kalibrasyonu</a> <span class="sep">·</span> <a href="model_versions.html">Model Sürümleri</a> <span class="sep">·</span> <a href="proposed_changes.html">Önerilen Değişiklikler</a> <span class="sep">·</span> <a href="source_health.html">Veri Kaynağı Sağlığı</a> <span class="sep">·</span> <a href="runs.html">Çalışma Geçmişi</a> <span class="sep">·</span> <a href="settings.html">Ayarlar</a></nav>
+  <nav class="small"><a href="picks.html">Tarama Listesi</a> <span class="sep">·</span> <a href="results.html">Tarama Sonuçları</a> <span class="sep">·</span> <a href="stats.html">Tarama İstatistiği</a> <span class="sep">·</span> <a href="method.html">Yöntem</a></nav>
+</header>
+<main>
+<h1>Bugünün Kuponu</h1>
+<div class="small muted">Futbol + Tenis · 2026-08-07</div>
+
+    <div class="card">
+      <div class="grid">
+        <div class="stat"><div class="label">Kupon durumu</div><div class="value">OLUŞTURULDU</div></div>
+        <div class="stat"><div class="label">Oluşturulma</div><div class="value">2026-08-07 07:20</div></div>
+        <div class="stat"><div class="label">Seçim sayısı</div><div class="value">4</div></div>
+        <div class="stat"><div class="label">Toplam oran</div><div class="value">1.95</div></div>
+        <div class="stat"><div class="label">Ortalama güven</div><div class="value">85.6</div></div>
+        <div class="stat"><div class="label">Birleşik başarı tahmini</div><div class="value">%79.9</div></div>
+      </div>
+      <div class="small muted" style="margin-top:10px">
+        Güven aralığı (kaba tahmin): %53.7 – %89.4
+        · minimum kombin güveni: 80.0/100
+        · tarama: 35 maç, 24 eşiği geçti,
+        23 hakem onayı aldı
+      </div>
+      <div class="card" style="margin-top:10px;background:var(--panel2)"><b>Kupon kodu:</b> <span class="mono">D9KM2</span><div class="small muted">4 bahis — Betwinner’da “Kuponu yükle” kutusuna elle girin; KOMBİNE olarak yüklenir.</div></div>
+      <div class="small muted" style="margin-top:10px"><i>4 seçim, 23 hakem onaylı adaydan seçildi. daha fazla seçim eklemek birleşik olasılığı ürünün anlamlı kabul ettiği eşiğin altına düşürüyordu. korelasyon notları: seçimlerin %100&#x27;i tek bir model kaynağına (generic) dayanıyor — ortak veri kaynağı riski.</i></div>
+    </div>
+    <h2>Seçimler</h2>
+    
+        <details class="card" open>
+          <summary><b>#1 Rosario Central v CA Aldosivi</b> — CA Aldosivi +2.5 handikap (en fazla 2 farkla kaybedebilir)
+            <span class="pill mono">oran 1.12</span>
+            <span class="pill mono">güven 86.1/100</span>
+          </summary>
+          <div class="small muted">Futbol · Argentina. Primera Division ·
+            2026-08-07T22:30:00+00:00</div>
+          <h2>Analiz</h2>
+          <div class="grid">
+            <div class="stat"><div class="label">Tahmini olasılık</div><div class="value">%95.5</div></div>
+            <div class="stat"><div class="label">Implied probability</div><div class="value">%89.1</div></div>
+            <div class="stat"><div class="label">EV (bilgi amaçlı)</div><div class="value">%7.1</div></div>
+            <div class="stat"><div class="label">Veri kalitesi</div><div class="value">77.4/100</div></div>
+            <div class="stat"><div class="label">Model sürümü</div><div class="value">generic-422g</div></div>
+          </div>
+          <div style="margin-top:10px"><div class="small">▲ güvenlik merdiveninde birden fazla basamak mevcuttu</div><div class="small">▼ kanıt gücü düşük (54/100)</div></div>
+          
+          <h2>Hakem kurulu</h2>
+          <div><span class="badge approve" title="veri kalite puanı 77/100">Veri Kalitesi Hakemi</span> <span class="badge approve" title="alanlar ve aralıklar tutarlı">İstatistiksel Tutarlılık Hakemi</span> <span class="badge approve" title="pazar sonuçlanma kuralı net">Pazar Güvenilirliği Hakemi</span> <span class="badge approve" title="iddia edilen olasılık örneklem büyüklüğüyle orantılı">Overfitting Hakemi</span> <span class="badge approve" title="veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)">Haber ve Güncellik Hakemi</span> <span class="badge approve" title="oran eşiği ve EV makul aralıkta">Oran/EV Hakemi</span> <span class="badge approve" title="bu spor için henüz yeterli notlandırılmış geçmiş yok (&lt;20) — değerlendirme yapılmadı">Geçmiş Performans Hakemi</span> <span class="badge approve" title="bu spor için sonuç doğrulama kaynağı yeterli">Sonuç Doğrulanabilirliği Hakemi</span> </div>
+          <div class="small muted" style="margin-top:6px">
+            regulation
+            
+          </div>
+          <div class="small" style="margin-top:6px"><a href="https://betwinner2.com/en/line/1/119599/356639434" target="_blank" rel="noopener">Betwinner’a git ↗</a></div>
+        </details>
+        <details class="card" open>
+          <summary><b>#2 Ceara v Associacao Atletica Ponte Preta</b> — Associacao Atletica Ponte Preta +2.5 handikap (en fazla 2 farkla kaybedebilir)
+            <span class="pill mono">oran 1.20</span>
+            <span class="pill mono">güven 86.0/100</span>
+          </summary>
+          <div class="small muted">Futbol · Brazil. Campeonato Brasileiro. Serie B ·
+            2026-08-07T23:30:00+00:00</div>
+          <h2>Analiz</h2>
+          <div class="grid">
+            <div class="stat"><div class="label">Tahmini olasılık</div><div class="value">%95.2</div></div>
+            <div class="stat"><div class="label">Implied probability</div><div class="value">%83.3</div></div>
+            <div class="stat"><div class="label">EV (bilgi amaçlı)</div><div class="value">%14.3</div></div>
+            <div class="stat"><div class="label">Veri kalitesi</div><div class="value">78.2/100</div></div>
+            <div class="stat"><div class="label">Model sürümü</div><div class="value">generic-460g</div></div>
+          </div>
+          <div style="margin-top:10px"><div class="small">▲ güvenlik merdiveninde birden fazla basamak mevcuttu</div><div class="small">▼ kanıt gücü düşük (55/100)</div></div>
+          
+          <h2>Hakem kurulu</h2>
+          <div><span class="badge approve" title="veri kalite puanı 78/100">Veri Kalitesi Hakemi</span> <span class="badge approve" title="alanlar ve aralıklar tutarlı">İstatistiksel Tutarlılık Hakemi</span> <span class="badge approve" title="pazar sonuçlanma kuralı net">Pazar Güvenilirliği Hakemi</span> <span class="badge approve" title="iddia edilen olasılık örneklem büyüklüğüyle orantılı">Overfitting Hakemi</span> <span class="badge approve" title="veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)">Haber ve Güncellik Hakemi</span> <span class="badge approve" title="oran eşiği ve EV makul aralıkta">Oran/EV Hakemi</span> <span class="badge approve" title="bu spor için henüz yeterli notlandırılmış geçmiş yok (&lt;20) — değerlendirme yapılmadı">Geçmiş Performans Hakemi</span> <span class="badge approve" title="bu spor için sonuç doğrulama kaynağı yeterli">Sonuç Doğrulanabilirliği Hakemi</span> </div>
+          <div class="small muted" style="margin-top:6px">
+            regulation
+            
+          </div>
+          <div class="small" style="margin-top:6px"><a href="https://betwinner2.com/en/line/1/57265/355369694" target="_blank" rel="noopener">Betwinner’a git ↗</a></div>
+        </details>
+        <details class="card" open>
+          <summary><b>#3 VVV-Venlo v Heracles Almelo</b> — VVV-Venlo +1.5 handikap (en fazla 1 farkla kaybedebilir)
+            <span class="pill mono">oran 1.18</span>
+            <span class="pill mono">güven 85.4/100</span>
+          </summary>
+          <div class="small muted">Futbol · Netherlands. Eerste Divisie ·
+            2026-08-07T18:00:00+00:00</div>
+          <h2>Analiz</h2>
+          <div class="grid">
+            <div class="stat"><div class="label">Tahmini olasılık</div><div class="value">%94.1</div></div>
+            <div class="stat"><div class="label">Implied probability</div><div class="value">%84.8</div></div>
+            <div class="stat"><div class="label">EV (bilgi amaçlı)</div><div class="value">%11.0</div></div>
+            <div class="stat"><div class="label">Veri kalitesi</div><div class="value">77.5/100</div></div>
+            <div class="stat"><div class="label">Model sürümü</div><div class="value">generic-426g</div></div>
+          </div>
+          <div style="margin-top:10px"><div class="small">▲ güvenlik merdiveninde birden fazla basamak mevcuttu</div><div class="small">▼ kanıt gücü düşük (54/100)</div></div>
+          
+          <h2>Hakem kurulu</h2>
+          <div><span class="badge approve" title="veri kalite puanı 78/100">Veri Kalitesi Hakemi</span> <span class="badge approve" title="alanlar ve aralıklar tutarlı">İstatistiksel Tutarlılık Hakemi</span> <span class="badge approve" title="pazar sonuçlanma kuralı net">Pazar Güvenilirliği Hakemi</span> <span class="badge approve" title="iddia edilen olasılık örneklem büyüklüğüyle orantılı">Overfitting Hakemi</span> <span class="badge approve" title="veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)">Haber ve Güncellik Hakemi</span> <span class="badge approve" title="oran eşiği ve EV makul aralıkta">Oran/EV Hakemi</span> <span class="badge approve" title="bu spor için henüz yeterli notlandırılmış geçmiş yok (&lt;20) — değerlendirme yapılmadı">Geçmiş Performans Hakemi</span> <span class="badge approve" title="bu spor için sonuç doğrulama kaynağı yeterli">Sonuç Doğrulanabilirliği Hakemi</span> </div>
+          <div class="small muted" style="margin-top:6px">
+            regulation
+            
+          </div>
+          <div class="small" style="margin-top:6px"><a href="https://betwinner2.com/en/line/1/2018747/356281480" target="_blank" rel="noopener">Betwinner’a git ↗</a></div>
+        </details>
+        <details class="card" >
+          <summary><b>#4 Bosna 92 Orebro v Syrianska Eskilstuna IF</b> — Toplam gol 5.5 altı
+            <span class="pill mono">oran 1.23</span>
+            <span class="pill mono">güven 85.0/100</span>
+          </summary>
+          <div class="small muted">Futbol · Sweden. Division 3 ·
+            2026-08-07T17:30:00+00:00</div>
+          <h2>Analiz</h2>
+          <div class="grid">
+            <div class="stat"><div class="label">Tahmini olasılık</div><div class="value">%93.3</div></div>
+            <div class="stat"><div class="label">Implied probability</div><div class="value">%81.3</div></div>
+            <div class="stat"><div class="label">EV (bilgi amaçlı)</div><div class="value">%14.8</div></div>
+            <div class="stat"><div class="label">Veri kalitesi</div><div class="value">77.7/100</div></div>
+            <div class="stat"><div class="label">Model sürümü</div><div class="value">generic-436g</div></div>
+          </div>
+          <div style="margin-top:10px"><div class="small">▲ güvenlik merdiveninde birden fazla basamak mevcuttu</div><div class="small">▼ kanıt gücü düşük (54/100)</div></div>
+          
+          <h2>Hakem kurulu</h2>
+          <div><span class="badge approve" title="veri kalite puanı 78/100">Veri Kalitesi Hakemi</span> <span class="badge approve" title="alanlar ve aralıklar tutarlı">İstatistiksel Tutarlılık Hakemi</span> <span class="badge approve" title="pazar sonuçlanma kuralı net">Pazar Güvenilirliği Hakemi</span> <span class="badge approve" title="iddia edilen olasılık örneklem büyüklüğüyle orantılı">Overfitting Hakemi</span> <span class="badge approve" title="veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)">Haber ve Güncellik Hakemi</span> <span class="badge approve" title="oran eşiği ve EV makul aralıkta">Oran/EV Hakemi</span> <span class="badge approve" title="bu spor için henüz yeterli notlandırılmış geçmiş yok (&lt;20) — değerlendirme yapılmadı">Geçmiş Performans Hakemi</span> <span class="badge approve" title="bu spor için sonuç doğrulama kaynağı yeterli">Sonuç Doğrulanabilirliği Hakemi</span> </div>
+          <div class="small muted" style="margin-top:6px">
+            regulation
+            
+          </div>
+          <div class="small" style="margin-top:6px"><a href="https://betwinner2.com/en/line/1/52837/357281866" target="_blank" rel="noopener">Betwinner’a git ↗</a></div>
+        </details>
+    <h2>Sınırda kalan seçimler</h2><div class="card"><ul><li>Racing de Santander v Deportivo Alaves — güven 84.9</li><li>Bray Wanderers v Finn Harps — güven 84.5</li><li>AD Ceuta v Malaga — güven 84.0</li><li>Ostersunds v Sundsvall — güven 84.0</li><li>Albacete Balompie v Eldense — güven 83.9</li><li>Club Brugge v Kortrijk — güven 83.3</li><li>Unirea Slobozia v CS Gloria Bistrita — güven 83.3</li><li>SonderjyskE v Viborg — güven 82.8</li><li>Galway v Drogheda United — güven 82.4</li><li>Shamrock Rovers v Dundalk — güven 82.4</li><li>Yokohama F. Marinos v Kashima Antlers — güven 82.2</li><li>Fulham v Crystal Palace — güven 81.7</li><li>Monza 1912 v Calcio Padova — güven 81.5</li><li>VfL Bochum v Hertha BSC — güven 80.6</li><li>Cambuur v Excelsior — güven 80.3</li><li>Vitesse v Waalwijk — güven 80.3</li><li>Wisla Krakow v Wisla PLock — güven 80.2</li><li>Wycombe Wanderers v Stevenage — güven 80.1</li><li>Estoril v Famalicao — güven 80.0</li></ul></div>
+</main>
+<footer>
+  Kişisel karar desteği aracı. Kesin kazanç veya risksiz bahis iddiası içermez.
+  Geçmiş performans gelecekteki başarının garantisi değildir. Otomatik bahis
+  verilmez — kupon kodu yalnızca Betwinner'ın kendi arayüzüne elle girilmek içindir.
+</footer>
+</body></html>

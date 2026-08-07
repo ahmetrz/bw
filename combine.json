@@ -1,0 +1,880 @@
+{
+  "generated_at": "2026-08-07T07:20:41.789139+00:00",
+  "legs": [
+    {
+      "sport": "Futbol",
+      "sport_id": 1,
+      "league": "Argentina. Primera Division",
+      "match": "Rosario Central v CA Aldosivi",
+      "p1": "Rosario Central",
+      "p2": "CA Aldosivi",
+      "p1_id": 2374,
+      "p2_id": 2388,
+      "start": "2026-08-07T22:30:00+00:00",
+      "market_type": "spreads",
+      "selection": "H2 2.5",
+      "selection_tr": "CA Aldosivi +2.5 handikap (en fazla 2 farkla kaybedebilir)",
+      "odds": 1.122,
+      "settlement": {
+        "scope": "regulation",
+        "detail": "Handicap settles at 90', extra time excluded.",
+        "needs_confirmation": false,
+        "key": "1.2"
+      },
+      "confidence": {
+        "estimated_probability": 0.955,
+        "model_uncertainty": 0.458,
+        "data_quality": {
+          "score": 77.4,
+          "blocks_combine": false,
+          "components": {
+            "identity": 1.0,
+            "sample": 0.281,
+            "odds": 1.0,
+            "staleness": 0.9,
+            "market": 1.0,
+            "result_verifiability": 1.0
+          },
+          "reasons": [
+            {
+              "code": "INSUFFICIENT_SAMPLE",
+              "severity": "minor",
+              "detail": "422 maçlık örneklem (tam güven için 1500+)"
+            },
+            {
+              "code": "STALE_EVENT_DATA",
+              "severity": "info",
+              "detail": "kaynak seçim bazlı güncellenme zamanı yayınlamıyor; tazelik doğrudan ölçülemiyor"
+            },
+            {
+              "code": "LINEUP_DATA_UNAVAILABLE",
+              "severity": "info",
+              "detail": "kadro/sakatlık verisi için ücretsiz, güvenilir bir kaynak entegre değil"
+            },
+            {
+              "code": "SOURCE_CONFLICT",
+              "severity": "info",
+              "detail": "tek oran kaynağı (Betwinner) kullanılıyor; çapraz kaynak tutarlılığı kontrol edilemiyor"
+            }
+          ]
+        },
+        "market_reliability": "confirmed",
+        "model_consensus": null,
+        "contradiction_score": null,
+        "bookmaker_odds": 1.122,
+        "implied_probability": 0.8913,
+        "corrected_probability": null,
+        "expected_value": 0.0715,
+        "confidence_score": 86.1,
+        "confidence_band": "orta",
+        "factors": {
+          "up": [
+            "güvenlik merdiveninde birden fazla basamak mevcuttu"
+          ],
+          "down": [
+            "kanıt gücü düşük (54/100)"
+          ]
+        },
+        "risks": [],
+        "data_sources": [
+          "generic"
+        ],
+        "model_version": "generic-422g",
+        "analysis_timestamp": "2026-08-07T07:20:44.080192+00:00"
+      },
+      "referee": {
+        "verdicts": [
+          {
+            "judge": "veri_kalitesi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri kalite puanı 77/100",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "istatistiksel_tutarlilik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "alanlar ve aralıklar tutarlı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "pazar_guvenilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "pazar sonuçlanma kuralı net",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "overfitting",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "iddia edilen olasılık örneklem büyüklüğüyle orantılı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "guncellik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "oran_ev",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "oran eşiği ve EV makul aralıkta",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "gecmis_performans",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için henüz yeterli notlandırılmış geçmiş yok (<20) — değerlendirme yapılmadı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "sonuc_dogrulanabilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için sonuç doğrulama kaynağı yeterli",
+            "confidence_penalty": 0.0
+          }
+        ],
+        "decision": {
+          "match": "Rosario Central v CA Aldosivi",
+          "include": true,
+          "vetoes": [],
+          "flags": [],
+          "correlation_flagged": false,
+          "confidence_penalty_total": 0.0,
+          "adjusted_confidence": 86.1
+        },
+        "correlation_flagged": false
+      },
+      "url": "https://betwinner2.com/en/line/1/119599/356639434",
+      "_game_id": 741775746,
+      "_market_key": [
+        356639434,
+        "2|-2.5"
+      ],
+      "_outcome_id": 8,
+      "_match_id": 356639434
+    },
+    {
+      "sport": "Futbol",
+      "sport_id": 1,
+      "league": "Brazil. Campeonato Brasileiro. Serie B",
+      "match": "Ceara v Associacao Atletica Ponte Preta",
+      "p1": "Ceara",
+      "p2": "Associacao Atletica Ponte Preta",
+      "p1_id": 2664,
+      "p2_id": 2630,
+      "start": "2026-08-07T23:30:00+00:00",
+      "market_type": "spreads",
+      "selection": "H2 2.5",
+      "selection_tr": "Associacao Atletica Ponte Preta +2.5 handikap (en fazla 2 farkla kaybedebilir)",
+      "odds": 1.2,
+      "settlement": {
+        "scope": "regulation",
+        "detail": "Handicap settles at 90', extra time excluded.",
+        "needs_confirmation": false,
+        "key": "1.2"
+      },
+      "confidence": {
+        "estimated_probability": 0.9522,
+        "model_uncertainty": 0.454,
+        "data_quality": {
+          "score": 78.2,
+          "blocks_combine": false,
+          "components": {
+            "identity": 1.0,
+            "sample": 0.307,
+            "odds": 1.0,
+            "staleness": 0.9,
+            "market": 1.0,
+            "result_verifiability": 1.0
+          },
+          "reasons": [
+            {
+              "code": "INSUFFICIENT_SAMPLE",
+              "severity": "minor",
+              "detail": "460 maçlık örneklem (tam güven için 1500+)"
+            },
+            {
+              "code": "STALE_EVENT_DATA",
+              "severity": "info",
+              "detail": "kaynak seçim bazlı güncellenme zamanı yayınlamıyor; tazelik doğrudan ölçülemiyor"
+            },
+            {
+              "code": "LINEUP_DATA_UNAVAILABLE",
+              "severity": "info",
+              "detail": "kadro/sakatlık verisi için ücretsiz, güvenilir bir kaynak entegre değil"
+            },
+            {
+              "code": "SOURCE_CONFLICT",
+              "severity": "info",
+              "detail": "tek oran kaynağı (Betwinner) kullanılıyor; çapraz kaynak tutarlılığı kontrol edilemiyor"
+            }
+          ]
+        },
+        "market_reliability": "confirmed",
+        "model_consensus": null,
+        "contradiction_score": null,
+        "bookmaker_odds": 1.2,
+        "implied_probability": 0.8333,
+        "corrected_probability": null,
+        "expected_value": 0.1426,
+        "confidence_score": 86.0,
+        "confidence_band": "orta",
+        "factors": {
+          "up": [
+            "güvenlik merdiveninde birden fazla basamak mevcuttu"
+          ],
+          "down": [
+            "kanıt gücü düşük (55/100)"
+          ]
+        },
+        "risks": [],
+        "data_sources": [
+          "generic"
+        ],
+        "model_version": "generic-460g",
+        "analysis_timestamp": "2026-08-07T07:20:44.080222+00:00"
+      },
+      "referee": {
+        "verdicts": [
+          {
+            "judge": "veri_kalitesi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri kalite puanı 78/100",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "istatistiksel_tutarlilik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "alanlar ve aralıklar tutarlı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "pazar_guvenilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "pazar sonuçlanma kuralı net",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "overfitting",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "iddia edilen olasılık örneklem büyüklüğüyle orantılı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "guncellik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "oran_ev",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "oran eşiği ve EV makul aralıkta",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "gecmis_performans",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için henüz yeterli notlandırılmış geçmiş yok (<20) — değerlendirme yapılmadı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "sonuc_dogrulanabilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için sonuç doğrulama kaynağı yeterli",
+            "confidence_penalty": 0.0
+          }
+        ],
+        "decision": {
+          "match": "Ceara v Associacao Atletica Ponte Preta",
+          "include": true,
+          "vetoes": [],
+          "flags": [],
+          "correlation_flagged": false,
+          "confidence_penalty_total": 0.0,
+          "adjusted_confidence": 86.0
+        },
+        "correlation_flagged": false
+      },
+      "url": "https://betwinner2.com/en/line/1/57265/355369694",
+      "_game_id": 740095980,
+      "_market_key": [
+        355369694,
+        "2|-2.5"
+      ],
+      "_outcome_id": 8,
+      "_match_id": 355369694
+    },
+    {
+      "sport": "Futbol",
+      "sport_id": 1,
+      "league": "Netherlands. Eerste Divisie",
+      "match": "VVV-Venlo v Heracles Almelo",
+      "p1": "VVV-Venlo",
+      "p2": "Heracles Almelo",
+      "p1_id": 4230,
+      "p2_id": 4216,
+      "start": "2026-08-07T18:00:00+00:00",
+      "market_type": "spreads",
+      "selection": "H1 1.5",
+      "selection_tr": "VVV-Venlo +1.5 handikap (en fazla 1 farkla kaybedebilir)",
+      "odds": 1.179,
+      "settlement": {
+        "scope": "regulation",
+        "detail": "Handicap settles at 90', extra time excluded.",
+        "needs_confirmation": false,
+        "key": "1.2"
+      },
+      "confidence": {
+        "estimated_probability": 0.9413,
+        "model_uncertainty": 0.457,
+        "data_quality": {
+          "score": 77.5,
+          "blocks_combine": false,
+          "components": {
+            "identity": 1.0,
+            "sample": 0.284,
+            "odds": 1.0,
+            "staleness": 0.9,
+            "market": 1.0,
+            "result_verifiability": 1.0
+          },
+          "reasons": [
+            {
+              "code": "INSUFFICIENT_SAMPLE",
+              "severity": "minor",
+              "detail": "426 maçlık örneklem (tam güven için 1500+)"
+            },
+            {
+              "code": "STALE_EVENT_DATA",
+              "severity": "info",
+              "detail": "kaynak seçim bazlı güncellenme zamanı yayınlamıyor; tazelik doğrudan ölçülemiyor"
+            },
+            {
+              "code": "LINEUP_DATA_UNAVAILABLE",
+              "severity": "info",
+              "detail": "kadro/sakatlık verisi için ücretsiz, güvenilir bir kaynak entegre değil"
+            },
+            {
+              "code": "SOURCE_CONFLICT",
+              "severity": "info",
+              "detail": "tek oran kaynağı (Betwinner) kullanılıyor; çapraz kaynak tutarlılığı kontrol edilemiyor"
+            }
+          ]
+        },
+        "market_reliability": "confirmed",
+        "model_consensus": null,
+        "contradiction_score": null,
+        "bookmaker_odds": 1.179,
+        "implied_probability": 0.8482,
+        "corrected_probability": null,
+        "expected_value": 0.1098,
+        "confidence_score": 85.4,
+        "confidence_band": "orta",
+        "factors": {
+          "up": [
+            "güvenlik merdiveninde birden fazla basamak mevcuttu"
+          ],
+          "down": [
+            "kanıt gücü düşük (54/100)"
+          ]
+        },
+        "risks": [],
+        "data_sources": [
+          "generic"
+        ],
+        "model_version": "generic-426g",
+        "analysis_timestamp": "2026-08-07T07:20:44.080248+00:00"
+      },
+      "referee": {
+        "verdicts": [
+          {
+            "judge": "veri_kalitesi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri kalite puanı 78/100",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "istatistiksel_tutarlilik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "alanlar ve aralıklar tutarlı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "pazar_guvenilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "pazar sonuçlanma kuralı net",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "overfitting",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "iddia edilen olasılık örneklem büyüklüğüyle orantılı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "guncellik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "oran_ev",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "oran eşiği ve EV makul aralıkta",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "gecmis_performans",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için henüz yeterli notlandırılmış geçmiş yok (<20) — değerlendirme yapılmadı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "sonuc_dogrulanabilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için sonuç doğrulama kaynağı yeterli",
+            "confidence_penalty": 0.0
+          }
+        ],
+        "decision": {
+          "match": "VVV-Venlo v Heracles Almelo",
+          "include": true,
+          "vetoes": [],
+          "flags": [],
+          "correlation_flagged": false,
+          "confidence_penalty_total": 0.0,
+          "adjusted_confidence": 85.4
+        },
+        "correlation_flagged": false
+      },
+      "url": "https://betwinner2.com/en/line/1/2018747/356281480",
+      "_game_id": 740868769,
+      "_market_key": [
+        356281480,
+        "2|1.5"
+      ],
+      "_outcome_id": 7,
+      "_match_id": 356281480
+    },
+    {
+      "sport": "Futbol",
+      "sport_id": 1,
+      "league": "Sweden. Division 3",
+      "match": "Bosna 92 Orebro v Syrianska Eskilstuna IF",
+      "p1": "Bosna 92 Orebro",
+      "p2": "Syrianska Eskilstuna IF",
+      "p1_id": 86039,
+      "p2_id": 1680827,
+      "start": "2026-08-07T17:30:00+00:00",
+      "market_type": "totals",
+      "selection": "under 5.5",
+      "selection_tr": "Toplam gol 5.5 altı",
+      "odds": 1.23,
+      "settlement": {
+        "scope": "regulation",
+        "detail": "Total goals settles at 90'. Penalty-shootout goals never count.",
+        "needs_confirmation": false,
+        "key": "1.17"
+      },
+      "confidence": {
+        "estimated_probability": 0.9335,
+        "model_uncertainty": 0.456,
+        "data_quality": {
+          "score": 77.7,
+          "blocks_combine": false,
+          "components": {
+            "identity": 1.0,
+            "sample": 0.291,
+            "odds": 1.0,
+            "staleness": 0.9,
+            "market": 1.0,
+            "result_verifiability": 1.0
+          },
+          "reasons": [
+            {
+              "code": "INSUFFICIENT_SAMPLE",
+              "severity": "minor",
+              "detail": "436 maçlık örneklem (tam güven için 1500+)"
+            },
+            {
+              "code": "STALE_EVENT_DATA",
+              "severity": "info",
+              "detail": "kaynak seçim bazlı güncellenme zamanı yayınlamıyor; tazelik doğrudan ölçülemiyor"
+            },
+            {
+              "code": "LINEUP_DATA_UNAVAILABLE",
+              "severity": "info",
+              "detail": "kadro/sakatlık verisi için ücretsiz, güvenilir bir kaynak entegre değil"
+            },
+            {
+              "code": "SOURCE_CONFLICT",
+              "severity": "info",
+              "detail": "tek oran kaynağı (Betwinner) kullanılıyor; çapraz kaynak tutarlılığı kontrol edilemiyor"
+            }
+          ]
+        },
+        "market_reliability": "confirmed",
+        "model_consensus": null,
+        "contradiction_score": null,
+        "bookmaker_odds": 1.23,
+        "implied_probability": 0.813,
+        "corrected_probability": null,
+        "expected_value": 0.1482,
+        "confidence_score": 85.0,
+        "confidence_band": "orta",
+        "factors": {
+          "up": [
+            "güvenlik merdiveninde birden fazla basamak mevcuttu"
+          ],
+          "down": [
+            "kanıt gücü düşük (54/100)"
+          ]
+        },
+        "risks": [],
+        "data_sources": [
+          "generic"
+        ],
+        "model_version": "generic-436g",
+        "analysis_timestamp": "2026-08-07T07:20:44.080274+00:00"
+      },
+      "referee": {
+        "verdicts": [
+          {
+            "judge": "veri_kalitesi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri kalite puanı 78/100",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "istatistiksel_tutarlilik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "alanlar ve aralıklar tutarlı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "pazar_guvenilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "pazar sonuçlanma kuralı net",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "overfitting",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "iddia edilen olasılık örneklem büyüklüğüyle orantılı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "guncellik",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "oran_ev",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "oran eşiği ve EV makul aralıkta",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "gecmis_performans",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için henüz yeterli notlandırılmış geçmiş yok (<20) — değerlendirme yapılmadı",
+            "confidence_penalty": 0.0
+          },
+          {
+            "judge": "sonuc_dogrulanabilirligi",
+            "verdict": "approve",
+            "reason_code": null,
+            "note": "bu spor için sonuç doğrulama kaynağı yeterli",
+            "confidence_penalty": 0.0
+          }
+        ],
+        "decision": {
+          "match": "Bosna 92 Orebro v Syrianska Eskilstuna IF",
+          "include": true,
+          "vetoes": [],
+          "flags": [],
+          "correlation_flagged": false,
+          "confidence_penalty_total": 0.0,
+          "adjusted_confidence": 85.0
+        },
+        "correlation_flagged": false
+      },
+      "url": "https://betwinner2.com/en/line/1/52837/357281866",
+      "_game_id": 741727186,
+      "_market_key": [
+        357281866,
+        "17|5.5"
+      ],
+      "_outcome_id": 10,
+      "_match_id": 357281866
+    }
+  ],
+  "leg_count": 4,
+  "combined_odds": 1.953,
+  "combined_probability": 0.799,
+  "combined_probability_band": {
+    "low": 0.5369,
+    "high": 0.8937
+  },
+  "avg_confidence": 85.6,
+  "scanned_count": 35,
+  "eligible_count": 24,
+  "referee_approved_count": 23,
+  "gate_excluded": [
+    {
+      "match": "Concarneau v Orleans",
+      "reasons": [
+        "güven puanı 79.9 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Derry City v Sligo Rovers",
+      "reasons": [
+        "güven puanı 79.6 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Emmen v Roda JC Kerkrade",
+      "reasons": [
+        "güven puanı 79.5 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "UD Almeria v Cordoba",
+      "reasons": [
+        "güven puanı 78.7 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "UTA Arad v Rapid Bucuresti",
+      "reasons": [
+        "güven puanı 78.5 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Athlone Town v Longford Town",
+      "reasons": [
+        "güven puanı 78.1 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Huesca v Andorra Andorra la Vella",
+      "reasons": [
+        "güven puanı 78.0 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "KSP Polonia Warszawa v Ruch Chorzow",
+      "reasons": [
+        "güven puanı 77.5 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Middlesbrough v Wrexham",
+      "reasons": [
+        "güven puanı 76.9 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Partick Thistle v Livingston",
+      "reasons": [
+        "güven puanı 76.1 < 80 eşiği"
+      ]
+    },
+    {
+      "match": "Rheindorf Altach v WSG Tirol",
+      "reasons": [
+        "güven puanı 75.5 < 80 eşiği"
+      ]
+    }
+  ],
+  "vetoed": [
+    {
+      "match": "Sudtirol v Virtus Verona",
+      "vetoes": [
+        "%99.1 iddiası yalnızca 436 maçlık örneğe dayanıyor — aşırı öğrenme riski"
+      ],
+      "all_verdicts": [
+        {
+          "judge": "veri_kalitesi",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "veri kalite puanı 78/100",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "istatistiksel_tutarlilik",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "alanlar ve aralıklar tutarlı",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "pazar_guvenilirligi",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "pazar sonuçlanma kuralı net",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "overfitting",
+          "verdict": "veto",
+          "reason_code": "INSUFFICIENT_SAMPLE",
+          "note": "%99.1 iddiası yalnızca 436 maçlık örneğe dayanıyor — aşırı öğrenme riski",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "guncellik",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "veri tazeliği kontrol edildi; haber/kadro doğrulaması bu platformda yok (kaynak entegrasyonu yapılmadı)",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "oran_ev",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "oran eşiği ve EV makul aralıkta",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "gecmis_performans",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "bu spor için henüz yeterli notlandırılmış geçmiş yok (<20) — değerlendirme yapılmadı",
+          "confidence_penalty": 0.0
+        },
+        {
+          "judge": "sonuc_dogrulanabilirligi",
+          "verdict": "approve",
+          "reason_code": null,
+          "note": "bu spor için sonuç doğrulama kaynağı yeterli",
+          "confidence_penalty": 0.0
+        }
+      ]
+    }
+  ],
+  "borderline": [
+    {
+      "match": "Racing de Santander v Deportivo Alaves",
+      "confidence": 84.9
+    },
+    {
+      "match": "Bray Wanderers v Finn Harps",
+      "confidence": 84.5
+    },
+    {
+      "match": "AD Ceuta v Malaga",
+      "confidence": 84.0
+    },
+    {
+      "match": "Ostersunds v Sundsvall",
+      "confidence": 84.0
+    },
+    {
+      "match": "Albacete Balompie v Eldense",
+      "confidence": 83.9
+    },
+    {
+      "match": "Club Brugge v Kortrijk",
+      "confidence": 83.3
+    },
+    {
+      "match": "Unirea Slobozia v CS Gloria Bistrita",
+      "confidence": 83.3
+    },
+    {
+      "match": "SonderjyskE v Viborg",
+      "confidence": 82.8
+    },
+    {
+      "match": "Galway v Drogheda United",
+      "confidence": 82.4
+    },
+    {
+      "match": "Shamrock Rovers v Dundalk",
+      "confidence": 82.4
+    },
+    {
+      "match": "Yokohama F. Marinos v Kashima Antlers",
+      "confidence": 82.2
+    },
+    {
+      "match": "Fulham v Crystal Palace",
+      "confidence": 81.7
+    },
+    {
+      "match": "Monza 1912 v Calcio Padova",
+      "confidence": 81.5
+    },
+    {
+      "match": "VfL Bochum v Hertha BSC",
+      "confidence": 80.6
+    },
+    {
+      "match": "Cambuur v Excelsior",
+      "confidence": 80.3
+    },
+    {
+      "match": "Vitesse v Waalwijk",
+      "confidence": 80.3
+    },
+    {
+      "match": "Wisla Krakow v Wisla PLock",
+      "confidence": 80.2
+    },
+    {
+      "match": "Wycombe Wanderers v Stevenage",
+      "confidence": 80.1
+    },
+    {
+      "match": "Estoril v Famalicao",
+      "confidence": 80.0
+    }
+  ],
+  "correlation_notes": [
+    "seçimlerin %100'i tek bir model kaynağına (generic) dayanıyor — ortak veri kaynağı riski"
+  ],
+  "why": "4 seçim, 23 hakem onaylı adaydan seçildi. daha fazla seçim eklemek birleşik olasılığı ürünün anlamlı kabul ettiği eşiğin altına düşürüyordu. korelasyon notları: seçimlerin %100'i tek bir model kaynağına (generic) dayanıyor — ortak veri kaynağı riski.",
+  "config_fingerprint": "a5e6c4855ace",
+  "coupon_code": "D9KM2",
+  "coupon_detail": "4 bahis",
+  "link_host": "betwinner2.com",
+  "date": "2026-08-07",
+  "min_combine_confidence": 80.0,
+  "scanned_matches": 711,
+  "settlement": null
+}

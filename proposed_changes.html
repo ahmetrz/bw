@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="tr"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Önerilen Model Değişiklikleri — Kombine Platformu</title>
+<style>
+:root {
+  --bg: #0b0f14; --panel: #121821; --panel2: #171f2a; --border: #232d3a;
+  --text: #e6edf3; --muted: #8b98a5; --accent: #4fb0ff; --accent2: #7ee0c3;
+  --warn: #f0b429; --bad: #ff6b6b; --good: #58d68d;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f5f7fa; --panel: #ffffff; --panel2: #eef1f5; --border: #dde3ea;
+          --text: #16202b; --muted: #5b6b7a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans);
+       line-height: 1.5; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header { position: sticky; top: 0; z-index: 5; background: var(--panel);
+         border-bottom: 1px solid var(--border); padding: 10px 14px; }
+header .brand { font-weight: 700; letter-spacing: .02em; }
+nav { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px; font-size: 13px; }
+nav a { color: var(--muted); padding: 3px 0; }
+nav a.active { color: var(--accent); font-weight: 600; }
+nav .sep { color: var(--border); }
+main { max-width: 1100px; margin: 0 auto; padding: 18px 14px 60px; }
+h1 { font-size: 20px; margin: 6px 0 14px; }
+h2 { font-size: 16px; margin: 26px 0 10px; color: var(--accent2); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px 16px; margin-bottom: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px; }
+.stat { background: var(--panel2); border-radius: 8px; padding: 10px 12px; }
+.stat .label { color: var(--muted); font-size: 11px; text-transform: uppercase;
+               letter-spacing: .04em; }
+.stat .value { font-family: var(--mono); font-size: 20px; margin-top: 2px; }
+.tablewrap { width: 100%; overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+table { border-collapse: collapse; width: 100%; min-width: 480px; font-size: 13px; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left;
+         white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+tr:last-child td { border-bottom: none; }
+.mono { font-family: var(--mono); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+         font-weight: 700; }
+.badge.win, .badge.approve, .badge.ok { background: rgba(88,214,141,.15); color: var(--good); }
+.badge.loss, .badge.veto, .badge.bad { background: rgba(255,107,107,.15); color: var(--bad); }
+.badge.push, .badge.flag, .badge.warn { background: rgba(240,180,41,.15); color: var(--warn); }
+.badge.pending { background: rgba(139,152,165,.15); color: var(--muted); }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.empty { text-align: center; padding: 40px 20px; color: var(--muted); }
+.pill { display: inline-block; background: var(--panel2); border: 1px solid var(--border);
+        border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+details { margin: 6px 0; }
+details summary { cursor: pointer; color: var(--accent); }
+footer { max-width: 1100px; margin: 30px auto 0; padding: 14px; color: var(--muted);
+         font-size: 12px; border-top: 1px solid var(--border); }
+</style>
+</head><body>
+<header>
+  <div class="brand">⚽🎾 Futbol &amp; Tenis Kombine Platformu</div>
+  <nav><a href="combine.html">Bugünün Kuponu</a> <span class="sep">·</span> <a href="referee.html">Hakem Kurulu</a> <span class="sep">·</span> <a href="dataquality.html">Veri Kalitesi</a> <span class="sep">·</span> <a href="scanned.html">Taranan Karşılaşmalar</a> <span class="sep">·</span> <a href="rejected.html">Elenen Seçimler</a> <span class="sep">·</span> <a href="combine_history.html">Geçmiş Kuponlar</a> <span class="sep">·</span> <a href="combine_results.html">Sonuçlar</a> <span class="sep">·</span> <a href="lab.html">Performans Laboratuvarı</a> <span class="sep">·</span> <a href="calibration.html">Güven Kalibrasyonu</a> <span class="sep">·</span> <a href="model_versions.html">Model Sürümleri</a> <span class="sep">·</span> <a href="proposed_changes.html" class="active">Önerilen Değişiklikler</a> <span class="sep">·</span> <a href="source_health.html">Veri Kaynağı Sağlığı</a> <span class="sep">·</span> <a href="runs.html">Çalışma Geçmişi</a> <span class="sep">·</span> <a href="settings.html">Ayarlar</a></nav>
+  <nav class="small"><a href="picks.html">Tarama Listesi</a> <span class="sep">·</span> <a href="results.html">Tarama Sonuçları</a> <span class="sep">·</span> <a href="stats.html">Tarama İstatistiği</a> <span class="sep">·</span> <a href="method.html">Yöntem</a></nav>
+</header>
+<main>
+<h1>Önerilen Model Değişiklikleri</h1>
+<div class="small muted">İnsan onayı olmadan hiçbir üretim modeli, eşik veya kural değişmez</div>
+<details class="card">
+          <summary><span class="badge ok">APPROVED</span>
+            <b>Kalibrasyon testini satır sayısı yerine tarihe orantılı böl (tenis)</b>
+            <span class="small muted">(calibration_method_change, 2026-08-06)</span>
+          </summary>
+          <p class="small">tools/build_generic_model.py, her sporu ayni yontemle, son %20 SATIRI test seti olarak ayirarak kalibre ediyor. Futbol/basketbol/beyzbol/masa tenisi icin bu calisiyor (olcumlu bosluk sirasiyla ~0.012/0.028/0.014/0.011). Tenis icin calismiyor: 38.724 satirin son %20si (7.745 satir) sadece 11 GUNE denk geliyor, cunku TML arsivi (2015-2026, ATP tur seviyesi, ~2.700 mac/yil) ile tennisexplorer+canli izleyicinin son haftalardaki YOGUN ekleri (binlerce mac/hafta, agirlikli olarak Challenger/ITF/eleme oyunculari) arasinda satir yogunlugu asiri dengesiz. Sonuc: test satirlarinin 0/7745 tanesinde iki taraf da MIN_APPEARANCES esigini egitim setinden geciyor, kalibrasyon tablosu bos donuyor, model reddediliyor. Olcum: data/models/4.json calibration=[], calibration_holdout={train:30979,test:7745}. Detay: docs/TENNIS_MODELS.md.</p>
+          <div class="small"><b>Mevcut değer:</b> <span class="mono">cut = int(len(rows) * 0.8)  # row-count proportional</span></div>
+          <div class="small"><b>Önerilen değer:</b> <span class="mono">cut = index of the row where date &gt;= (last_date - 0.2 * (last_date - first_date))  # date-range proportional, same chronological-only guarantee</span></div>
+          <details><summary class="small">Kanıt</summary>
+            <pre class="small mono" style="white-space:pre-wrap">{
+  &quot;measured_at&quot;: &quot;2026-08-06&quot;,
+  &quot;total_rows&quot;: 38724,
+  &quot;test_rows&quot;: 7745,
+  &quot;test_date_span_days&quot;: 11,
+  &quot;test_rows_passing_appearance_filter&quot;: 0,
+  &quot;players_with_20plus_appearances&quot;: 416,
+  &quot;total_distinct_players&quot;: 8977,
+  &quot;affected_sport_id&quot;: 4,
+  &quot;other_sports_unaffected_calibration_gap&quot;: {
+    &quot;1_football&quot;: 0.012,
+    &quot;3_basketball&quot;: 0.028,
+    &quot;5_baseball&quot;: 0.014,
+    &quot;10_table_tennis&quot;: 0.011
+  }
+}</pre>
+          </details>
+          <div class="small muted">İnceleyen: operator — Onaylandi (sohbet ici, 2026-08-06). Uygulandi: tools/build_generic_model.py _holdout_cut(). Olcum: futbol 0.012-&gt;0.010, masa tenisi 0.015-&gt;0.006, badminton 0.024-&gt;0.013, tenis bos-&gt;0.023 (KULLANILABILIR). Yan etki: basketbol 0.028-&gt;0.030, esigin (0.03) tam ustune cikti ve REDDEDILDI oldu -- kucuk, olcum gurultusu sinirinda bir fark, kalibrasyon kapisinin tam da tasarlandigi gibi calismasi (bir spor kalifiye olmadiginda otomatik reddediliyor). Sonraki refit turlarinda kendiliginden duzelebilir.</div>
+        </details>
+</main>
+<footer>
+  Kişisel karar desteği aracı. Kesin kazanç veya risksiz bahis iddiası içermez.
+  Geçmiş performans gelecekteki başarının garantisi değildir. Otomatik bahis
+  verilmez — kupon kodu yalnızca Betwinner'ın kendi arayüzüne elle girilmek içindir.
+</footer>
+</body></html>
