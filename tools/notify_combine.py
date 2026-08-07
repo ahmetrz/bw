@@ -49,7 +49,10 @@ def build_caption(c):
         if conf is not None:
             stats.append(f"ortalama güven <b>{conf:.0f}/100</b>")
         if prob is not None:
-            stats.append(f"kitap-ima birleşik olasılık %{prob * 100:.1f}")
+            # Modelin kendi iddiası (her bacağın model_survival'inin çarpımı) — kitabın
+            # oranlarından türetilmiş bir sayı DEĞİL. "Birleşik başarı tahmini" ifadesi
+            # PDF/HTML sayfalarıyla aynı, tarafsız etiketleme (docs/COUPON_OPTIMIZATION.md).
+            stats.append(f"modelin birleşik başarı tahmini %{prob * 100:.1f}")
         if stats:
             lines.append(" · ".join(stats))
         lines += [

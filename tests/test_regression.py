@@ -22,6 +22,7 @@ from engine import (bwfeed, coupon, grade, ladder, mirror, model_generic,  # noq
                     parlay, pick, rating, results_store, settlement, signals,
                     simulated, telegram)
 from tools import collect_live, grade_predictions, heartbeat, refresh_combine  # noqa: E402
+from tools import notify_combine  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "fixtures", "sample.json")
 
@@ -1084,6 +1085,25 @@ class TestRegression(unittest.TestCase):
         # code that loads nothing is worse than no code, so the combine loses it.
         late = _dt(2026, 8, 2, 0, 0, tzinfo=_tz.utc)
         self.assertEqual(refresh_combine.open_legs(combine, now=late), [])
+
+    def test_telegram_caption_never_calls_a_model_number_book_implied(self):
+        """combined_odds (product of the legs' own decimal prices) genuinely IS
+        book-implied arithmetic. combined_probability (product of each leg's
+        model_survival, engine/combine.py's _combined_probability) is NOT — it is the
+        model's own claim about the combine as a whole, documented as such in
+        docs/COUPON_OPTIMIZATION.md. A caption that labelled it "kitap-ima" (book-
+        implied) anyway would relabel a model claim as a harder, book-derived fact —
+        the same class of error hard rule 6 exists to prevent, aimed at the combine's
+        combined figure instead of a single selection's score. This shipped once, in
+        the first version of tools/notify_combine.py's own caption text, and was caught
+        by actually reading a real caption rather than only reading the code."""
+        combine = {"date": "2026-08-07", "legs": [{"x": 1}], "combined_odds": 1.95,
+                   "combined_probability": 0.799, "avg_confidence": 86.0,
+                   "coupon_code": "D9KM2", "coupon_detail": "4 bahis"}
+        caption = notify_combine.build_caption(combine)
+        self.assertNotIn("kitap-ima", caption)
+        self.assertNotIn("kitap ima", caption)
+        self.assertIn("79.9", caption)   # the number itself still has to be there
 
     def test_a_coupon_leg_carries_the_line_the_backed_side_sees(self):
         """The bet-slip event must express the line from the BACKED side's point of view.
