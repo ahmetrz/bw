@@ -8,14 +8,17 @@ selections across as many matches as the day's card genuinely supports) or it sa
 that no combine cleared the bar. It never auto-bets, never handles real money, and never
 claims a guaranteed or risk-free outcome.
 
-It is built on top of, and does not replace, the existing **Betwinner Odds Scanner**
-(`CLAUDE.md`) — a separate, already-live, multi-sport product that ranks the book's own
-markets by within-book cheapness and produces a daily top-N singles list across dozens of
-sports. Where the two overlap (both read Betwinner's card, both use the calibrated
-per-sport model layer) they share code; where their products differ (one combine vs. many
-singles, football+tennis vs. every sport, an 80-point floor vs. a 75-point one, a ten-judge
-review board vs. none) they are kept deliberately separate. See
-`docs/DECISIONS/0001-extend-not-replace.md`.
+It is the only product in this repo. It was originally built alongside, and on top of, an
+older **Betwinner Odds Scanner** — a separate multi-sport product that ranked the book's
+own markets by within-book cheapness and produced a daily top-N singles list across dozens
+of sports (`docs/DECISIONS/0001-extend-not-replace.md`). That scanner has since been
+**retired outright**, on the operator's own instruction: "Eski yapıyı ortadan kaldır.
+Sadece tenis ve futbol olacak ve yeni yapı ile ilerleyeceğiz" (`docs/DECISIONS/0007-retire-
+the-scanner-single-product.md`). `docs/DECISIONS/0001`'s "extend, don't replace" premise
+described how this platform was first built; `docs/DECISIONS/0007` supersedes it — nothing
+today shares this repo with the combine platform, and its scope (football+tennis, an
+80-point confidence floor, a ten-judge review board, one combine or none) is simply the
+product's scope, not one of two products' scope.
 
 ## What "serious" means here, concretely
 
@@ -27,12 +30,13 @@ Not a demo, not a random-pick generator, not a dashboard over fabricated numbers
    when only the price changes).
 2. **A model is trusted on its calibration, not its authorship.** `engine/model_generic.py`
    refuses to price a sport whose held-out predictions disagree with its own observed
-   history by more than 3 points (hard rule 8). This session found tennis currently failing
-   that check and did not force it through — see `docs/TENNIS_MODELS.md`.
-3. **Results are tracked and fed back.** `data/predictions.jsonl` and
-   `data/combine_log.jsonl` are append-only, reproducible logs; `tools/grade_predictions.py`
-   and `tools/grade_combine.py` settle them against independently-sourced results, never
-   against the model's own claim.
+   history by more than 3 points (hard rule 8). Tennis failed that check for most of one
+   session and was correctly refused rather than forced through; the underlying calibration
+   split was then fixed, reviewed, and approved through governance, and tennis now clears
+   the bar at a 0.023 gap — see `docs/TENNIS_MODELS.md` for the full before/after.
+3. **Results are tracked and fed back.** `data/combine_log.jsonl` is this product's
+   append-only, reproducible log; `tools/grade_combine.py` settles it against
+   independently-sourced results, never against the model's own claim.
 4. **A combine can legitimately be nothing.** `engine/combine.py`'s search space always
    includes the empty combine, and it wins whenever nothing else scores higher — "kupon
    bulunamadı" is not a fallback UI state bolted on afterward, it is a normal branch of the
@@ -45,9 +49,9 @@ Not a demo, not a random-pick generator, not a dashboard over fabricated numbers
 
 - Not a guarantee. No screen, page, or report claims certain profit or a risk-free bet
   (master brief, hard prohibition).
-- Not a value-betting tool against a reference book. There is no second book; the scanner
-  it sits on top of ranks Betwinner's own prices against Betwinner's own prices
-  (`CLAUDE.md`, opening paragraph).
+- Not a value-betting tool against a reference book. There is no second book and no
+  "beat the sharp" claim; every gate, score and judgement is computed within Betwinner's
+  own prices (`CLAUDE.md`, opening paragraph).
 - Not a staking or bankroll manager. `engine/combine.py`'s `COMBINE_STAKE_UNITS` is a flat
   analytical unit for computing a hypothetical ROI figure in the performance lab — never a
   real-money instruction, never connected to any account.

@@ -3,8 +3,8 @@
 This is not a new feature. It documents a mechanism that already exists and already
 satisfies the brief's requirement that manual import stay available
 ("manuel içe aktarma çalışır durumda kalsın") if Betwinner's API or another data source
-is unreachable. Nothing below required new code this session — it required reading
-`scan.py`, `tools/daily_report.py`, `engine/bwfeed.py` and `engine/results_store.py`
+is unreachable. Nothing below required new code — it required reading
+`tools/daily_combine.py`, `engine/bwfeed.py` and `engine/results_store.py`
 closely enough to say plainly what they already do.
 
 Two independent things can need manual replacement: the **odds card** (what to price)
@@ -15,8 +15,7 @@ table. Neither was built for this doc; both already cover it.
 
 ## The odds card: `--input` already is manual import
 
-`scan.py`, `tools/daily_report.py`, and (through `tools/daily_report.load()`)
-`tools/daily_combine.py` all take:
+`tools/daily_combine.py` (and the standalone diagnostic fetch workflows) takes:
 
 ```
 --input <path to a JSON or .json.gz file>
@@ -29,10 +28,10 @@ wherever the scheduled workflow runs, dropping a file at, say, `data/manual_pull
 and running
 
 ```
-python3 tools/daily_report.py --input data/manual_pull.json --no-coupon
+python3 tools/daily_combine.py --input data/manual_pull.json --no-coupon
 ```
 
-is the whole procedure. `daily.yml` already has a version of this for a different reason
+is the whole procedure. `combine.yml` already has a version of this for a different reason
 (`use_committed_card: true` copies `data/card_today.json.gz` over the expected input path
 instead of fetching — see `docs/GITHUB_ACTIONS.md`), which is the same mechanism used for
 a different trigger.
@@ -56,38 +55,43 @@ docstring alone. This is **not** a simplified or human-authored format: a hand-b
 has to carry the same abbreviated keys the live feed uses, because nothing downstream
 transforms it further before `engine/bwfeed.normalize()` runs.
 
-`.json.gz` is accepted everywhere `.json` is — both `scan.py` and
-`tools/daily_report.load()` pick the opener from the file extension, which is why the
-scheduled workflow stores its 48-hour pulls gzipped.
+`.json.gz` is accepted everywhere `.json` is — `tools/daily_combine.py`'s own `load()`
+picks the opener from the file extension, which is why the scheduled workflow stores its
+24-hour pulls gzipped.
 
-### `scan.py` is more permissive than the daily tools — know which one you're using
+### `tools/daily_combine.py` refuses anything that isn't genuinely Betwinner-shaped
 
-`scan.py` accepts a second shape too: an OddsPapi `odds-by-tournaments` response
-(`engine/parser.py`), and picks whichever of the two normalizers matches
-(`bwfeed.is_bwfeed(data)` first, `parser` otherwise). `tools/daily_report.py` and
-`tools/daily_combine.py` do not — they call `bwfeed.is_bwfeed()` directly and refuse to
-proceed if it's false:
+`tools/daily_combine.py` calls `bwfeed.is_bwfeed()` directly on whatever `--input` loads,
+and refuses to proceed if it's false:
 
 ```
 Input is not a Betwinner feed pull — refusing to proceed.
 ```
 
 This is deliberate, not an oversight: hard rule 5 ("never fabricate odds or limits... if
-the loaded data's book ≠ the requested book, STOP") is stricter for the products that
-actually notify the operator and log a permanent prediction than it is for the scan path,
-which already prints a mismatch warning (`report.warn_book`) rather than refusing
-outright. A manually assembled file for the daily pipeline has to be genuinely
-Betwinner-shaped; there's no book-mismatch mode to fall back on there.
+the loaded data's book ≠ the requested book, STOP") applies at full strength to the one
+tool left that actually notifies the operator and logs a permanent daily record. A
+manually assembled file has to be genuinely Betwinner-shaped; there's no book-mismatch
+fallback mode to degrade into. (The retired scanner's `scan.py` used to accept a second
+shape too — an OddsPapi response via the now-deleted `engine/parser.py` — with a looser,
+warn-rather-than-refuse posture appropriate to a tool that never wrote a permanent record;
+that leniency left with the scanner, `docs/DECISIONS/0007`.)
 
 ## Results: writing directly to `data/results/<sport_id>.jsonl`
 
 Every sport's results — used to fit `engine/model_generic.py`, nothing else — live in
 one file per sport, one JSON object per line, in the shape `engine/results_store.py`'s
 `clean()` enforces. This is the same store every adapter in `tools/collect_results.py`
-writes to (`football` → sport 1, `euroleague` → 3, `tml`/`tennisexplorer` → 4, `mlb` → 5,
-`setka` → 10 — see `ADAPTERS` in that file, or run `python3 tools/collect_results.py
---list`), and the live watcher (`tools/collect_live.py`) writes to it too. A manually
+writes to (`football` → sport 1, `tml`/`tennisexplorer` → 4 — see `ADAPTERS` in that
+file, or run `python3 tools/collect_results.py --list`), and the live watcher
+(`tools/collect_live.py`, football+tennis only today) writes to it too. A manually
 supplied result is not a special case to the model — it's another row in the same table.
+
+`ADAPTERS` narrowed to these two sports' three adapters when scope fixed at football+tennis
+(`docs/DECISIONS/0007`) — it used to also carry `euroleague` (→ 3), `mlb` (→ 5) and
+`setka` (→ 10). Those sports' *already-collected* rows are still sitting in
+`data/results/3.jsonl`, `5.jsonl`, `10.jsonl` etc. as historical record; nothing collects
+more of them now, and nothing in the current product reads those files.
 
 ### Required fields (`results_store.REQUIRED`)
 

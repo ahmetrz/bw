@@ -16,30 +16,43 @@ Read `combine.json`'s `why` field first — it is written for exactly this quest
   `config.MIN_COMBINE_COMBINED_PROBABILITY` (0.15). This is not a bug — see
   `docs/COUPON_OPTIMIZATION.md`.
 
-If `scanned_count` itself is 0 or very low: check `daily_report.json`'s `coverage` section
-(the pre-existing scanner already reports per-sport reachability) — football/tennis simply
-may not have had many recognizable fixtures on that day's card.
+If `scanned_count` itself is 0 or very low: `combine.json` has no dedicated coverage
+section of its own (the scanner's `daily_report.json` used to carry one; it was deleted
+with the scanner, `docs/DECISIONS/0007`). Instead, check `tools/daily_combine.py`'s own
+run output — it prints `candidate picks: N (skipped: {...})`, where the `skipped` dict
+(from `engine/pick.for_fixtures()`) breaks down exactly why a fixture produced no pick:
+`no_model` (the sport/team pair isn't in the trained store), `unmodelled_sport` (not
+football or tennis, or the sport failed calibration), `no_confident_rung` (a model priced
+it but nothing cleared the odds/survival gates) — each further broken down by sport and,
+for `no_model`, by league. football/tennis simply may not have had many recognizable
+fixtures on that day's card.
 
-## "Tennis never produces picks"
+## "Tennis never produces picks" — RESOLVED, kept for reference
 
-Expected today. `data/models/4.json`'s `calibration` is empty — `model_generic.usable()`
-refuses it. This is not a crash or a missing step; it is the calibration gate correctly
-refusing a sport whose test window happens to be dominated by players the training data
-doesn't cover. Full diagnosis: `docs/TENNIS_MODELS.md`. Do not "fix" this by lowering
-`MIN_APPEARANCES` or the calibration threshold — that defeats the gate hard rule 8 exists
-for. The actual fix (a date-proportional calibration split) is filed as
-`pmc-2026-08-06-tennis-split` in `data/proposed_changes.jsonl`, awaiting review.
+This described a real, then-current bug: through most of one session, `data/models/4.json`
+carried an empty `calibration` table and `model_generic.usable()` correctly refused to
+price tennis at all — not a crash, the calibration gate doing exactly its job on a test
+window dominated by players the training data didn't cover. The fix (switching the
+calibration split from row-count-proportional to date-proportional,
+`pmc-2026-08-06-tennis-split`) was filed as a governance proposal, **reviewed and approved
+by the operator, and implemented the same session** — tennis now clears calibration at a
+0.023 held-out gap and produces picks normally. Full before/after numbers, including a
+disclosed side effect on basketball's own calibration, are in `docs/TENNIS_MODELS.md`
+(`Status: IMPLEMENTED_AND_VERIFIED`). If tennis ever stops producing picks again, that is a
+NEW symptom — start from `docs/TENNIS_MODELS.md`'s diagnostic method, not from the
+assumption that this same bug has recurred, and do not "fix" a future occurrence by
+lowering `MIN_APPEARANCES` or the calibration threshold — that defeats the gate hard rule 8
+exists for.
 
-## "The daily.yml / results.yml commit step failed" or "conflicted with the live watcher"
+## "The combine.yml / results.yml commit step failed" or "conflicted with the live watcher"
 
-Expected occasionally — three to four automated jobs write to this branch (daily, results,
-watch-live, and now anyone pushing platform changes by hand). Both workflows already retry
-with `git pull --rebase` + reset-and-reapply-MINE-files up to 3-4 times
+Expected occasionally — three automated jobs write to this branch (`combine.yml`,
+`results.yml`, `watch-live.yml`, plus anyone pushing platform changes by hand). All three
+already retry with `git pull --rebase` + reset-and-reapply-MINE-files up to 3-4 times
 (`docs/GITHUB_ACTIONS.md`). If it still fails after all retries, the next scheduled run
-recovers automatically for everything EXCEPT that day's `data/predictions.jsonl` /
-`data/combine_log.jsonl` rows, which cannot be reconstructed after the fact (by design —
-see `docs/SELF_LEARNING.md` on why a record has to be written at selection time or not at
-all).
+recovers automatically for everything EXCEPT that day's `data/combine_log.jsonl` row, which
+cannot be reconstructed after the fact (by design — see `docs/SELF_LEARNING.md` on why a
+record has to be written at selection time or not at all).
 
 ## "I pushed by hand and hit a merge conflict on data/models/*.json or data/results/*.jsonl"
 

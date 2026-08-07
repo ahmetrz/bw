@@ -6,8 +6,9 @@ that one narrates.
 
 | Metric | Function | Good direction | Minimum sample before shown |
 |---|---|---|---|
-| Hit rate (decided legs) | `engine/grade.summarize()` | higher | `MIN_MEANINGFUL=20` (`tools/make_stats_page.py`) |
-| Break-even hit rate | `engine/stake.break_even_rate()` | — (a reference line, not a target) | none — pure arithmetic on the book's own prices |
+| Hit rate (decided legs) | `engine/grade.summarize()` | higher | `MIN_MEANINGFUL=20` (`engine/track_record.py`) |
+| Combined odds (reference, not a target) | `engine/combine.py`'s `combined_odds` — pure arithmetic on the book's own per-leg prices | — | none |
+| Combined probability floor | `engine/combine.py`'s `combined_probability` (product of each leg's `model_survival` — the combine's own estimate, not book arithmetic, `docs/COUPON_OPTIMIZATION.md`), gated at `config.MIN_COMBINE_COMBINED_PROBABILITY` | higher | none |
 | Calibration gap (claimed − realised) | `engine/track_record.calibration_by_sport()` | closer to 0 | 20 graded per sport |
 | Brier score | `engine/track_record.brier_score()` | lower (0 = perfect, 0.25 = coin-flip baseline) | none — reported with `n` alongside it |
 | Log loss | `engine/track_record.log_loss()` | lower (0.693 = coin-flip baseline) | none |
@@ -19,8 +20,9 @@ that one narrates.
 Hit rate is never shown next to the model's own claimed confidence without the calibration
 gap alongside it. Showing "92% average confidence, 88% hit rate" without also showing "−4
 points, N=137" invites reading the gap as noise when 137 samples can distinguish it from
-noise — this is exactly the reasoning `stats.html` (the pre-existing product) already
-applies, extended to the new platform's own numbers on `lab.html` and `calibration.html`.
+noise — the same reasoning the retired scanner's own `stats.html` used to apply
+(`docs/DECISIONS/0007`), carried forward onto this platform's own numbers on `lab.html` and
+`calibration.html`.
 
 ## What is deliberately not computed
 

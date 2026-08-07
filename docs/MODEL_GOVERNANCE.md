@@ -4,9 +4,13 @@
 
 The platform brief says: "İnsan onayı olmadan üretim modelini, eşikleri veya aktif
 kuralları değiştirme." Taken completely literally that would forbid the daily automatic
-model refit that has been running in production since before this session
-(`tools/build_generic_model.py --all`, called from `daily.yml`). It does not forbid it,
-because **routine recalibration is not the kind of change that sentence is about**:
+model refit that has been running in production for as long as this platform has existed
+(`tools/build_generic_model.py --sport 1` and `--sport 4`, called from `combine.yml`'s
+"Refresh the results store and rebuild the football/tennis models" step — explicit
+per-sport calls rather than `--all`, since the results store may still hold other sports'
+historical rows even though only football and tennis are refit daily; this replaced the
+retired scanner's own `daily.yml --all` call, `docs/DECISIONS/0007`). It does not forbid
+it, because **routine recalibration is not the kind of change that sentence is about**:
 
 | | Routine recalibration | Structural change |
 |---|---|---|

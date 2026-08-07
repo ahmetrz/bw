@@ -23,9 +23,9 @@ else — `os.environ.get(...)`, never a config file, never a CLI flag:
 run completes normally (`CLAUDE.md`'s "Secrets" section states this as policy;
 `tools/telegram_ping.py`'s own docstring states the reasoning: "a missing token is a
 valid state — the daily run still scans and still writes its report, it just cannot
-notify"). `daily.yml`'s "Check Telegram credentials" step runs `telegram_ping.py --quiet`
+notify"). `combine.yml`'s "Check Telegram credentials" step runs `telegram_ping.py --quiet`
 before the expensive fetch specifically so a **present but broken** token — a genuine
-fault — surfaces in seconds rather than after a two-hour fetch has nowhere to send its
+fault — surfaces in seconds rather than after the fetch has nowhere to send its
 result; that script exits 0 when credentials are simply absent and 1 only when they're
 set and fail.
 
@@ -40,32 +40,32 @@ interpolating a secret into it.
 ## Output encoding
 
 Every HTML page this project generates is built by Python string formatting, not a
-templating engine with autoescaping — so escaping is manual, and it happens through two
-independent code paths that were kept independent on purpose
-(`tools/webshell.py`'s docstring, `docs/DECISIONS/0001`):
+templating engine with autoescaping — so escaping is manual. All 14 platform pages go
+through one shared helper: `tools/webshell.py`'s `esc(v)`
+(`html.escape(str(v), quote=True)`), used at every dynamic interpolation point across
+`tools/make_platform_pages.py`. One template, one escaping path, by design — a second,
+independently-formatted page generator would be a second chance to get escaping wrong
+(`docs/ARCHITECTURE.md`).
 
-- **The pre-existing pages** (`picks.html`, `results.html`, `stats.html`, `method.html`)
-  call `html.escape()` inline at each interpolation point — `tools/make_picks_page.py`
-  (22 call sites), `tools/make_stats_page.py` (3), `tools/make_method_page.py` (25).
-- **The 14 new combine-platform pages** go through one shared helper instead:
-  `tools/webshell.py`'s `esc(v)` (`html.escape(str(v), quote=True)`), used at every
-  dynamic interpolation point across `tools/make_platform_pages.py` (53 call sites).
-  Centralizing it here — rather than repeating `html.escape()` at each new page like the
-  older files do — was a deliberate choice for the new code, not an inconsistency; the
-  old pages were left as they were specifically to avoid touching code already covered
-  by `tests/test_regression.py`'s exact-content assertions.
+This used to be two independent escaping paths, kept apart on purpose while a second,
+now-retired product shared this repo: the old scanner's own pages (`picks.html`,
+`results.html`, `stats.html`, `method.html`, rendered by `tools/make_picks_page.py`,
+`tools/make_stats_page.py`, `tools/make_method_page.py`, each calling `html.escape()`
+inline at its own interpolation points) were kept separate from the new platform's shared
+`webshell.py` helper specifically so touching one code path never risked the other's
+test coverage. Those tools and pages were deleted with the scanner
+(`docs/DECISIONS/0007`), so `webshell.py`'s `esc()` is the only escaping path left; both
+it and the retired pages' inline calls always quoted attribute values
+(`quote=True` / `html.escape`'s default), so escaped text was safe in both element content
+and attribute position either way.
 
-Both paths quote attribute values (`quote=True` / `html.escape`'s default), so escaped
-text is safe in both element content and attribute position.
-
-The one place a dynamic value is embedded directly into inline JavaScript rather than
-into HTML — `picks.html`'s client-side filter script, which reads a `DAY` value — uses
-`json.dumps()` to produce the literal, not an f-string
-(`tools/make_picks_page.py`: `day=json.dumps(str(report.get("day") or generated[:10]))`).
-That's the correct technique for landing a string safely inside a `<script>` block, and
-it's used precisely because HTML-escaping alone does not make a value safe inside a JS
-string literal — a different context needs a different function, and the code reflects
-that distinction rather than reusing `html.escape()` somewhere it wouldn't help.
+The one place a dynamic value used to be embedded directly into inline JavaScript rather
+than into HTML — the retired `picks.html`'s client-side filter script, which read a `DAY`
+value — used `json.dumps()` to produce the literal, not an f-string. That was the correct
+technique for landing a string safely inside a `<script>` block, since HTML-escaping alone
+does not make a value safe inside a JS string literal; nothing in the surviving 14 pages
+currently embeds a dynamic value into inline JavaScript the same way, but the technique is
+worth keeping in mind if one ever does.
 
 Every generated page is also a single self-contained file: no CDN script, no external
 font, no analytics, no `<script src=` (`webshell.py`'s stated design constraint, matched
@@ -82,7 +82,7 @@ attacker-controlled input in the position that would make either threat real:
   external input.** `tools/check_source_health.py`'s `SOURCES` tuple, `engine/bwfeed.py`
   / `engine/coupon.py` / `engine/mirror.py`'s Betwinner endpoint bases, and
   `tools/collect_results.py`'s per-adapter base URLs (`FD_BASE`,
-  `raw.githubusercontent.com/...`, `statsapi.mlb.com`, ...) are all written directly into
+  `raw.githubusercontent.com/...`, `tennisexplorer.com`, ...) are all written directly into
   the `.py` files. Nothing in this project accepts a URL from a request, a form, or any
   other untrusted party and then fetches it — there is no code path where that could even
   be wired up, because there is no request-handling surface at all. Classic SSRF assumes
@@ -101,9 +101,9 @@ what exists today.
 
 ## Dependency posture
 
-The core pipeline — `engine/`, `scan.py`, `tools/daily_report.py`,
-`tools/daily_combine.py`, every collector, the model fitter, every page generator except
-the PDF one — is standard library only (`requirements.txt`'s own header comment;
+The core pipeline — `engine/`, `tools/daily_combine.py`, every collector, the model
+fitter, every page generator except the PDF one — is standard library only
+(`requirements.txt`'s own header comment;
 verified by `tests/test_regression.py` running with zero installs). The **one** pinned
 dependency is `reportlab>=4.0,<5.1`, used exclusively by `tools/make_pdf_report.py`. No
 lockfile, no transitive dependency tree to audit beyond what PyPI resolves for that one
@@ -124,8 +124,8 @@ pull in an untested major version.
   control with nothing behind it to protect.
 - **The generated pages have no access control**, because the repo they're committed to
   is public (`docs/DATA_SOURCES.md`: "the repo is public, Actions minutes are
-  unlimited") — anyone with the repo URL can read `picks.html`, `combine.html`, and
-  everything else this pipeline writes, same as any other file in a public repo. That is
+  unlimited") — anyone with the repo URL can read `combine.html` and every other platform
+  page this pipeline writes, same as any other file in a public repo. That is
   a consequence of the operator's own hosting choice (public repo, unlimited Actions
   minutes, per that same source) rather than a gap this project should close — the pages
   contain no credentials and no personal data beyond the operator's own betting selections,

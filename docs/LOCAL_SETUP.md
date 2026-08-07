@@ -1,10 +1,10 @@
 # LOCAL_SETUP.md — running this locally
 
-Two products live in this repo: the original scanner/daily-picks pipeline and the
-football+tennis combine platform added this session (`docs/DECISIONS/0001` — extension,
-not a rewrite). Both run from the same fixture, both run with zero installs, and both are
-covered below. Command lines are exact — copied from each tool's `argparse` block, not
-guessed.
+One product lives in this repo today: the football+tennis daily combine platform. An
+earlier, second product — a multi-sport top-N scanner and its own daily-picks pipeline —
+was retired outright (`docs/DECISIONS/0007`); this document no longer covers it. What
+remains runs from the same fixture and with zero installs, covered below. Command lines
+are exact — copied from each tool's `argparse` block, not guessed.
 
 ## Clone
 
@@ -17,9 +17,9 @@ No submodules, no `.env` template to fill in — see "Secrets" below for what's 
 
 ## Dependencies: none, except for PDF generation
 
-The core pipeline (`engine/`, `scan.py`, `tools/daily_report.py`,
-`tools/daily_combine.py`, `tools/collect_*.py`, `tools/build_generic_model.py` and
-everything they import) is **standard library only**. This isn't a claim made here first —
+The core pipeline (`engine/`, `tools/daily_combine.py`, `tools/collect_*.py`,
+`tools/build_generic_model.py` and everything they import) is **standard library only**.
+This isn't a claim made here first —
 `tests/test_regression.py`'s own docstring states it ("Standard library only — the project
 takes no pip dependencies") and the test suite is what would break if it stopped being
 true. Skip `pip install` entirely unless you need a PDF.
@@ -35,92 +35,14 @@ Nothing else in the repo imports it. Running the test suite without installing i
 is fine — the PDF-dependent tests skip themselves cleanly (see "Tests" below) rather than
 failing.
 
-## The scanner (`scan.py`)
-
-The original product: single-book, composite-score, top-N singles. Runs fully offline on
-a saved JSON pull — there is no network call anywhere in this path.
-
-```
-python3 scan.py --input fixtures/sample.json
-```
-
-Flags (`scan.py`):
-
-| Flag | Default | Meaning |
-|---|---|---|
-| `--input` | *(required)* | Path to a JSON or `.json.gz` odds pull |
-| `--book` | `config.BOOK` (`betwinner`) | Bookmaker slug to scan |
-| `--top` | `config.TOP_N` (`50`) | Rows to print/write |
-| `--include-alt` | off | Include alternative lines, not just the main line |
-| `--parlay` | off | Also print a top-N parlay summary (book-implied numbers only — hard rule 4) |
-
-Writes `report.json` (`config.REPORT_PATH`) and prints the ranked table to stdout. This
-is the tool the regression test (`tests/test_regression.py`) re-runs against
-`fixtures/expected_report.json` on every change.
-
-## The daily picks pipeline (`tools/daily_report.py`)
-
-The scheduled product (`.github/workflows/daily.yml`): windows → picks → score → page →
-Telegram, described in full in `CLAUDE.md`. Locally, against the committed fixture:
-
-```
-python3 tools/daily_report.py --input fixtures/sample.json --no-coupon --no-telegram
-```
-
-Both flags matter for a local run, not just convenience:
-
-- **`--no-coupon`** skips `engine/coupon.py`'s call to Betwinner's own
-  `LiveBet/Open/SaveCoupon` endpoint. Without it, this command reaches out to
-  `betwinner.com` over the real network (and does so again inside `--no-coupon`-less
-  `daily_combine.py` runs — see below). It fails gracefully if the network is unreachable
-  (`engine/coupon.py`'s `_post()` catches the error and returns `Success: False` rather
-  than raising), but it still tries, on a live host, for real.
-- **`--no-telegram`** prints the notice text to stdout instead of calling
-  `engine/telegram.py`. Not strictly required — a missing `TELEGRAM_BOT_TOKEN` /
-  `TELEGRAM_CHAT_ID` already degrades to a no-op send rather than an error (see
-  `docs/SECURITY.md`) — but it's the only way to see the notice text without either
-  setting real credentials or letting a network call attempt and fail.
-
-Other flags:
-
-| Flag | Default | Meaning |
-|---|---|---|
-| `--input` | *(required)* | Betwinner feed pull, JSON or `.json.gz` |
-| `--predictions-log` | `data/predictions.jsonl` | Append-only prediction log (see caveat below) |
-| `--windows` | `24` (`config.DAILY_WINDOWS_HOURS`) | Comma-separated hour windows to analyse |
-| `--out` | `daily_report.json` | Report JSON |
-| `--page` | `picks.html` | Rendered page (built via `tools/make_picks_page.py`, called automatically — see "Web pages" below) |
-| `--simulated-out` | `data/simulated_leagues.json` | Flagged simulated-fixture competitions |
-| `--only-if-new` | off | Skip the run (or just the Telegram send) if today's date is already logged — the backstop-run guard `daily.yml`'s 07:43/08:43 retries pass |
-
-### Local runs write into files the live pipeline treats as permanent
-
-`--predictions-log`, `--out`, `--page`, and `--simulated-out` all default to paths that
-are git-tracked, live-production artifacts: `data/predictions.jsonl` in particular is the
-append-only log `docs/MANUAL_DATA_IMPORT.md`-adjacent grading depends on, and per
-`CLAUDE.md` it is written once, at pick time, and never rewritten — a local test run
-against `fixtures/sample.json` would append real rows stamped with **today's actual
-wall-clock date** into that same file. Point every one of these flags at a scratch
-location for a local test:
-
-```
-mkdir -p /tmp/bwtest
-python3 tools/daily_report.py --input fixtures/sample.json --no-coupon --no-telegram \
-  --predictions-log /tmp/bwtest/predictions.jsonl \
-  --out /tmp/bwtest/daily_report.json \
-  --page /tmp/bwtest/picks.html \
-  --simulated-out /tmp/bwtest/simulated_leagues.json
-```
-
-If you skip this, `git status` after the run is the way back — nothing is pushed by a
-local invocation, only written to the working tree.
-
 ## The daily combine pipeline (`tools/daily_combine.py`)
 
-This session's product: one football+tennis combine a day, or an honest "none today"
-(`docs/DECISIONS/0001`, `0003`). Reuses the same card-loading and model-loading code as
-`daily_report.py` (`tools/daily_report.load`, `.load_models`) rather than re-fetching or
-re-fitting anything.
+The product: one football+tennis combine a day, or an honest "none today"
+(`docs/DECISIONS/0001`, `0003`, `0007`). Its card-loading and model-loading helpers
+(`load()`, `within()`, `load_models()`) live directly inside `daily_combine.py` itself —
+they used to be shared with the now-retired scanner's own daily-picks tool via a separate
+module, and were folded in here once that tool was deleted and `daily_combine.py` became
+the only caller (`docs/ARCHITECTURE.md`).
 
 ```
 python3 tools/daily_combine.py --input fixtures/sample.json --no-coupon \
@@ -160,19 +82,21 @@ python3 -m unittest discover -s tests -v
 
 Two files, deliberately separate (`tests/test_combine_platform.py`'s own docstring):
 
-- **`tests/test_regression.py`** — anchors the live scan/daily-picks pipeline against
-  `fixtures/expected_report.json`. Regenerating the snapshot is a deliberate act, not a
-  side effect of a passing run:
-  ```
-  python3 tests/test_regression.py --update
-  ```
-  Read the diff before committing a regenerated snapshot — this file is what would catch
-  an unintended change to the live pipeline's output.
-- **`tests/test_combine_platform.py`** — the new platform's engine layer
+- **`tests/test_regression.py`** — regression + integration tests for the combine
+  platform's shared engine (`engine/bwfeed.py`, `coupon.py`, `grade.py`, `ladder.py`,
+  `mirror.py`, `model_generic.py`, `parlay.py`, `pick.py`, `rating.py`,
+  `results_store.py`, `settlement.py`, `signals.py`, `simulated.py`, `telegram.py`, plus
+  `tools/collect_live.py`, `grade_predictions.py`, `heartbeat.py`, `refresh_combine.py`),
+  run directly against `fixtures/sample.json`. Previously anchored the now-retired
+  scanner's output against a committed snapshot (`fixtures/expected_report.json`,
+  regenerated with a `--update` flag); both the snapshot file and that mode were removed
+  with the scanner (`docs/DECISIONS/0007`) — this file tests the surviving pipeline
+  directly rather than by snapshot comparison.
+- **`tests/test_combine_platform.py`** — the platform's engine layer
   (`engine/dataquality.py`, `engine/confidence.py`, `engine/referee.py`,
   `engine/combine.py`, `engine/governance.py`), against synthetic fixtures, not the
   sample card. Kept in its own file so a failure here never reads as a failure in the
-  live pipeline's own suite, or vice versa.
+  other file's own suite, or vice versa.
 
 `TestPdfReport` inside `test_combine_platform.py` calls `unittest.SkipTest` in
 `setUpClass` if `reportlab` isn't importable, so the full discovery command above passes
@@ -188,39 +112,35 @@ This mirrors `.github/workflows/tests.yml` exactly — see `docs/GITHUB_ACTIONS.
 
 ## Web pages
 
-Two independent code paths, deliberately not merged (`tools/webshell.py`'s own
-docstring, `docs/DECISIONS/0001`):
+The 14 combine-platform screens are rendered standalone, in one pass, from whatever data
+already exists on disk, through one shared shell (`tools/webshell.py`):
 
-- **`picks.html` / `results.html`** are built by `tools/make_picks_page.py`, called
-  automatically from inside `tools/daily_report.py` (`--page`) and
-  `tools/daily_results.py` (`--out`) respectively. There's no reason to invoke
-  `make_picks_page.py` directly for a normal local run:
-  ```
-  python3 tools/make_picks_page.py --report daily_report.json --out picks.html
-  ```
-  (`--report` defaults to `daily_report.json`, `--out` to `picks.html` — useful only if
-  you already have a report JSON on disk and want to re-render just the page.)
+```
+python3 tools/make_platform_pages.py
+```
 
-- **The 14 combine-platform screens** are rendered standalone, in one pass, from
-  whatever data already exists on disk:
-  ```
-  python3 tools/make_platform_pages.py
-  ```
-  | Flag | Default |
-  |---|---|
-  | `--combine` | `combine.json` |
-  | `--combine-log` | `data/combine_log.jsonl` |
-  | `--source-health` | `data/source_health.json` |
-  | `--watch-log` | `data/watch_log.jsonl` |
-  | `--out-dir` | `.` |
+| Flag | Default |
+|---|---|
+| `--combine` | `combine.json` |
+| `--combine-log` | `data/combine_log.jsonl` |
+| `--source-health` | `data/source_health.json` |
+| `--watch-log` | `data/watch_log.jsonl` |
+| `--out-dir` | `.` |
 
-  Missing inputs degrade to an explicit empty state per page rather than an error — run
-  it against an empty checkout and it still writes all 14 files
-  (`combine.html`, `referee.html`, `dataquality.html`, `scanned.html`, `rejected.html`,
-  `combine_history.html`, `combine_results.html`, `lab.html`, `calibration.html`,
-  `model_versions.html`, `proposed_changes.html`, `source_health.html`, `runs.html`,
-  `settings.html`). Point `--out-dir` at a scratch directory locally for the same reason
-  as above: the defaults land on files `daily.yml`/`results.yml` also write.
+Missing inputs degrade to an explicit empty state per page rather than an error — run
+it against an empty checkout and it still writes all 14 files
+(`combine.html`, `referee.html`, `dataquality.html`, `scanned.html`, `rejected.html`,
+`combine_history.html`, `combine_results.html`, `lab.html`, `calibration.html`,
+`model_versions.html`, `proposed_changes.html`, `source_health.html`, `runs.html`,
+`settings.html`). Point `--out-dir` at a scratch directory locally for the same reason
+as above: the defaults land on files `combine.yml`/`results.yml` also write.
+
+The retired scanner used to render a second, independent set of pages (`picks.html`,
+`results.html`, via `tools/make_picks_page.py`) through its own separate escaping path,
+kept apart from `webshell.py` on purpose while both products were live
+(`docs/DECISIONS/0001`). That tool and those pages were deleted with the scanner
+(`docs/DECISIONS/0007`) — `make_platform_pages.py`/`webshell.py` is the only page-rendering
+path left.
 
 ## Generating a PDF
 
@@ -239,10 +159,10 @@ Turkish text.
 
 ## The results / model loop (touches the network)
 
-Unlike everything above, these four tools are not fixture-only — they fetch from real,
+Unlike everything above, these tools are not fixture-only — they fetch from real,
 named external sources or need results already collected to do anything useful. Listed
 here for completeness since their flags were asked for, not because a local run needs
-them to exercise the daily-picks or combine pipeline against the fixture.
+them to exercise the combine pipeline against the fixture.
 
 **`tools/collect_results.py`** — one HTTP-fetching adapter per source, all sharing
 `engine/results_store.py`'s schema (see `docs/MANUAL_DATA_IMPORT.md` for the schema
@@ -257,7 +177,7 @@ python3 tools/collect_results.py --source tml --restate   # re-derive that adapt
 
 | Flag | Meaning |
 |---|---|
-| `--source NAME` | Run one adapter (`football`, `euroleague`, `tml`, `tennisexplorer`, `mlb`, `setka`) |
+| `--source NAME` | Run one adapter (`football`, `tml`, `tennisexplorer` — narrowed from six, including `euroleague`/`mlb`/`setka`, when scope fixed at football+tennis, `docs/DECISIONS/0007`) |
 | `--all` | Run every adapter |
 | `--list` | Print adapters and current `data/results/` coverage, fetches nothing |
 | `--restate` | Re-apply the named adapter's current field set to rows it already wrote, without re-deriving scores (see the tool's own docstring for why this exists — an adapter learning to declare a new field, e.g. `surface`) |
@@ -276,7 +196,11 @@ every sport currently in the store and prints which came back `KULLANILABİLİR`
 
 **`tools/grade_predictions.py`** — checks the results store first (local, no network);
 falls back to fetching `football-data.co.uk` season CSVs and a flashscore feed only for
-football predictions the store hasn't resolved.
+football predictions the store hasn't resolved. No scheduled workflow invokes it as a
+script any more — the retired scanner's own daily-picks pipeline was its main caller
+(`docs/DECISIONS/0007`) — but `tools/grade_combine.py` still imports its lookup tables
+(`docs/ARCHITECTURE.md`), and it remains runnable standalone against the historical
+`data/predictions.jsonl` log.
 
 ```
 python3 tools/grade_predictions.py
@@ -289,26 +213,9 @@ python3 tools/grade_predictions.py
 | `--season` | `2526` | football-data.co.uk season code for the CSV fallback |
 | `--flashscore-days` | `4` | Days of the flashscore feed to read for football fallback |
 
-**`tools/daily_results.py`** — local only (reads the prediction log, rebuilds a page);
-Telegram send is the only network call, and it's skippable.
-
-```
-python3 tools/daily_results.py --out /tmp/bwtest/results.html --no-telegram
-python3 tools/daily_results.py --date 2026-07-26 --no-telegram
-```
-
-| Flag | Default | Meaning |
-|---|---|---|
-| `--predictions` | `data/predictions.jsonl` | Log to read |
-| `--date` | *(blank = most recent logged day)* | `YYYY-MM-DD` |
-| `--out` | `results.html` | Rendered scorecard |
-| `--state` | `data/results_sent.json` | Notification-dedup state |
-| `--no-telegram` | off | Skip the send |
-| `--force-send` | off | Notify even when nothing new settled |
-
-**`tools/grade_combine.py`** — the combine platform's equivalent of
-`grade_predictions.py`. No flags at all; reads and rewrites `data/combine_log.jsonl` in
-place.
+**`tools/grade_combine.py`** — the combine platform's own settlement tool, reusing
+`grade_predictions.py`'s lookup tables rather than duplicating them. No flags at all;
+reads and rewrites `data/combine_log.jsonl` in place.
 
 ```
 python3 tools/grade_combine.py

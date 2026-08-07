@@ -12,23 +12,30 @@ zero working coverage before this session — see `docs/TENNIS_MODELS.md`).
 
 ## What actually prices a football fixture
 
-Two models, tried in this order (`engine/pick.resolve()`):
+One model prices every football selection today. `engine/pick.py`'s `MODELLED_SPORTS` —
+the list of sports with a HAND-WRITTEN model tried before the generic path — is empty, so
+`engine/pick.resolve()`'s `sport not in MODELLED_SPORTS` branch is always taken for
+football and returns straight from the generic-model lookup; the `if sport == 1:` branch
+below it (hand-written Elo, then ClubElo) is unreachable code today, not a live fallback:
 
-1. **Hand-written Elo** (`engine/model_elo.py`) — fitted on 298,950 results across 39
-   divisions, own history, works in and out of season. **Not currently promoted to
-   production selection** — hard rule 8 requires held-out calibration before a model is
-   trusted, and this one has never been measured against unseen matches. Present, not used.
-2. **ClubElo** (`engine/model_football.py`) — ~60 European leagues, near-term fixtures
-   only, Poisson-pair scoreline matrix with a fitted draw correction. Used as the
-   `MODELLED_SPORTS`-style hand-written source when it reaches a fixture.
-3. **Generic model** (`engine/model_generic.py`, sport 1) — counted Elo-plus-margin
-   fitted from 141,457+ stored results (`data/results/1.jsonl`, fed by
-   `football-data.co.uk` + the live watcher). **This is the one actually admitted**:
-   0.012 held-out calibration gap, comfortably inside the 0.03 bar. Per hard rule 8 ("a
-   model is wired in on its calibration, not its reach"), the generic model is what
-   `engine/pick.py` uses for football's real selections today, with ClubElo/the hand-Elo
-   as reach-extending fallbacks only when the generic model cannot resolve the fixture at
-   all (unknown team, insufficient appearances).
+1. **Generic model** (`engine/model_generic.py`, sport 1) — counted Elo-plus-margin
+   fitted from stored results (`data/results/1.jsonl`, fed by `football-data.co.uk` + the
+   live watcher). **This is the only model actually admitted for football**: 0.010
+   held-out calibration gap (improved from 0.012 by the date-proportional split fix —
+   `docs/TENNIS_MODELS.md`), comfortably inside the 0.03 bar. Per hard rule 8 ("a model is
+   wired in on its calibration, not its reach"), this is what `engine/pick.py` uses for
+   every football selection today.
+2. **Hand-written Elo** (`engine/model_elo.py`) — fitted on 298,950 results across 39
+   divisions, own history, works in and out of season, reaches more fixtures than the
+   generic model. **Dormant, not a fallback** — hard rule 8 requires held-out calibration
+   before a model is trusted, and this one has never been measured against unseen matches,
+   so it left `MODELLED_SPORTS` earlier and the branch that would call it is unreachable.
+   Kept, not deleted, so re-admitting it is a one-line change if a future comparison ever
+   favours it (`docs/DECISIONS/0007`).
+3. **ClubElo** (`engine/model_football.py`) — ~60 European leagues, near-term fixtures
+   only, Poisson-pair scoreline matrix with a fitted draw correction. Sits behind the same
+   now-unreachable `if sport == 1:` branch as the hand-written Elo — present in the code,
+   never actually called while `MODELLED_SPORTS` stays empty.
 
 ## Factors actually used vs. the brief's list (section 9)
 

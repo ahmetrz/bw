@@ -391,6 +391,37 @@ class TestTrackRecord(unittest.TestCase):
         path = self._write_log(rows)
         self.assertEqual(track_record.calibration_by_sport(path), {})
 
+    def test_reads_combine_log_shape_not_only_flat_rows(self):
+        """docs/DECISIONS/0007: tools/daily_report.py (predictions.jsonl's only writer)
+        was deleted with the retired scanner, so a track record still defaulting to that
+        file would be frozen from the day the old product left — silently stale exactly
+        the way hard rule 8 warns against, just aimed at this module instead of a pricing
+        model. DEFAULT_LOG now points at data/combine_log.jsonl, and _load() flattens
+        each day's nested `legs` into the same per-selection shape the tests above write
+        directly — a combine day with two graded legs must score exactly as if it had
+        been logged as two flat predictions.jsonl-style rows."""
+        from engine import track_record
+        nested = self._write_log([
+            {"date": "2026-08-06", "legs": [
+                {"sport_id": 1, "market_type": "handicap",
+                 "start": "2026-08-06T12:00:00+00:00",
+                 "confidence": {"confidence_score": 100.0}, "result": "win"},
+                {"sport_id": 4, "market_type": "totals",
+                 "start": "2026-08-06T14:00:00+00:00",
+                 "confidence": {"confidence_score": 100.0}, "result": "win"},
+            ], "settlement": {"result": "win"}},
+            # A day with no combine contributes nothing and must not crash the reader.
+            {"date": "2026-08-05", "legs": [], "settlement": {"result": "no_bet"}},
+        ])
+        flat = self._write_log([
+            {"model_pct": 100.0, "result": "win", "sport_id": 1},
+            {"model_pct": 100.0, "result": "win", "sport_id": 4},
+        ])
+        self.assertAlmostEqual(track_record.brier_score(nested)["overall"],
+                               track_record.brier_score(flat)["overall"])
+        self.assertAlmostEqual(track_record.log_loss(nested),
+                               track_record.log_loss(flat))
+
 
 class TestGovernance(unittest.TestCase):
     def setUp(self):

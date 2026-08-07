@@ -97,15 +97,21 @@ decision, not a capability that was lost.
     anyway — it is what the slip will actually do.
 - **How much to bet:** this product does not size a bankroll and does not recommend a
   stake. `engine/combine.py`'s `COMBINE_STAKE_UNITS` is a flat, analytical-only constant
-  used solely to express the combine's own figures (expected-return multiple, break-even
-  rate) on a consistent 1-unit basis — never a position-sizing recommendation, and never
-  read from the model's own confidence: doing that would convert "the model is 86% sure"
-  into "the model is 86% sure AND the book is wrong about it" and size a bet on a claim
-  the product never makes out loud. The reported figures are the combine's own
-  book-implied numbers (`combined_odds`, `combined_probability`,
-  `MIN_COMBINE_COMBINED_PROBABILITY`), which assert nothing beyond arithmetic on the
-  book's own prices, sitting beside the realised settlement — never beside the model's
-  confidence, which is the thing under test.
+  (currently defined but not yet read by any report — a real expected-return/break-even
+  figure for the combine, the kind the retired scanner's own `engine/stake.py` used to
+  report for its list, is not built) reserved for exactly that purpose rather than left
+  unnamed; it must never become a position-sizing recommendation, and never be read from
+  the model's own confidence — doing that would convert "the model is 86% sure" into "the
+  model is 86% sure AND the book is wrong about it" and size a bet on a claim the product
+  never makes out loud. The two figures the combine DOES report are NOT the same kind of
+  number and must not be described as if they were: `combined_odds` (`engine/combine.py`'s
+  `_combined_odds`) is genuinely book-implied — the product of the legs' own decimal odds,
+  arithmetic on the book's own prices and nothing else. `combined_probability` (and the
+  `MIN_COMBINE_COMBINED_PROBABILITY` floor gating it) is the product of each leg's
+  `model_survival` instead — a MODEL-derived quantity, explicitly documented as a stated
+  simplification in `docs/COUPON_OPTIMIZATION.md` and `config.py`'s own comment. Confusing
+  the two would mislabel a model claim as if it were a harder, book-derived fact — the
+  same class of error hard rule 6 exists to prevent, aimed at a different number.
 
 ## The daily rule, in order (this is the product)
 1. **The model picks the direction.** Never the price. A short price is a probability
@@ -296,12 +302,18 @@ rule by number across `docs/`, the test suite, and the ADRs themselves.
    safest rung, and every plus-handicap and non-headline total IS an alt line.
 3. **Default deliverable is ONE combine a day, or an honest "no combine today."** Not a
    top-N list — that was the retired product's shape, not this one's.
-4. **The combine's own numbers are never presented as positive value.** Because there is
-   no reference, a combine can only be described in the book's OWN implied numbers:
-   combined decimal odds, combined book-implied probability, and
-   `MIN_COMBINE_COMBINED_PROBABILITY` as the floor below which adding one more leg is
-   refused regardless of how attractive it looks alone. By construction within one book
-   this cannot carry positive expectation, and nothing here presents it as if it could.
+4. **The combine's own numbers are never presented as positive value, and a model number
+   is never relabelled as a book one.** `combined_odds` is genuinely book-implied — the
+   product of the legs' own decimal prices, by construction unable to carry positive
+   expectation within one book, and nothing here presents it as if it could.
+   `combined_probability` (and the `MIN_COMBINE_COMBINED_PROBABILITY` floor below which
+   adding one more leg is refused regardless of how attractive it looks alone) is a
+   DIFFERENT kind of number — the product of each leg's own `model_survival`, a stated
+   simplification documented as such in `docs/COUPON_OPTIMIZATION.md`. It is not a claim
+   about the book's prices at all; it is the model's own claim about the combine as a
+   whole, reported plainly as that rather than dressed up as harder, book-derived
+   arithmetic — the same honesty hard rule 6 requires of the single-selection score,
+   applied to the combine's combined figure.
 5. **Never fabricate odds or limits.** If the loaded data's book ≠ the requested book,
    or the API 4xx's, STOP and report — never proceed on fallback data.
 6. **Direction never comes from the price.** This is the one invariant most likely to be

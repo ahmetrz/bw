@@ -11,9 +11,10 @@ formula, from `engine/rating.py` (unchanged this session):
 puan = 100 × ( eşik + (olasılık − eşik) × kanıt )
 ```
 
-`eşik` (floor) is `config.MIN_MODEL_SURVIVAL` (0.75) for the daily-picks path;
-`engine/confidence.py` calls the exact same function with the exact same floor for the
-combine platform — there is no second scoring formula. Verified by
+`eşik` (floor) is `config.MIN_MODEL_SURVIVAL` (0.75). `engine/pick.py`'s own candidate
+selection and `engine/confidence.py`'s reported score both call the exact same
+`rating.score()` function with the exact same floor — there is no second scoring formula.
+Verified by
 `tests/test_combine_platform.py::TestConfidence::test_confidence_score_equals_ratings_score_exactly`
 and `test_score_never_reads_the_price_through_confidence_either`, which assert the number
 is byte-identical to `rating.score()`'s own output and provably blind to the odds.
@@ -40,14 +41,14 @@ The platform brief (section 12) asks for a full record per candidate, not just a
 
 ## Why EV is reported but never used to select
 
-`engine/edge.py` (pre-existing) already states the reasoning for the daily-picks path: a
-computed positive edge against a free public model is far more often model error than a
-real mispricing, because the model is not sharper than a bookmaker's own pricing. Section
-12 of the brief asks for EV to be *reported* — this session does exactly that and no more.
-`engine/referee.py`'s `odds_ev_judge` goes one step further and treats an implausibly large
-computed EV (+35% or more) as a reason to **flag the selection as suspicious**, not as a
-reason to prefer it — the inversion is deliberate and is the same judgement `edge.py`
-already made, applied per-leg.
+`engine/edge.py` (pre-existing) already states the reasoning: a computed positive edge
+against a free public model is far more often model error than a real mispricing, because
+the model is not sharper than a bookmaker's own pricing. Section 12 of the brief asks for
+EV to be *reported* — this platform does exactly that and no more. `engine/referee.py`'s
+`odds_ev_judge` goes one step further and treats an implausibly large computed EV (+35% or
+more) as a reason to **flag the selection as suspicious**, not as a reason to prefer it —
+the inversion is deliberate and is the same judgement `edge.py` already made, applied
+per-leg.
 
 ## Reproducibility
 

@@ -3,7 +3,8 @@
 ## The pipeline, in order
 
 ```
-picks (football+tennis, from the SAME model layer the daily-picks path uses)
+picks (football+tennis, from engine/pick.py's model+ladder+gates layer — CLAUDE.md's
+       "The daily rule, in order")
   -> engine.confidence.annotate()      full ConfidencePrediction per pick
   -> engine.combine.eligible()         hard gates (see below) — yes/no, not scored
   -> engine.referee.review_all()       10 judges; any veto removes the leg
@@ -17,7 +18,8 @@ picks (football+tennis, from the SAME model layer the daily-picks path uses)
    scope, section 3).
 2. `confidence_score >= config.MIN_COMBINE_CONFIDENCE` (80.0) — see
    `docs/DECISIONS/0003-two-thresholds-not-one.md` for why this is a SEPARATE number from
-   the daily-picks path's 0.75 floor, not a reconciled one.
+   `engine/pick.py`'s own 0.75 survival floor (`MIN_MODEL_SURVIVAL`, applied to every
+   candidate before it is even considered for the combine), not a reconciled one.
 3. Data quality does not block (`dataquality.assess()["blocks_combine"]`).
 4. Fixture has not started (`start` parsed and compared against the run's `now`).
 5. `odds >= config.MIN_ODDS` (1.10 — the SAME gate the rest of the product uses, re-checked

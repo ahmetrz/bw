@@ -14,6 +14,14 @@ reproduce them at a cost, and CLAUDE.md's own rule (hard rule 10) is to read the
 assume a check is stale until there's a reason to think so. Where a status is inherited
 rather than freshly checked, the "checked" column says which date it is inherited from.
 
+**Scope note:** this platform's active scope is fixed at football and tennis
+(`config.COMBINE_SPORTS = {1, 4}`, `docs/DECISIONS/0007-retire-the-scanner-single-product.md`
+— the multi-sport scanner that used to sit alongside this platform is retired). The odds,
+football and tennis sections immediately below are current and in active use. Sources
+catalogued for every other sport are kept further down as historical record rather than
+deleted — real, verified research with standalone value if scope ever widens again — not
+because they are still read by anything today.
+
 ## Status legend
 - **PRODUCTION** — a working adapter reads this today, code path named.
 - **RECOMMENDED / NEW** — verified reachable and legal to use, no adapter yet; this session
@@ -36,8 +44,8 @@ rather than freshly checked, the "checked" column says which date it is inherite
 | Source | URL | Auth | Status | Coverage | License | Reliability | Checked |
 |---|---|---|---|---|---|---|---|
 | Betwinner LiveFeed (live watcher) | see above | none | PRODUCTION | every football fixture the book carries, ~130/day observed | Betwinner's own data — not a third-party licence question | High for sports it can watch to completion; football finish is CLOCK-detected (`CLOCK_FINISH`), not status-string-detected, because only 1 of 3 watched matches ever showed "Match finished" literally | 2026-08-06 |
-| ClubElo | `api.clubelo.com/{Club}` | none | PRODUCTION (`engine/model_football.py`) | ~60 European leagues, Elo back to 1946 | Free, attribution-friendly, no explicit redistribution ban found | High — daily updates, narrow but deep coverage; near-term fixtures only for its leagues | 2026-07-25 |
-| Hand-written football Elo (298,950 results, 39 divisions) | internal, `engine/model_elo.py` | n/a | PRODUCTION but NOT wired into ranking | wider than ClubElo, in and out of season | n/a (own fit) | **Uncalibrated against unseen matches** — hard rule 8 keeps it out of production until a held-out gap is measured; the generic model currently out-evidences it (0.011 vs unmeasured) | 2026-08-06 |
+| ClubElo | `api.clubelo.com/{Club}` | none | PRESENT, code path DORMANT (`engine/model_football.py` implements it, but sits behind the same unreachable `MODELLED_SPORTS` branch as the hand-written Elo below — `docs/FOOTBALL_MODELS.md`) | ~60 European leagues, Elo back to 1946 | Free, attribution-friendly, no explicit redistribution ban found | High — daily updates, narrow but deep coverage; near-term fixtures only for its leagues | 2026-07-25 |
+| Hand-written football Elo (298,950 results, 39 divisions) | internal, `engine/model_elo.py` | n/a | PRESENT, code path DORMANT (`engine/pick.py`'s `MODELLED_SPORTS` is empty, so the branch that would call it is unreachable — `docs/FOOTBALL_MODELS.md`) | wider than ClubElo, in and out of season | n/a (own fit) | **Uncalibrated against unseen matches** — hard rule 8 keeps it out of production until a held-out gap is measured; the generic model currently out-evidences it (0.010 vs unmeasured) | 2026-08-06 |
 | football-data.co.uk | `football-data.co.uk/mmz4281/{YY}{YY}/{div}.csv` | none | PRODUCTION-eligible / RECOMMENDED for deeper football | shots, SoT, corners, fouls, cards, referee, HT/FT, closing odds/AH/O-U 2.5; 22+ divisions, 1993/94– | no explicit restriction found on the site; used widely in public research | High — static CSV, no rate limit observed | 2026-07-25 |
 | understat.com | `understat.com/match/{id}` | scraping | RECOMMENDED, not yet wired | xG, shots, SoT, deep completions, PPDA; Big-5 + RFPL, 2014/15– | scraping — no explicit ToS grant; personal/research use only | Medium — league INDEX is Cloudflare-gated from datacenter IPs (i.e. from GitHub Actions), match pages were OK. A GH Actions job would need to reach match pages by id, not crawl the index. | 2026-07-25 |
 | ESPN football summary API | `site.api.espn.com/apis/site/v2/sports/soccer/{lg}/summary` | none | **REFUSED — robots.txt names our crawler.** `anthropic-ai` is `Disallow: /` on espn.com (hard rule 11). Not used regardless of how useful `officials`/lineups/H2H looked in the 2026-07-25 sweep. | — | — | — | 2026-08-06 (robots re-check per hard rule 11) |
@@ -65,27 +73,44 @@ rather than freshly checked, the "checked" column says which date it is inherite
 | Ultimate Tennis Statistics | `ultimatetennisstatistics.com` | scraping | REFUSED — stale | Open-Era ATP Elo/stats | — | `season=2025` returns 0 rows, Elo `bestRankDate` stuck at 2024-06-24; historical baseline only, not usable as a live source | 2026-07-25 |
 | Sofascore, ATP tennis via api-sports | — | — | BLOCKED | — | — | 403 from this environment; api-sports shows no tennis subdomain at all while all 12 other sports have one | 2026-07-25 |
 
-## Table tennis, basketball, baseball and the other 60 sports
+## Table tennis, basketball, baseball and the other sports — out of scope (historical record)
 
-Covered by the **generic model** (`engine/model_generic.py`) fed by two mechanisms, per
-`CLAUDE.md`:
-1. **The live watcher is the default** — `tools/collect_live.py` reads Betwinner's own
-   `LiveFeed/Get1x2_VZip`, which carries every sport the book runs. This is now how most
-   sports accumulate history at all (table tennis ~490/day, football ~130/day, volleyball
-   ~120/day, esports ~60/day, measured over two full runs on 2026-08-06).
+**Not part of this platform's active scope.** `docs/DECISIONS/0007` fixed scope at football
+and tennis (`config.COMBINE_SPORTS = {1, 4}`); every sport in this section left the product
+entirely, not merely a ranking within it. Kept rather than deleted because the research
+itself — sources checked, verified reachable, or refused on robots.txt/licence/body grounds
+— has standalone value if scope ever widens again; nothing in this section is read by the
+platform today.
+
+While scope was wider, these were covered by the **generic model**
+(`engine/model_generic.py`) fed by two mechanisms:
+1. **The live watcher was the default** — `tools/collect_live.py` read Betwinner's own
+   `LiveFeed/Get1x2_VZip`, which carries every sport the book runs. This was, at the time,
+   how most sports accumulated history at all (table tennis ~490/day, football ~130/day,
+   volleyball ~120/day, esports ~60/day, measured over two full runs on 2026-08-06) — the
+   highest-volume sports in that measurement, table tennis and volleyball, are exactly the
+   ones now outside scope. `tools/collect_live.py`'s watch list (`SPORTS`) is football+tennis
+   only today, so none of this is still accumulating; the rows already collected remain in
+   `data/results/*.jsonl` as historical record (deleting collected data was a separate,
+   larger decision `docs/DECISIONS/0007` did not make).
 2. **A handful of pre-existing archives** for sports too thin to wait on the watcher:
    basketball (`api-live.euroleague.net`), baseball (`statsapi.mlb.com`), table tennis
-   (Setka API, hand-written model `engine/model_tt.py`, plus the generic store).
+   (Setka API). Table tennis's hand-written model (`engine/model_tt.py`) and its dedicated
+   collectors (`tools/collect_tt.py`, `tools/harvest_tt_history.py`,
+   `tools/build_tt_model.py`) were **deleted** with the scope narrowing, not merely
+   disconnected — unlike football's Elo model, which stays dormant in `engine/pick.py` for a
+   one-line re-admission, table tennis left the product entirely so its dedicated code left
+   with it.
 
 Sources **checked and refused on robots.txt grounds by our crawler's name** (hard rule 11,
-2026-07-26): NHL (`api-web.nhle.com`, `api.nhle.com`), OpenDota, Liquipedia, bo3.gg `/api/`,
-ESPN (all sports, not just football), cbv.com.br, FIVB (became disallowed after being
-previously usable — sources can revoke). Checked and found technically open but useless
-(hard rule 10, body-not-status-code): `api.openligadb.de` (real JSON, but its hockey/handball
-seasons are 2008–2013 and not the competitions on Betwinner's card), `cev.eu` (a website, not
-a feed). `api.snooker.org` requires an unregistered application name (401). `dartsorakel.com`
-is fully open (`Disallow:` empty) and is the best remaining darts candidate if that sport
-stays too thin for the watcher to reach 400 results on its own.
+2026-07-26, for sports outside today's scope): NHL (`api-web.nhle.com`, `api.nhle.com`),
+OpenDota, Liquipedia, bo3.gg `/api/`, ESPN (all sports, not just football), cbv.com.br, FIVB
+(became disallowed after being previously usable — sources can revoke). Checked and found
+technically open but useless (hard rule 10, body-not-status-code): `api.openligadb.de` (real
+JSON, but its hockey/handball seasons are 2008–2013 and not the competitions on Betwinner's
+card), `cev.eu` (a website, not a feed). `api.snooker.org` requires an unregistered
+application name (401). `dartsorakel.com` is fully open (`Disallow:` empty) and would be the
+best remaining darts candidate if darts ever entered scope.
 
 ## Betwinner's own results service — investigated, not usable yet
 
@@ -118,7 +143,8 @@ starts empty on a fresh clone; it is populated by the health-check step describe
 
 - **Football**: no new adapter was strictly required for the vertical slice — ClubElo +
   the existing Elo model + the live watcher already clear hard rule 8's calibration bar
-  (0.012 generic gap per CLAUDE.md). `football-data.co.uk` is catalogued above as the clear
+  (0.010 generic gap per `CLAUDE.md`, improved from 0.012 by the later date-proportional
+  calibration-split fix — `docs/TENNIS_MODELS.md`). `football-data.co.uk` is catalogued above as the clear
   next step for a richer factor set (cards, corners, referee) and is left `RECOMMENDED`
   rather than wired in, so as not to grow the football surface area in the same session a
   new sport (tennis) is being added — see `docs/DECISIONS/0002-football-scope-this-session.md`.

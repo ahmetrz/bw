@@ -18,7 +18,16 @@ recorded first.
 `tools/build_generic_model.py`'s calibration split changed from row-count-proportional to
 **date-proportional** (`_holdout_cut()`, new function) — see "What was deliberately NOT
 attempted" below for why this needed approval before touching it, and `docs/MODEL_GOVERNANCE.md`
-for the governance record. Rebuilding all sports with the new split, measured directly:
+for the governance record. The split lives in code shared by every sport that has enough
+results to fit, not just this product's two — `model_generic.usable()`'s calibration gate
+runs the same way "whether or not [a sport is] in `config.COMBINE_SPORTS`" (`CLAUDE.md`,
+hard rule 8), which is exactly why basketball/baseball/table tennis/badminton appear in the
+table below. **None of those four are in this product's active scope** — table tennis and
+the others left the product entirely under `docs/DECISIONS/0007`; they are shown here only
+because rebuilding one shared function's calibration necessarily re-measured every sport
+with a model, and the basketball regression below is a real, disclosed side effect of that,
+not a claim that basketball is part of what this platform selects from. Rebuilding all
+sports with the new split, measured directly:
 
 | Sport | Before (row-count split) | After (date-proportional split) |
 |---|---|---|
@@ -52,7 +61,10 @@ fields, added in the same change.
 `engine/pick.py` needed no further wiring: tennis flows through the same
 `generic.get(sport)` path every non-hand-written sport already uses, gated purely by
 `model_generic.usable()` — the moment the calibration table is non-empty and clears 0.03,
-the daily-picks pipeline and the combine platform both pick it up automatically.
+the combine platform picks it up automatically. (At the time this fix shipped, the
+now-retired scanner's own daily-picks pipeline shared this exact code path too and picked
+it up the same way; that pipeline was deleted with the scanner, `docs/DECISIONS/0007`, but
+the wiring point this paragraph describes is unchanged.)
 
 ## Two real bugs fixed earlier the same session (verified, tests pass, safe for any sport)
 

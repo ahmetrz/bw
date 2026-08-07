@@ -1,10 +1,21 @@
-"""Aggregate data/predictions.jsonl into the two lookups engine/referee.py's board-context
+"""Aggregate data/combine_log.jsonl into the two lookups engine/referee.py's board-context
 needs (market gradeability, per-sport claimed-vs-realised), and the numbers the
 performance-lab web pages show. Read-only over the existing log; writes nothing.
 
-Kept separate from tools/make_stats_page.py deliberately: that module OWNS stats.html's
-exact rendering for the live scan/daily-picks product and is covered by the existing test
-suite's page-content assertions. This module only aggregates; nothing here renders HTML.
+Reads data/combine_log.jsonl, not data/predictions.jsonl (docs/DECISIONS/0007): the
+retired scanner's daily run was the only writer of predictions.jsonl, so once it was
+deleted that file stopped growing — a track record silently frozen on the day the old
+product was removed would be exactly the kind of stale-but-confident number hard rule 8
+exists to catch, just aimed at this module instead of a pricing model. combine_log.jsonl
+is a DIFFERENT shape (one row per DAY, each carrying a `legs` list, not one row per
+selection), so `_load()` flattens each row's legs into the same per-selection shape the
+aggregation functions below were written against — every leg becomes a record with
+`sport_id`, `market_type`, `start`, `result` (None until tools/grade_combine.py settles
+it) and `model_pct` (read from the leg's own `confidence.confidence_score`, the same 0-100
+number engine/rating.py computed for it — hard rule 6 extended: this module is reporting
+on that number after the fact, never recomputing a second one). A row that is already
+flat (no `legs` key) passes through unchanged, which is what lets the test suite keep
+constructing simple flat fixtures directly.
 """
 import datetime
 import json
@@ -12,13 +23,31 @@ import math
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_LOG = os.path.join(ROOT, "data", "predictions.jsonl")
+DEFAULT_LOG = os.path.join(ROOT, "data", "combine_log.jsonl")
 
 MIN_MEANINGFUL = 20
 DECIDED = ("win", "loss")           # push/half excluded from a hit-rate denominator,
                                      # same convention engine/grade.summarize() already uses
 GRADEABLE_AFTER_HOURS = 48.0        # a prediction younger than this may simply not have
                                      # happened yet — not evidence the market is ungradeable
+
+
+def _flatten(row):
+    """One combine_log.jsonl row -> its legs, each shaped like a single predictions.jsonl
+    record. A row with no `legs` key (a flat row already) passes through as-is."""
+    if "legs" not in row:
+        return [row]
+    out = []
+    for leg in row.get("legs") or []:
+        conf = leg.get("confidence") or {}
+        out.append({
+            "sport_id": leg.get("sport_id"),
+            "market_type": leg.get("market_type"),
+            "start": leg.get("start"),
+            "result": leg.get("result"),
+            "model_pct": conf.get("confidence_score"),
+        })
+    return out
 
 
 def _load(path):
@@ -31,9 +60,10 @@ def _load(path):
             if not line:
                 continue
             try:
-                rows.append(json.loads(line))
+                row = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            rows.extend(_flatten(row))
     return rows
 
 
@@ -81,9 +111,9 @@ def market_history(path=None, now=None):
 def calibration_by_sport(path=None):
     """sport_id -> {"graded": n, "claimed": avg stated probability, "realised": hit rate}.
 
-    Mirrors tools/make_stats_page.py's calibration-table logic at the sport level rather
-    than the odds-band level — the granularity engine/referee.historical_performance_judge
-    actually needs to decide whether to trust a NEW pick FOR THIS SPORT.
+    Per-sport rather than per-odds-band — the granularity
+    engine/referee.historical_performance_judge actually needs to decide whether to trust
+    a NEW pick FOR THIS SPORT.
     """
     rows = _load(path or DEFAULT_LOG)
     by_sport = {}

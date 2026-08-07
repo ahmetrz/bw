@@ -106,12 +106,12 @@ COMBINE_SPORTS = {1, 4}          # football, tennis — the brief's explicit sco
 # 80 easier to reach).
 MIN_COMBINE_CONFIDENCE = 80.0
 
-# A combine's legs are treated as independent for the combined-probability estimate
-# (matching how engine/parlay.py already estimates the book-implied combined probability
-# under the same assumption) — a simplification, not a claim of true independence; real
-# correlation is instead FLAGGED by engine/referee.correlation_judge and penalised in the
-# optimizer's objective, rather than modelled exactly, because modelling it exactly would
-# need a joint outcome model this platform does not have.
+# A combine's legs are treated as independent for the combined-probability estimate —
+# engine/combine.py's own product of each leg's model_survival, a MODEL quantity, not a
+# book one (docs/COUPON_OPTIMIZATION.md) — a simplification, not a claim of true
+# independence; real correlation is instead FLAGGED by engine/referee.correlation_judge
+# and penalised in the optimizer's objective, rather than modelled exactly, because
+# modelling it exactly would need a joint outcome model this platform does not have.
 #
 # The floor below is what stops leg-count or total-odds growth from hollowing out the
 # combine's own real chance of winning (the brief's explicit "toplam oranın yükselmesi

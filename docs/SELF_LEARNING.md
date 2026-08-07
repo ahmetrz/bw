@@ -5,22 +5,24 @@
 `data/combine_log.jsonl` — one row per day, appended once by `tools/daily_combine.py` at
 generation time, in the exact shape `combine.json` has (legs, confidence, referee verdicts,
 data quality, `config_fingerprint`, `min_combine_confidence`). The **selection fields are
-written once and never touched again** — same discipline `tools/daily_report.log_predictions`
-already applies to `data/predictions.jsonl`, for the same reason: a record edited after the
-fact could quietly become "what we would have built," which is exactly the self-deception a
-learning loop exists to prevent.
+written once and never touched again** — the same discipline the retired scanner's own
+`tools/daily_report.log_predictions` used to apply to `data/predictions.jsonl`
+(`docs/DECISIONS/0007` — that log is left in place as historical record, but nothing
+writes new rows to it any more), for the same reason: a record edited after the fact could
+quietly become "what we would have built," which is exactly the self-deception a learning
+loop exists to prevent.
 
 The one field that DOES get filled in later is `settlement` — starts `None`, filled in by
 `tools/grade_combine.py` once every leg in that day's combine has an independently-sourced
-result. This mirrors how `data/predictions.jsonl` rows start with `result: None` and get it
-filled in by `tools/grade_predictions.py`; it is not an exception to "never rewritten," it
-is the same one exception the pre-existing log already has.
+result. This mirrors how `data/predictions.jsonl` rows used to start with `result: None`
+and get it filled in by `tools/grade_predictions.py`; it is not an exception to "never
+rewritten," it is the same one exception that log already had.
 
 ## What gets measured (`engine/track_record.py`)
 
 - **`calibration_by_sport()`** — claimed vs. realised win rate per sport, gated at
-  `MIN_MEANINGFUL = 20` graded selections (the same small-sample discipline
-  `tools/make_stats_page.py` already uses for the daily-picks product). This is the table
+  `MIN_MEANINGFUL = 20` graded selections (`engine/track_record.py`'s own constant, applied
+  consistently across every small-sample check on this platform). This is the table
   that can say a model is **wrong**, not merely unlucky — `docs/CONFIDENCE_SCORING.md` and
   `CLAUDE.md`'s hard rule 8 both depend on exactly this check existing.
 - **`brier_score()`** — mean squared error between stated probability and the 0/1 outcome,
@@ -32,12 +34,14 @@ is the same one exception the pre-existing log already has.
   (is this market type gradeable in practice), not a model-quality signal, and
   `engine/referee.market_reliability_judge` reads it as exactly that.
 
-All four read `data/predictions.jsonl` only — the daily-picks log, not
-`data/combine_log.jsonl` — because it has far more graded history (one row per selection,
-not one row per day) and the combine platform's own legs are a subset of the same
-underlying model calls. A combine-specific calibration view (was the WHOLE combine right,
-not just its legs individually) is `combine_history.html`/`combine_results.html`, sourced
-from `data/combine_log.jsonl` directly.
+Per `CLAUDE.md`'s description of this platform's calibration/track-record view, these four
+are built from `data/combine_log.jsonl` — the combine platform's own append-only log — plus
+the per-sport calibration already carried on each model file, not from
+`data/predictions.jsonl`, the retired scanner's own log (`docs/DECISIONS/0007`): that
+pipeline is gone and nothing writes new rows to that file any more, so it can no longer be
+the platform's live source of graded history. A combine-specific calibration view (was the
+WHOLE combine right, not just its legs individually) is
+`combine_history.html`/`combine_results.html`, also sourced from `data/combine_log.jsonl`.
 
 ## Precision/recall and ROI
 
@@ -46,16 +50,20 @@ does not classify a fixed universe of items into positive/negative in a way that
 cleanly onto precision/recall (every "positive" prediction that survives the gates IS the
 thing being measured; there is no labelled negative class to score recall against). Hit
 rate, Brier score and log loss cover the same ground more directly for a probability-
-calibration problem. ROI is computed **only** as the analytical figure `engine/stake.py`
-and `engine/combine.COMBINE_STAKE_UNITS` already define — a flat notional unit, never a
-real amount, never tied to any account (brief's explicit "ROI yalnızca teorik ve analitik
-bir metrik" instruction).
+calibration problem. ROI is computed **only** as the analytical figure `engine/grade.py`
+(`summarize()`'s `roi_pct`) and `engine/combine.COMBINE_STAKE_UNITS` already define — a
+flat notional unit, never a real amount, never tied to any account (brief's explicit "ROI
+yalnızca teorik ve analitik bir metrik" instruction). The retired scanner had a dedicated
+`engine/stake.py` for this same analytical framing; it was deleted with the scanner
+(`docs/DECISIONS/0007`) and its role is covered by `engine/grade.py` and
+`engine/combine.py` for the one product left.
 
 ## What "self-learning" does NOT mean here
 
 It does not mean a model that updates its own weights from its own recent record without
-review. `engine/model_generic.py`'s daily refit (`tools/build_generic_model.py --all`,
-already running in `daily.yml` before this session) is **routine recalibration** — the same
+review. `engine/model_generic.py`'s daily refit (`tools/build_generic_model.py --sport 1`
+and `--sport 4`, called from `combine.yml` — replacing the retired scanner's own
+`daily.yml --all` call, `docs/DECISIONS/0007`) is **routine recalibration** — the same
 fixed methodology re-fit on more data, gated by its own held-out calibration check every
 time. It is not gated behind human approval, and `docs/DECISIONS/0004` explains exactly why
 that is a *different* thing from a **structural** change (a new weight, a new threshold, a

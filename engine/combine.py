@@ -311,8 +311,11 @@ def settle_combine(graded_legs):
     }
 
 
-# Analytical only — see hard prohibition on real-money features. This is a notional unit
-# used purely to report a hypothetical ROI figure on the performance lab pages, exactly
-# like engine/stake.py's existing flat-unit convention for the singles list; no real
-# amount is ever suggested, no account is ever touched.
+# Analytical only — see hard prohibition on real-money features. A notional unit reserved
+# for a hypothetical ROI figure on the performance lab pages; no report reads it yet (a
+# real expected-return/break-even figure for the combine, the kind the now-retired
+# scanner's own engine/stake.py used to compute for its list, was never built for this
+# product — see docs/ROADMAP.md). Kept defined and named rather than left as a bare
+# literal wherever a stake unit is eventually needed. No real amount is ever suggested,
+# no account is ever touched.
 COMBINE_STAKE_UNITS = 1.0
